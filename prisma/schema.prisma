@@ -1,0 +1,381 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StaffRole {
+  ADMIN
+  REGISTRATION
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum GymPresenceStatus {
+  IN_GYM
+  NOT_IN_GYM
+}
+
+enum CustomerPackageStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  FROZEN
+}
+
+enum SessionChangeType {
+  CHECK_IN_DEDUCTION
+  MANUAL_CORRECTION
+}
+
+enum OccupancyEventType {
+  CHECK_IN
+  CHECK_OUT
+  MANUAL_CORRECTION
+}
+
+enum AuditActionType {
+  CUSTOMER_CHECK_IN
+  CUSTOMER_CHECK_OUT
+  SESSION_DEDUCTION
+  SESSION_CORRECTION
+  OCCUPANCY_CORRECTION
+  PACKAGE_FREEZE
+  PACKAGE_REACTIVATION
+  PACKAGE_RENEWAL
+  CUSTOMER_EDIT
+  PACKAGE_EDIT
+  COACH_EDIT
+  SETTINGS_EDIT
+  PUBLIC_CONTENT_EDIT
+}
+
+enum PublicContentType {
+  OFFER
+  PROMOTION
+  DISCOUNT
+  NEWS
+  ANNOUNCEMENT
+  HERO
+}
+
+model StaffUser {
+  id           String    @id @default(cuid())
+  name         String?
+  username     String?   @unique
+  email        String?   @unique
+  passwordHash String?
+  role         StaffRole
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdContent         PublicContent[]
+  checkedInVisits        GymVisit[]             @relation("VisitCheckedInBy")
+  checkedOutVisits       GymVisit[]             @relation("VisitCheckedOutBy")
+  sessionChanges         PackageSessionChange[]
+  notesCreated           Note[]                 @relation("NoteCreatedBy")
+  notesUpdated           Note[]                 @relation("NoteUpdatedBy")
+  occupancyStatesUpdated OccupancyState[]
+  occupancyEvents        OccupancyEvent[]
+  auditLogs              AuditLog[]
+
+  @@index([role, isActive])
+}
+
+model GymSettings {
+  id                                    String   @id @default(cuid())
+  gymName                               String
+  logoUrl                               String?
+  contactNumber                         String?
+  whatsappLink                          String?
+  instagramLink                         String?
+  address                               String?
+  mapLink                               String?
+  workingDays                           String?
+  workingHours                          String?
+  occupancyGreenMax                     Int?
+  occupancyYellowMax                    Int?
+  showPhoneInPublicApp                  Boolean  @default(true)
+  showWhatsappInPublicApp               Boolean  @default(true)
+  showInstagramInPublicApp              Boolean  @default(true)
+  showLocationInPublicApp               Boolean  @default(true)
+  showMotivationalTextInPublicApp       Boolean  @default(true)
+  motivationalText                      String?
+  hideInactiveCustomersFromRegistration Boolean  @default(false)
+  createdAt                             DateTime @default(now())
+  updatedAt                             DateTime @updatedAt
+}
+
+model PublicContent {
+  id          String            @id @default(cuid())
+  type        PublicContentType
+  title       String
+  body        String?
+  imageUrl    String?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  isActive    Boolean           @default(true)
+  deletedAt   DateTime?
+  createdById String?
+  createdBy   StaffUser?        @relation(fields: [createdById], references: [id])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([type, isActive])
+  @@index([createdById])
+}
+
+model Customer {
+  id                String            @id @default(cuid())
+  customerCode      String            @unique
+  firstName         String?
+  lastName          String?
+  fullName          String
+  phone             String?
+  status            CustomerStatus    @default(ACTIVE)
+  gymPresenceStatus GymPresenceStatus @default(NOT_IN_GYM)
+  assignedCoachId   String?
+  assignedCoach     Coach?            @relation(fields: [assignedCoachId], references: [id])
+  lastCheckInAt     DateTime?
+  lastCheckOutAt    DateTime?
+  deletedAt         DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  packages  CustomerPackage[]
+  visits    GymVisit[]
+  notes     Note[]
+  auditLogs AuditLog[]
+
+  @@index([fullName])
+  @@index([status])
+  @@index([gymPresenceStatus])
+  @@index([assignedCoachId])
+}
+
+model Coach {
+  id          String    @id @default(cuid())
+  firstName   String
+  lastName    String
+  photoUrl    String?
+  specialty   String
+  description String?
+  contactInfo String?
+  isActive    Boolean   @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  assignedCustomers Customer[]
+  packages          Package[]
+  customerPackages  CustomerPackage[]
+
+  @@index([isActive])
+}
+
+model Package {
+  id                   String    @id @default(cuid())
+  name                 String
+  description          String?
+  price                Decimal   @db.Decimal(10, 2)
+  sessionCount         Int
+  packageType          String
+  assignedCoachId      String?
+  assignedCoach        Coach?    @relation(fields: [assignedCoachId], references: [id])
+  isActive             Boolean   @default(true)
+  hasTimeRestriction   Boolean   @default(false)
+  allowedStartTime     String?
+  allowedEndTime       String?
+  timeRestrictionLabel String?
+  deletedAt            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  customerPackages CustomerPackage[]
+
+  @@index([name])
+  @@index([packageType])
+  @@index([isActive])
+  @@index([assignedCoachId])
+}
+
+model CustomerPackage {
+  id                String                @id @default(cuid())
+  customerId        String
+  customer          Customer              @relation(fields: [customerId], references: [id])
+  packageId         String
+  package           Package               @relation(fields: [packageId], references: [id])
+  coachId           String?
+  coach             Coach?                @relation(fields: [coachId], references: [id])
+  activationDate    DateTime
+  expirationDate    DateTime
+  initialSessions   Int
+  remainingSessions Int
+  status            CustomerPackageStatus @default(ACTIVE)
+  frozenAt          DateTime?
+  reactivatedAt     DateTime?
+  deletedAt         DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  visitUsages    VisitPackageUsage[]
+  sessionChanges PackageSessionChange[]
+
+  @@index([customerId])
+  @@index([packageId])
+  @@index([coachId])
+  @@index([status])
+  @@index([expirationDate])
+  @@index([remainingSessions])
+}
+
+model GymVisit {
+  id                     String     @id @default(cuid())
+  customerId             String
+  customer               Customer   @relation(fields: [customerId], references: [id])
+  checkedInAt            DateTime   @default(now())
+  checkedOutAt           DateTime?
+  checkedInById          String
+  checkedInBy            StaffUser  @relation("VisitCheckedInBy", fields: [checkedInById], references: [id])
+  checkedOutById         String?
+  checkedOutBy           StaffUser? @relation("VisitCheckedOutBy", fields: [checkedOutById], references: [id])
+  occupancyAfterCheckIn  Int?
+  occupancyAfterCheckOut Int?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  packageUsages   VisitPackageUsage[]
+  sessionChanges  PackageSessionChange[]
+  occupancyEvents OccupancyEvent[]
+
+  @@index([customerId])
+  @@index([checkedInAt])
+  @@index([checkedOutAt])
+  @@index([checkedInById])
+  @@index([checkedOutById])
+}
+
+model VisitPackageUsage {
+  id                String          @id @default(cuid())
+  visitId           String
+  visit             GymVisit        @relation(fields: [visitId], references: [id])
+  customerPackageId String
+  customerPackage   CustomerPackage @relation(fields: [customerPackageId], references: [id])
+  sessionsDeducted  Int             @default(1)
+  createdAt         DateTime        @default(now())
+
+  sessionChange PackageSessionChange?
+
+  @@index([visitId])
+  @@index([customerPackageId])
+}
+
+model PackageSessionChange {
+  id                        String             @id @default(cuid())
+  customerPackageId         String
+  customerPackage           CustomerPackage    @relation(fields: [customerPackageId], references: [id])
+  visitId                   String?
+  visit                     GymVisit?          @relation(fields: [visitId], references: [id])
+  visitPackageUsageId       String?            @unique
+  visitPackageUsage         VisitPackageUsage? @relation(fields: [visitPackageUsageId], references: [id])
+  changedById               String
+  changedBy                 StaffUser          @relation(fields: [changedById], references: [id])
+  changeType                SessionChangeType
+  previousRemainingSessions Int
+  newRemainingSessions      Int
+  delta                     Int
+  reason                    String?
+  createdAt                 DateTime           @default(now())
+
+  @@index([customerPackageId])
+  @@index([visitId])
+  @@index([changedById])
+  @@index([createdAt])
+}
+
+model Note {
+  id          String     @id @default(cuid())
+  customerId  String?
+  customer    Customer?  @relation(fields: [customerId], references: [id])
+  content     String
+  createdById String
+  createdBy   StaffUser  @relation("NoteCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   StaffUser? @relation("NoteUpdatedBy", fields: [updatedById], references: [id])
+  deletedAt   DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([customerId])
+  @@index([createdById])
+  @@index([createdAt])
+}
+
+model OccupancyState {
+  id           String     @id @default(cuid())
+  currentCount Int        @default(0)
+  updatedById  String?
+  updatedBy    StaffUser? @relation(fields: [updatedById], references: [id])
+  updatedAt    DateTime   @updatedAt
+
+  @@index([updatedById])
+}
+
+model OccupancyEvent {
+  id            String             @id @default(cuid())
+  eventType     OccupancyEventType
+  previousCount Int
+  newCount      Int
+  delta         Int
+  visitId       String?
+  visit         GymVisit?          @relation(fields: [visitId], references: [id])
+  changedById   String?
+  changedBy     StaffUser?         @relation(fields: [changedById], references: [id])
+  reason        String?
+  createdAt     DateTime           @default(now())
+
+  @@index([visitId])
+  @@index([changedById])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id          String          @id @default(cuid())
+  actorId     String?
+  actor       StaffUser?      @relation(fields: [actorId], references: [id])
+  actionType  AuditActionType
+  targetType  String?
+  targetId    String?
+  customerId  String?
+  customer    Customer?       @relation(fields: [customerId], references: [id])
+  description String
+  oldValue    Json?
+  newValue    Json?
+  createdAt   DateTime        @default(now())
+
+  @@index([actorId])
+  @@index([customerId])
+  @@index([actionType])
+  @@index([createdAt])
+  @@index([targetType, targetId])
+}
+
+model GalleryImage {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  title     String?
+  altText   String?
+  sortOrder Int?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}

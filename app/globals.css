@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+:root {
+  --brand-blue: #009bdf;
+  --primary-hover: #008ac7;
+  --primary-active: #0076aa;
+  --soft-blue: #e6f7fe;
+  --black: #000000;
+  --white: #ffffff;
+  --logo-gray: #9ca0a8;
+
+  --background: #ffffff;
+  --page-background: #f5f7fa;
+  --card-background: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca0a8;
+  --border: #e5e7eb;
+  --input-border: #d1d5db;
+  --neutral-button: #f3f4f6;
+  --neutral-hover: #e5e7eb;
+
+  --dark-background: #05070a;
+  --dark-page-background: #0b1117;
+  --dark-card-background: #111827;
+  --dark-text-primary: #f9fafb;
+  --dark-text-secondary: #cbd5e1;
+  --dark-text-muted: #9ca0a8;
+  --dark-border: #1f2937;
+  --dark-hover: #374151;
+  --dark-soft-blue: #06283a;
+  --dark-link-blue: #22b8f0;
+
+  --button-primary: #009bdf;
+  --button-primary-hover: #008ac7;
+  --button-success: #22c55e;
+  --button-success-hover: #16a34a;
+  --button-warning: #f97316;
+  --button-warning-hover: #ea580c;
+  --button-danger: #ef4444;
+  --button-danger-hover: #dc2626;
+
+  --status-low: #22c55e;
+  --status-medium: #facc15;
+  --status-high: #ef4444;
+  --status-in-gym: #009bdf;
+  --status-not-in-gym: #9ca0a8;
+  --status-expired: #ef4444;
+  --status-close-to-expiry: #f97316;
+  --status-active: #22c55e;
+}
+
+@theme inline {
+  --color-brand: var(--brand-blue);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-soft-blue: var(--soft-blue);
+  --color-page: var(--page-background);
+  --color-card: var(--card-background);
+  --color-foreground: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-input-border: var(--input-border);
+  --color-neutral: var(--neutral-button);
+  --color-neutral-hover: var(--neutral-hover);
+  --color-button-success: var(--button-success);
+  --color-button-success-hover: var(--button-success-hover);
+  --color-button-warning: var(--button-warning);
+  --color-button-warning-hover: var(--button-warning-hover);
+  --color-button-danger: var(--button-danger);
+  --color-button-danger-hover: var(--button-danger-hover);
+  --color-status-low: var(--status-low);
+  --color-status-medium: var(--status-medium);
+  --color-status-high: var(--status-high);
+  --color-status-in-gym: var(--status-in-gym);
+  --color-status-not-in-gym: var(--status-not-in-gym);
+  --color-status-expired: var(--status-expired);
+  --color-status-close-to-expiry: var(--status-close-to-expiry);
+  --color-status-active: var(--status-active);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--page-background);
+  color: var(--text-primary);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: var(--soft-blue);
+  color: var(--text-primary);
+}
+
+.dark {
+  --background: var(--dark-background);
+  --page-background: var(--dark-page-background);
+  --card-background: var(--dark-card-background);
+  --text-primary: var(--dark-text-primary);
+  --text-secondary: var(--dark-text-secondary);
+  --text-muted: var(--dark-text-muted);
+  --border: var(--dark-border);
+  --input-border: var(--dark-border);
+  --neutral-button: var(--dark-border);
+  --neutral-hover: var(--dark-hover);
+  --soft-blue: var(--dark-soft-blue);
+
+  color-scheme: dark;
+}
