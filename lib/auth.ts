@@ -119,7 +119,14 @@ export async function createStaffSession(user: {
 
 export async function clearStaffSession() {
   const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE);
+  cookieStore.set(SESSION_COOKIE, "", {
+    expires: new Date(0),
+    httpOnly: true,
+    maxAge: 0,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 }
 
 export async function getCurrentStaffUser(): Promise<CurrentStaffUser | null> {
@@ -162,12 +169,18 @@ export function staffHome(role: StaffRole) {
   return role === "ADMIN" ? "/admin" : "/registration";
 }
 
-export async function requireStaffRole(role: StaffRole) {
+export async function requireStaffUser() {
   const user = await getCurrentStaffUser();
 
   if (!user) {
     redirect("/login");
   }
+
+  return user;
+}
+
+export async function requireStaffRole(role: StaffRole) {
+  const user = await requireStaffUser();
 
   if (user.role !== role) {
     redirect(staffHome(user.role));

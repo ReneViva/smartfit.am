@@ -54,6 +54,9 @@ enum AuditActionType {
   COACH_EDIT
   SETTINGS_EDIT
   PUBLIC_CONTENT_EDIT
+  NOTE_CREATE
+  NOTE_EDIT
+  NOTE_DELETE
 }
 
 enum PublicContentType {

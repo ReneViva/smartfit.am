@@ -5,6 +5,8 @@ import { Button } from "../../components/ui/button";
 import { getCurrentStaffUser, staffHome } from "../../lib/auth";
 import { loginAction } from "./actions";
 
+export const dynamic = "force-dynamic";
+
 type LoginPageProps = {
   searchParams: Promise<{
     error?: string;

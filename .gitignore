@@ -18,6 +18,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# generated exports
+/exports/
+/smartfit-*.xlsx
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

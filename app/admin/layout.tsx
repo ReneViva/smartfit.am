@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { AdminNav } from "../../components/admin/admin-nav";
 import { PrivateLayout } from "../../components/layout/private-layout";
 import { Button } from "../../components/ui/button";
 import { requireStaffRole } from "../../lib/auth";
@@ -16,10 +17,13 @@ export default async function AdminLayout({
     <PrivateLayout
       actions={
         <form action={logoutAction}>
-          <Button variant="neutral">Log out</Button>
+          <Button type="submit" variant="neutral">
+            Log out
+          </Button>
         </form>
       }
       description={`Signed in as ${user.name ?? user.username ?? "admin"}`}
+      navigation={<AdminNav />}
       title="Admin"
     >
       {children}

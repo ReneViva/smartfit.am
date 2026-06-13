@@ -1,0 +1,151 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+import { requireStaffRole } from "../../../lib/auth";
+import { db } from "../../../lib/db";
+import { writeAuditLog } from "../../../lib/logging";
+import {
+  imageUploadErrorCode,
+  uploadImageFromForm,
+} from "../../../lib/uploads/cloudinary";
+
+const SETTINGS_PATH = "/admin/settings";
+
+function optionalText(formData: FormData, name: string, maxLength = 500) {
+  const value = formData.get(name);
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  return value.trim().slice(0, maxLength) || null;
+}
+
+function optionalPublicUrl(formData: FormData, name: string) {
+  const value = optionalText(formData, name, 1000);
+
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+
+    return url.protocol === "http:" || url.protocol === "https:" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function threshold(formData: FormData, name: string) {
+  const value = formData.get(name);
+  const parsed = typeof value === "string" ? Number(value) : Number.NaN;
+
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+export async function saveSettingsAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const gymName = optionalText(formData, "gymName", 120);
+  const greenMax = threshold(formData, "occupancyGreenMax");
+  const yellowMax = threshold(formData, "occupancyYellowMax");
+  const rawUrlFields = [
+    "logoUrl",
+    "whatsappLink",
+    "instagramLink",
+    "mapLink",
+  ] as const;
+  const urls = Object.fromEntries(
+    rawUrlFields.map((field) => [field, optionalPublicUrl(formData, field)]),
+  ) as Record<(typeof rawUrlFields)[number], string | null>;
+
+  if (!gymName) {
+    redirect(`${SETTINGS_PATH}?error=missing-name`);
+  }
+
+  if (greenMax === null || yellowMax === null || greenMax > yellowMax) {
+    redirect(`${SETTINGS_PATH}?error=invalid-thresholds`);
+  }
+
+  const uploadedLogoUrl = await uploadImageFromForm(formData, "logoUpload").catch(
+    (error) => {
+      redirect(`${SETTINGS_PATH}?error=upload-${imageUploadErrorCode(error)}`);
+    },
+  );
+  const hasInvalidUrl = rawUrlFields.some((field) => {
+    if (field === "logoUrl" && uploadedLogoUrl) {
+      return false;
+    }
+
+    const rawValue = optionalText(formData, field, 1000);
+    return Boolean(rawValue && !urls[field]);
+  });
+
+  if (hasInvalidUrl) {
+    redirect(`${SETTINGS_PATH}?error=invalid-url`);
+  }
+
+  const data = {
+    address: optionalText(formData, "address"),
+    contactNumber: optionalText(formData, "contactNumber", 120),
+    gymName,
+    hideInactiveCustomersFromRegistration:
+      formData.get("hideInactiveCustomersFromRegistration") === "on",
+    instagramLink: urls.instagramLink,
+    logoUrl: uploadedLogoUrl ?? urls.logoUrl,
+    mapLink: urls.mapLink,
+    motivationalText: optionalText(formData, "motivationalText", 1000),
+    occupancyGreenMax: greenMax,
+    occupancyYellowMax: yellowMax,
+    showInstagramInPublicApp:
+      formData.get("showInstagramInPublicApp") === "on",
+    showLocationInPublicApp:
+      formData.get("showLocationInPublicApp") === "on",
+    showMotivationalTextInPublicApp:
+      formData.get("showMotivationalTextInPublicApp") === "on",
+    showPhoneInPublicApp: formData.get("showPhoneInPublicApp") === "on",
+    showWhatsappInPublicApp:
+      formData.get("showWhatsappInPublicApp") === "on",
+    whatsappLink: urls.whatsappLink,
+    workingDays: optionalText(formData, "workingDays", 200),
+    workingHours: optionalText(formData, "workingHours", 200),
+  };
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const existing = await transaction.gymSettings.findFirst();
+      const saved = existing
+        ? await transaction.gymSettings.update({
+            data,
+            where: { id: existing.id },
+          })
+        : await transaction.gymSettings.create({
+            data: {
+              ...data,
+              id: "default",
+            },
+          });
+
+      await writeAuditLog(transaction, {
+        actionType: "SETTINGS_EDIT",
+        actorId: user.id,
+        description: "Updated gym settings.",
+        newValue: saved,
+        oldValue: existing ?? undefined,
+        targetId: saved.id,
+        targetType: "GymSettings",
+      });
+    });
+  } catch {
+    redirect(`${SETTINGS_PATH}?error=unavailable`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/contact");
+  revalidatePath("/our-app");
+  revalidatePath("/admin");
+  revalidatePath(SETTINGS_PATH);
+  redirect(`${SETTINGS_PATH}?status=saved`);
+}
