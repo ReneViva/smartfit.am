@@ -1,11 +1,18 @@
-import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 
+import {
+  CustomerSearchResults,
+} from "../../components/registration/customer-search-results";
 import { RegistrationCustomerCard } from "../../components/registration/customer-card";
-import { OccupancyCorrection } from "../../components/registration/occupancy-correction";
+import {
+  CustomerLookupControls,
+  CustomerLookupMotion,
+  CustomerWorkspaceMotion,
+} from "../../components/registration/customer-lookup-motion";
 import { Card } from "../../components/ui/card";
-import { StatusBadge } from "../../components/ui/status-badge";
 import { db } from "../../lib/db";
 import { noteWithStaffSelect, toCustomerNoteView } from "../../lib/notes";
+import { getCustomerRecentActivity } from "../../lib/registration/recent-activity";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +20,67 @@ type RegistrationPageProps = {
   searchParams: Promise<{
     customer?: string;
     error?: string;
+    customerFilter?: string;
     q?: string;
     showAll?: string;
+    sort?: string;
     status?: string;
+    view?: string;
   }>;
 };
+
+const customerFilters = [
+  "all",
+  "in-gym",
+  "not-in-gym",
+  "active",
+  "inactive",
+  "needs-attention",
+] as const;
+
+type CustomerFilter = (typeof customerFilters)[number];
+
+const customerSorts = [
+  "name-asc",
+  "name-desc",
+  "newest",
+  "oldest",
+  "code-asc",
+  "code-desc",
+] as const;
+
+type CustomerSort = (typeof customerSorts)[number];
+
+function parseCustomerFilter(value: string | undefined): CustomerFilter {
+  return customerFilters.includes(value as CustomerFilter)
+    ? (value as CustomerFilter)
+    : "all";
+}
+
+function parseCustomerSort(value: string | undefined): CustomerSort {
+  return customerSorts.includes(value as CustomerSort)
+    ? (value as CustomerSort)
+    : "name-asc";
+}
+
+function customerOrderBy(
+  sort: CustomerSort,
+): Prisma.CustomerOrderByWithRelationInput[] {
+  switch (sort) {
+    case "name-desc":
+      return [{ fullName: "desc" }, { customerCode: "desc" }];
+    case "newest":
+      return [{ createdAt: "desc" }, { fullName: "asc" }];
+    case "oldest":
+      return [{ createdAt: "asc" }, { fullName: "asc" }];
+    case "code-asc":
+      return [{ customerCode: "asc" }];
+    case "code-desc":
+      return [{ customerCode: "desc" }];
+    default:
+      return [{ fullName: "asc" }, { customerCode: "asc" }];
+  }
+}
 
 const errorMessages: Record<string, string> = {
   "already-in-gym": "This customer is already in the gym.",
@@ -36,6 +99,10 @@ const errorMessages: Record<string, string> = {
     "Enter a valid non-negative whole number for occupancy.",
   "invalid-package":
     "One or more selected packages are not usable for check-in.",
+  "frozen-package":
+    "Frozen packages cannot be selected or used for check-in.",
+  "invalid-package-action":
+    "The selected package is unavailable for that action.",
   "open-visit": "This customer already has an open gym visit.",
   "no-open-visit":
     "This customer has no open gym visit and cannot be checked out.",
@@ -46,6 +113,16 @@ const errorMessages: Record<string, string> = {
     "Occupancy is already zero. Correct the live count before checking out.",
   "package-selection-required":
     "Select at least one usable package before check-in.",
+  "package-freeze-unavailable":
+    "The package could not be frozen. Please review it and try again.",
+  "package-not-freezable":
+    "Only active, unexpired packages with remaining sessions can be frozen.",
+  "package-not-frozen":
+    "Only frozen packages can be reactivated.",
+  "package-reactivation-unavailable":
+    "The package could not be reactivated. Please review it and try again.",
+  "package-status-stale":
+    "The package status changed before the action completed. Review and try again.",
   "package-stale":
     "A selected package changed before check-in. Review it and try again.",
   "stale-correction":
@@ -59,50 +136,87 @@ export default async function RegistrationPage({
 }: RegistrationPageProps) {
   const params = await searchParams;
   const query = params.q?.trim().slice(0, 200) ?? "";
+  const customerFilter = parseCustomerFilter(params.customerFilter);
+  const sort = parseCustomerSort(params.sort);
   const selectedCustomerCode = params.customer?.trim().slice(0, 100) ?? "";
+  const compact = params.view === "compact";
+  const showAllPackages = params.showAll === "1";
   const settings = await db.gymSettings.findFirst({
     select: { hideInactiveCustomersFromRegistration: true },
   });
   const hideInactiveCustomers =
     settings?.hideInactiveCustomersFromRegistration ?? false;
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
   const customerVisibility = {
     deletedAt: null,
     ...(hideInactiveCustomers ? { status: "ACTIVE" as const } : {}),
   };
-  const [searchResults, selectedCustomer, occupancy] = await Promise.all([
-    query
-      ? db.customer.findMany({
-          orderBy: [{ fullName: "asc" }, { customerCode: "asc" }],
-          select: {
-            customerCode: true,
-            fullName: true,
-            gymPresenceStatus: true,
-            status: true,
-            _count: {
-              select: {
-                packages: {
-                  where: {
-                    deletedAt: null,
-                    expirationDate: { gte: today },
-                    remainingSessions: { gt: 0 },
-                    status: "ACTIVE",
-                  },
-                },
-              },
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const customerConditions: Prisma.CustomerWhereInput[] = [
+    customerVisibility,
+  ];
+
+  if (query) {
+    customerConditions.push({
+      OR: [
+        { customerCode: { contains: query, mode: "insensitive" } },
+        { fullName: { contains: query, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (customerFilter === "in-gym") {
+    customerConditions.push({ gymPresenceStatus: "IN_GYM" });
+  } else if (customerFilter === "not-in-gym") {
+    customerConditions.push({ gymPresenceStatus: "NOT_IN_GYM" });
+  } else if (customerFilter === "active") {
+    customerConditions.push({ status: "ACTIVE" });
+  } else if (customerFilter === "inactive") {
+    customerConditions.push({ status: "INACTIVE" });
+  } else if (customerFilter === "needs-attention") {
+    customerConditions.push({
+      OR: [
+        { packages: { none: { deletedAt: null } } },
+        {
+          packages: {
+            some: {
+              deletedAt: null,
+              OR: [
+                { expirationDate: { lt: today } },
+                { remainingSessions: { lte: 0 } },
+                { status: { in: ["EXPIRED", "FROZEN"] } },
+              ],
             },
           },
-          take: 25,
-          where: {
-            ...customerVisibility,
-            OR: [
-              { customerCode: { contains: query, mode: "insensitive" } },
-              { fullName: { contains: query, mode: "insensitive" } },
-            ],
+        },
+      ],
+    });
+  }
+
+  const [searchResults, selectedCustomer, occupancy] = await Promise.all([
+    db.customer.findMany({
+      orderBy: customerOrderBy(sort),
+      select: {
+        assignedCoach: {
+          select: { firstName: true, lastName: true },
+        },
+        customerCode: true,
+        fullName: true,
+        gymPresenceStatus: true,
+        packages: {
+          select: {
+            expirationDate: true,
+            remainingSessions: true,
+            status: true,
           },
-        })
-      : Promise.resolve([]),
+          where: { deletedAt: null },
+        },
+        status: true,
+      },
+      where: {
+        AND: customerConditions,
+      },
+    }),
     selectedCustomerCode
       ? db.customer.findFirst({
           include: {
@@ -159,6 +273,12 @@ export default async function RegistrationPage({
       ? "Customer checked in successfully."
       : params.status === "checked-out"
         ? "Customer checked out successfully."
+        : params.status === "package-frozen"
+          ? "Package frozen. Expiration and remaining sessions were not changed."
+          : params.status === "package-reactivated"
+            ? "Package reactivated. Normal package eligibility rules still apply."
+            : params.status === "package-reactivated-expired"
+              ? "Package reactivated as expired. Its expiration date was not extended."
         : params.status === "correction-saved"
         ? "Remaining sessions updated and logged."
         : params.status === "occupancy-corrected"
@@ -168,20 +288,35 @@ export default async function RegistrationPage({
         : params.status === "no-change"
           ? "No session change was needed."
           : null;
+  const currentOccupancy = Math.max(0, occupancy?.currentCount ?? 0);
+  const recentActivity = selectedCustomer
+    ? await getCustomerRecentActivity(selectedCustomer.id)
+    : [];
 
   return (
     <>
-      <header>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-          Registration
-        </p>
-        <h2 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-          Find a customer
-        </h2>
-        <p className="mt-3 max-w-3xl leading-7 text-secondary">
-          Search by full name or member ID to review current status and package
-          sessions.
-        </p>
+      <header className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+            Registration
+          </p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+            Reception workspace
+          </h2>
+          <p className="mt-3 max-w-3xl leading-7 text-secondary">
+            Find a customer, understand their current status, and complete
+            daily reception actions from one workspace.
+          </p>
+        </div>
+        <div className="min-w-44 rounded-xl border border-border bg-page px-4 py-3 lg:text-right">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-secondary">
+            Live occupancy
+          </p>
+          <p className="mt-1 text-2xl font-bold text-foreground">
+            {currentOccupancy}
+          </p>
+          <p className="text-sm text-secondary">people currently inside</p>
+        </div>
       </header>
 
       {hideInactiveCustomers ? (
@@ -203,123 +338,87 @@ export default async function RegistrationPage({
         </p>
       ) : null}
 
-      <OccupancyCorrection
-        currentCount={Math.max(0, occupancy?.currentCount ?? 0)}
-        customerCode={selectedCustomerCode || null}
-        showAllPackages={params.showAll === "1"}
-      />
+      <CustomerLookupMotion selectedCustomerCode={selectedCustomerCode}>
+        <Card className="mt-6 scroll-mt-6 p-5 sm:p-6" id="customer-search">
+          <div className="mb-4">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
+              Customer lookup
+            </p>
+            <h3 className="mt-1 text-xl font-bold text-foreground">
+              Search and select a customer
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-secondary">
+              Browse all customers or narrow the visible list by name, member
+              ID, status, or package attention.
+            </p>
+          </div>
+          <CustomerLookupControls
+            compact={compact}
+            customerFilter={customerFilter}
+            query={query}
+            selectedCustomerCode={selectedCustomerCode}
+            showAllPackages={showAllPackages}
+            sort={sort}
+          />
+        </Card>
 
-      <Card className="mt-8">
-        <form className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="block flex-1 text-sm font-semibold text-foreground">
-            Customer full name or member ID
-            <input
-              autoFocus
-              className="mt-2 min-h-12 w-full rounded-lg border border-input-border bg-card px-4 py-3 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue"
-              defaultValue={query}
-              name="q"
-              placeholder="Search name or 0012..."
+        <div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-[minmax(20rem,0.75fr)_minmax(0,1.25fr)]">
+          <div className="min-w-0 xl:sticky xl:top-6 xl:self-start">
+            <CustomerSearchResults
+              compact={compact}
+              customerFilter={customerFilter}
+              key={`${query}-${customerFilter}-${sort}`}
+              query={query}
+              results={searchResults}
+              selectedCustomerCode={selectedCustomerCode}
+              showAllPackages={showAllPackages}
+              sort={sort}
             />
-          </label>
-          <button
-            className="inline-flex min-h-12 items-center justify-center rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
-            type="submit"
-          >
-            Search
-          </button>
-        </form>
-      </Card>
-
-      {query ? (
-        <section className="mt-8">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h3 className="text-2xl font-bold text-foreground">
-                Search results
-              </h3>
-              <p className="mt-1 text-sm text-secondary">
-                {searchResults.length} matching customer
-                {searchResults.length === 1 ? "" : "s"}.
-              </p>
-            </div>
-            <Link
-              className="text-sm font-semibold text-brand hover:text-primary-hover"
-              href="/registration"
-            >
-              Clear search
-            </Link>
           </div>
 
-          {searchResults.length ? (
-            <div className="mt-5 grid gap-4 lg:grid-cols-2">
-              {searchResults.map((customer) => (
-                <Link
-                  className="rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-brand hover:bg-soft-blue"
-                  href={`/registration?q=${encodeURIComponent(query)}&customer=${encodeURIComponent(customer.customerCode)}`}
-                  key={customer.customerCode}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-brand">
-                        Member ID: {customer.customerCode}
-                      </p>
-                      <p className="mt-1 text-xl font-bold text-foreground">
-                        {customer.fullName}
-                      </p>
-                      <p className="mt-2 text-sm text-secondary">
-                        {customer._count.packages} usable package
-                        {customer._count.packages === 1 ? "" : "s"}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <StatusBadge
-                        status={
-                          customer.status === "ACTIVE" ? "active" : "notInGym"
-                        }
-                      >
-                        {customer.status.toLowerCase()}
-                      </StatusBadge>
-                      <StatusBadge
-                        status={
-                          customer.gymPresenceStatus === "IN_GYM"
-                            ? "inGym"
-                            : "notInGym"
-                        }
-                      >
-                        {customer.gymPresenceStatus
-                          .toLowerCase()
-                          .replaceAll("_", " ")}
-                      </StatusBadge>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-5 rounded-2xl border border-dashed border-border bg-card px-6 py-10 text-center text-secondary">
-              No customers match that name or member ID.
-            </p>
-          )}
-        </section>
-      ) : (
-        <p className="mt-8 rounded-2xl border border-dashed border-border bg-card px-6 py-10 text-center text-secondary">
-          Enter a customer name or member ID to begin.
-        </p>
-      )}
-
-      {selectedCustomer ? (
-        <RegistrationCustomerCard
-          customer={{
-            ...selectedCustomer,
-            notes: selectedCustomer.notes.map(toCustomerNoteView),
-          }}
-          showAllPackages={params.showAll === "1"}
-        />
-      ) : selectedCustomerCode ? (
-        <p className="mt-8 rounded-2xl border border-dashed border-border bg-card px-6 py-10 text-center text-secondary">
-          That customer is unavailable or hidden by registration settings.
-        </p>
-      ) : null}
+          <CustomerWorkspaceMotion
+            key={selectedCustomer?.id ?? selectedCustomerCode ?? "empty"}
+            selectedCustomerKey={selectedCustomer?.id ?? null}
+          >
+            {selectedCustomer ? (
+              <RegistrationCustomerCard
+                compact={compact}
+                customer={{
+                  ...selectedCustomer,
+                  notes: selectedCustomer.notes.map(toCustomerNoteView),
+                }}
+                recentActivity={recentActivity}
+                showAllPackages={showAllPackages}
+              />
+            ) : selectedCustomerCode ? (
+              <section className="smooth-panel rounded-2xl border border-status-medium bg-card px-6 py-8 shadow-sm">
+                <h3 className="text-xl font-bold text-foreground">
+                  Customer workspace unavailable
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">
+                  That customer is unavailable or hidden by registration
+                  settings. Search again to open another customer workspace.
+                </p>
+              </section>
+            ) : (
+              <section className="smooth-panel overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                <div className="border-b border-border bg-soft-blue px-6 py-6 sm:px-8">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-active">
+                    Customer workspace
+                  </p>
+                  <h3 className="mt-2 text-2xl font-bold text-foreground">
+                    Select a customer to begin
+                  </h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
+                    Package sessions, check-in or check-out, customer notes,
+                    and recent activity will appear here.
+                  </p>
+                </div>
+              </section>
+            )}
+          </CustomerWorkspaceMotion>
+        </div>
+      </CustomerLookupMotion>
     </>
   );
 }

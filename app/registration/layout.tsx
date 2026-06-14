@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { PrivateLayout } from "../../components/layout/private-layout";
+import { RegistrationNav } from "../../components/registration/registration-nav";
 import { Button } from "../../components/ui/button";
 import { requireStaffUser } from "../../lib/auth";
 import { logoutAction } from "../login/actions";
@@ -22,6 +23,7 @@ export default async function RegistrationLayout({
         </form>
       }
       description={`Signed in as ${user.name ?? user.username ?? "registration staff"}`}
+      navigation={<RegistrationNav />}
       title="Registration"
     >
       {children}

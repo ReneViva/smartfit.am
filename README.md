@@ -81,6 +81,26 @@ Protected routes:
 
 Run the seed intentionally. Before any production seed run, set strong unique passwords and a strong `AUTH_SECRET`.
 
+### Local Demo Data
+
+The separate demo seed prepares the official package list, demo coaches, and demo customers for local workflow testing. New demo customers start outside the gym. The seed is idempotent and does not create visits, check-ins, session changes, audit logs, or occupancy changes; repeat runs preserve existing customer presence workflow state.
+
+The script refuses to run without an explicit one-command safety flag and also blocks database hosts or names that look production-like. Run it only after confirming the connected database is local or disposable development data.
+
+macOS/Linux:
+
+```bash
+ALLOW_DEMO_SEED=true npm run db:seed:demo
+```
+
+PowerShell:
+
+```powershell
+$env:ALLOW_DEMO_SEED="true"; npm run db:seed:demo
+```
+
+Do not add `ALLOW_DEMO_SEED` permanently to a production environment.
+
 ## Image Uploads
 
 Admin image fields accept a public `http` or `https` URL. With Cloudinary configured, they also accept a local image file and store only the resulting public URL.
@@ -96,6 +116,9 @@ npm run build
 ```
 
 There is currently no configured lint or automated test command. Complete the manual route, role, and core workflow checks in [DEPLOYMENT.md](DEPLOYMENT.md) before release.
+
+For a focused Registration Panel demo and regression pass, use the
+[Registration client review checklist](docs/07-registration-client-review-checklist.md).
 
 ## Production Deployment
 

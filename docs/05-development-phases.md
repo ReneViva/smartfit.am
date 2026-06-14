@@ -3,7 +3,7 @@
 **Document path:** `docs/05-development-phases.md`  
 **Project:** Smartfit.am  
 **Document type:** Controlled development phase plan  
-**Purpose:** Official fixed implementation order for the Smartfit.am MVP. This file is intended for the ChatGPT Project knowledge base first and can later be saved inside the real project directory.
+**Purpose:** Official controlled implementation order for the completed Smartfit.am MVP and the manually approved post-MVP Registration Panel improvement phases.
 
 ---
 
@@ -42,10 +42,11 @@ This file is the official controlled development phase plan for Smartfit.am.
 - ChatGPT should use this file when generating Codex prompts.
 - New phases must not be invented automatically.
 - Future changes require manually updating this document.
-- If a feature does not fit into the fixed phases, it must be placed under **Blocked / Unclear Items** instead of creating a new phase.
-- If the phase plan ends at Phase 15, then Phase 15 is the final phase for this document.
+- If a feature does not fit into the approved phases, it must be placed under **Blocked / Unclear Items** instead of creating a new phase.
+- Phase 0 through Phase 15 are the completed original MVP phases.
+- Phase 16 through Phase 21 were manually added after MVP completion for confirmed Registration Panel improvements.
 
-**This plan contains exactly 16 phases: Phase 0 through Phase 15. Do not create Phase 16 or any later phase unless this document is manually updated.**
+**This plan now contains Phase 0 through Phase 21. Phase 16 through Phase 21 were added manually by the project owner after MVP completion. Do not create Phase 22 or any later phase unless this document is manually updated again.**
 
 ---
 
@@ -68,7 +69,9 @@ This file is the official controlled development phase plan for Smartfit.am.
 15. Business-critical operations must remain server-side.
 16. Public routes must never expose private customer, package ownership, notes, logs, or staff data.
 17. Admin and Registration/Reception access must stay separated according to the uploaded requirements.
-18. The final project completion phase is Phase 15 only.
+18. Phase 15 remains the final original MVP phase.
+19. Post-MVP work must stay inside the manually approved Registration Panel improvement phases, Phase 16 through Phase 21.
+20. Do not create Phase 22 or any later phase without another manual documentation update.
 
 ---
 
@@ -76,25 +79,32 @@ This file is the official controlled development phase plan for Smartfit.am.
 
 | Phase | Name | Main Goal | Depends On | Status |
 |---|---|---|---|---|
-| Phase 0 | Project Setup and Repository Baseline | Create the basic Smartfit.am app foundation and documentation structure | None | Planned |
-| Phase 1 | Design System and App Layout | Apply Smartfit.am colors, global layout, navigation, and reusable UI basics | Phase 0 | Planned |
-| Phase 2 | Database and Prisma Foundation | Add confirmed database models, migrations, seed data, and data access foundation | Phase 1 | Planned |
-| Phase 3 | Authentication and Route Protection | Add internal login and protect Admin/Registration areas | Phase 2 | Planned |
-| Phase 4 | Public Website Pages | Build public pages for gym information, offers, coaches, packages, contact, and app entry point | Phase 3 | Planned |
-| Phase 5 | Public Our App and Live Occupancy Page | Build the no-login mobile app-like page with public occupancy and Add to Home Screen guidance | Phase 4 | Planned |
-| Phase 6 | Admin Shell, Settings, and Public Content | Build admin panel foundation, settings management, and homepage content management | Phase 5 | Planned |
-| Phase 7 | Admin Coaches and Packages | Build coach CRUD, package CRUD, and simple time-restriction configuration | Phase 6 | Planned |
-| Phase 8 | Admin Customers and Package Assignment | Build customer CRUD, customer package assignment, and admin package overview | Phase 7 | Planned |
-| Phase 9 | Registration Search and Customer Card | Build reception customer search, customer card, package display, and manual session correction UI | Phase 8 | Planned |
-| Phase 10 | Check-In Workflow | Implement check-in, package selection, time restriction validation, session deduction, occupancy increase, and logs | Phase 9 | Planned |
-| Phase 11 | Check-Out and Occupancy Correction | Implement check-out, occupancy decrease, and manual occupancy correction | Phase 10 | Planned |
-| Phase 12 | Notes and Admin Logs | Implement operational notes and admin-visible audit log review | Phase 11 | Planned |
-| Phase 13 | Excel Export | Add basic admin Excel exports for confirmed data categories | Phase 12 | Planned |
-| Phase 14 | Basic Analytics | Add MVP analytics: current occupancy, daily check-ins, and peak hours | Phase 13 | Planned |
-| Phase 15 | Final Testing and Deployment Preparation | Verify MVP completeness, security, private data protection, and deployment readiness | Phase 14 | Planned |
+| Phase 0 | Project Setup and Repository Baseline | Create the basic Smartfit.am app foundation and documentation structure | None | Complete |
+| Phase 1 | Design System and App Layout | Apply Smartfit.am colors, global layout, navigation, and reusable UI basics | Phase 0 | Complete |
+| Phase 2 | Database and Prisma Foundation | Add confirmed database models, migrations, seed data, and data access foundation | Phase 1 | Complete |
+| Phase 3 | Authentication and Route Protection | Add internal login and protect Admin/Registration areas | Phase 2 | Complete |
+| Phase 4 | Public Website Pages | Build public pages for gym information, offers, coaches, packages, contact, and app entry point | Phase 3 | Complete |
+| Phase 5 | Public Our App and Live Occupancy Page | Build the no-login mobile app-like page with public occupancy and Add to Home Screen guidance | Phase 4 | Complete |
+| Phase 6 | Admin Shell, Settings, and Public Content | Build admin panel foundation, settings management, and homepage content management | Phase 5 | Complete |
+| Phase 7 | Admin Coaches and Packages | Build coach CRUD, package CRUD, and simple time-restriction configuration | Phase 6 | Complete |
+| Phase 8 | Admin Customers and Package Assignment | Build customer CRUD, customer package assignment, and admin package overview | Phase 7 | Complete |
+| Phase 9 | Registration Search and Customer Card | Build reception customer search, customer card, package display, and manual session correction UI | Phase 8 | Complete |
+| Phase 10 | Check-In Workflow | Implement check-in, package selection, time restriction validation, session deduction, occupancy increase, and logs | Phase 9 | Complete |
+| Phase 11 | Check-Out and Occupancy Correction | Implement check-out, occupancy decrease, and manual occupancy correction | Phase 10 | Complete |
+| Phase 12 | Notes and Admin Logs | Implement operational notes and admin-visible audit log review | Phase 11 | Complete |
+| Phase 13 | Excel Export | Add basic admin Excel exports for confirmed data categories | Phase 12 | Complete |
+| Phase 14 | Basic Analytics | Add MVP analytics: current occupancy, daily check-ins, and peak hours | Phase 13 | Complete |
+| Phase 15 | Final Testing and Deployment Preparation | Verify MVP completeness, security, private data protection, and deployment readiness | Phase 14 | Complete |
+| Phase 16 | Registration Gap Audit and Missing Section Fixes | Audit and expose missing or hidden confirmed Registration Panel sections | Phase 15 | Planned |
+| Phase 17 | Registration Customer Workspace Redesign | Redesign `/registration` as a professional daily reception workspace | Phase 16 | Planned |
+| Phase 18 | Registration Notes and Activity Experience Polish | Improve customer notes and safe recent operational context | Phase 17 | Planned |
+| Phase 19 | Registration Package Freeze and Reactivation | Add the simplest confirmed freeze/reactivation workflow after permission confirmation | Phase 18 | Planned |
+| Phase 20 | Reception Workspace Controls and Operational Rules Display | Add reception-side view controls and read-only operational rules | Phase 19 | Planned |
+| Phase 21 | Post-MVP Registration Regression and Client Review Preparation | Verify and prepare the improved Registration Panel for client review | Phase 20 | Planned |
 
-**Final phase count:** exactly 16 phases, Phase 0 through Phase 15.  
-**Final implementation phase:** Phase 15 — Final Testing and Deployment Preparation.
+**Original MVP phases:** Phase 0 through Phase 15, complete.
+**Manually approved post-MVP phases:** Phase 16 through Phase 21.
+**Current final approved phase:** Phase 21 — Post-MVP Registration Regression and Client Review Preparation.
 
 ---
 
@@ -1754,6 +1764,350 @@ None. Phase 15 is the final phase in this document.
 
 ---
 
+## Post-MVP Registration Improvement Phases
+
+These phases were added manually by the project owner after completion of the original MVP and Phase 15.
+
+- They are not part of the original MVP.
+- They focus only on improving the Registration Panel so it better matches the uploaded Smartfit.am specification and the project owner's reviewed expectations.
+- They must follow the same anti-hallucination, simplicity, privacy, server-side permission, and phase-control rules as the original phases.
+- They do not authorize customer login, coach login, payments, QR check-in, notifications, ecommerce, multi-branch, platform owner logic, or any other unconfirmed product area.
+- Admin Settings remain admin-only. Registration may receive view controls and read-only operational-rule visibility, but not a true system-settings editor.
+- The original Phase 15 wording above is preserved as historical MVP phase content. This manually added section authorizes only Phase 16 through Phase 21.
+
+---
+
+# Phase 16 — Registration Gap Audit and Missing Section Fixes
+
+## Goal
+
+Audit the current Registration Panel against the uploaded specification and fix missing or hidden confirmed sections without redesigning everything yet.
+
+## Why This Phase Exists
+
+The completed MVP Registration Panel contains core operational behavior, but the project owner found that the screen appears too basic and does not make every confirmed reception feature easy to discover.
+
+## What Codex Should Build
+
+- Inspect `/registration` in the real code and compare it with the uploaded specification.
+- Confirm whether notes appear after selecting a customer.
+- If notes only appear after selecting a customer, improve the empty state so this is clearly explained.
+- If notes are missing from selected customer cards, add or fix them.
+- Confirm the selected customer card shows status, package cards, remaining sessions, expiry dates, package statuses, time rules, check-in, check-out, manual session correction, notes, and occupancy correction.
+- Add missing navigation or visibility for already-built confirmed features.
+- Improve empty states and search results so reception understands what to do.
+- Keep this a small fix phase rather than a full redesign.
+
+## What Codex Must Not Build
+
+- Do not add new models unless a real blocker exists.
+- Do not add new product features.
+- Do not add an Admin Settings editor inside Registration.
+- Do not perform the advanced workspace redesign yet.
+- Do not add customer login, coach login, QR check-in, payments, notifications, ecommerce, multi-branch, or platform owner logic.
+
+## Acceptance Criteria
+
+- Registration empty state is clear.
+- After customer selection, every confirmed operational section is visible or intentionally explained.
+- Notes are visible for selected customers.
+- Occupancy correction remains available.
+- No private data is exposed publicly.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Open `/registration` without a selected customer and confirm the next action is clear.
+- Search by customer name and customer ID.
+- Select a customer and verify every confirmed operational section.
+- Verify notes and occupancy correction remain usable.
+- Verify public routes do not expose private customer data.
+
+## Completion Definition
+
+Phase 16 is complete when missing or hidden confirmed Registration Panel sections are visible and clearly explained without a broad redesign.
+
+## Next Phase
+
+Phase 17 — Registration Customer Workspace Redesign.
+
+---
+
+# Phase 17 — Registration Customer Workspace Redesign
+
+## Goal
+
+Redesign `/registration` into a professional reception workspace that is fast, clear, and practical for daily gym operations.
+
+## What Codex Should Build
+
+- Improve the Registration Panel UI layout while reusing existing operational logic.
+- Keep the private layout consistent with Smartfit.am branding.
+- Make the page feel like a reception dashboard rather than a basic form.
+- Add a better search area with clearer results.
+- When a customer is selected, show a strong customer header with:
+  - full name
+  - member code
+  - current gym status badge
+  - active/inactive customer status
+  - assigned coach if available
+  - last check-in/check-out if available
+- Show a quick-action area for:
+  - check in
+  - check out
+  - save session corrections
+  - occupancy correction
+- Show package cards in a professional responsive grid.
+- Show active packages by default and allow showing all packages.
+- Show invalid, expired, frozen, and zero-session states clearly.
+- Make notes visible in the customer workspace.
+- Keep mobile, tablet, and desktop layouts responsive.
+
+## What Codex Must Not Build
+
+- Do not add new business rules.
+- Do not add new data models unless required by a discovered blocker.
+- Do not add an Admin Settings editor inside Registration.
+- Do not add advanced analytics or exports.
+- Do not redesign unrelated admin areas.
+
+## Acceptance Criteria
+
+- Registration page is visually professional.
+- Reception staff can understand customer status and packages quickly.
+- Customer card works for no package, one package, and multiple packages.
+- Notes are visible and usable in the customer workspace.
+- Search, corrections, check-in/out, and occupancy still work.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Verify the workspace at mobile, tablet, and desktop sizes.
+- Verify no-package, one-package, and multiple-package customers.
+- Verify active, inactive, expired, frozen, and zero-session package states.
+- Verify all existing reception actions still work.
+
+## Completion Definition
+
+Phase 17 is complete when `/registration` works as a professional, responsive daily reception workspace without changing existing business rules.
+
+## Next Phase
+
+Phase 18 — Registration Notes and Activity Experience Polish.
+
+---
+
+# Phase 18 — Registration Notes and Activity Experience Polish
+
+## Goal
+
+Make notes and recent operational context easier to use inside the Registration Panel.
+
+## What Codex Should Build
+
+- Improve notes placement inside the selected customer workspace.
+- Keep notes sorted newest first.
+- Keep add, edit, and delete working for ADMIN and REGISTRATION according to existing permissions.
+- Keep stale-edit protection and lightweight metadata refresh.
+- Add a simple last-updated or refresh indicator if it is not already clear.
+- Add a compact recent activity summary only if it can safely reuse existing `AuditLog` and `GymVisit` data:
+  - last check-in
+  - last check-out
+  - last session correction
+  - last note update
+- Keep recent activity read-only and customer-specific.
+- Keep full admin logs restricted to ADMIN.
+
+## What Codex Must Not Build
+
+- Do not build a chat system.
+- Do not add notifications.
+- Do not add WebSockets.
+- Do not add a full logs page for reception.
+- Do not add note attachments.
+- Do not add note categories unless later confirmed.
+- Do not expose notes or activity publicly.
+
+## Acceptance Criteria
+
+- Reception can easily see and use customer notes.
+- Notes do not reset unrelated reception work.
+- Draft note edits are protected.
+- Recent activity, if added, is read-only and customer-specific.
+- Admin logs remain admin-only.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Create, edit, refresh, and delete a note as ADMIN and REGISTRATION.
+- Verify stale-edit protection.
+- Verify any recent activity summary contains only the selected customer's safe operational context.
+- Verify REGISTRATION cannot access the full admin logs page.
+
+## Completion Definition
+
+Phase 18 is complete when notes and safe recent customer activity are easy to understand and use without exposing full admin logs.
+
+## Next Phase
+
+Phase 19 — Registration Package Freeze and Reactivation.
+
+---
+
+# Phase 19 — Registration Package Freeze and Reactivation
+
+## Goal
+
+Implement the package freeze/reactivation workflow mentioned in the uploaded specification using the simplest confirmed behavior.
+
+## Permission Decision Required Before Implementation
+
+The project owner must confirm that REGISTRATION staff may freeze and reactivate customer packages. If this permission is not confirmed, stop and report the blocker instead of implementing the controls for REGISTRATION.
+
+## What Codex Should Build
+
+- Add freeze/reactivate controls for customer packages in `/registration`.
+- Allow ADMIN and REGISTRATION users to freeze/reactivate customer packages only if the project owner confirms the permission remains allowed.
+- Ensure frozen packages cannot be used for session deduction.
+- Ensure reactivated packages become usable again only when sessions, expiration date, package status, and time rules allow it.
+- Create `AuditLog` entries for freeze and reactivation.
+- Show frozen package state clearly in package cards.
+- Do not automatically extend expiration dates unless separately confirmed.
+
+## What Codex Must Not Build
+
+- Do not automatically extend expiration dates.
+- Do not add a freeze approval workflow.
+- Do not require a freeze reason unless later confirmed.
+- Do not redesign package renewal.
+- Do not add complex freeze policies.
+
+## Acceptance Criteria
+
+- A package can be frozen from Registration after permission confirmation.
+- A frozen package cannot be selected for check-in deduction.
+- A package can be reactivated.
+- Freeze and reactivation create logs.
+- The UI clearly marks frozen packages.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Confirm the permission decision before implementation.
+- Freeze an eligible package and verify it cannot be used for check-in.
+- Reactivate it and verify normal eligibility rules still apply.
+- Verify freeze/reactivation logs.
+- Verify no expiration date is automatically extended.
+
+## Completion Definition
+
+Phase 19 is complete when the confirmed freeze/reactivation workflow is safe, logged, and clear in Registration.
+
+## Next Phase
+
+Phase 20 — Reception Workspace Controls and Operational Rules Display.
+
+---
+
+# Phase 20 — Reception Workspace Controls and Operational Rules Display
+
+## Goal
+
+Add a simple Registration-side controls and status area that helps reception understand current operational rules without giving them Admin Settings access.
+
+## What Codex Should Build
+
+- Add a compact Reception Controls, Reception View Controls, or Workspace Controls panel.
+- Show current occupancy correction in a better location if needed.
+- Show current registration display behavior:
+  - whether inactive customers are hidden or visible based on the admin setting
+  - active packages by default and the show-all-packages option
+  - current package time-rule behavior
+- Add local UI preferences only when simple and not system-wide:
+  - compact/detailed customer card mode
+  - keep selected customer visible after actions
+  - remember the show-all-packages toggle during the current session
+- Keep all true system settings editable only in Admin Settings.
+
+## What Codex Must Not Build
+
+- Do not add a true Admin Settings editor in Registration.
+- Do not allow Registration to change occupancy thresholds.
+- Do not allow Registration to change public app content.
+- Do not allow Registration to change gym contact or location settings.
+- Do not add new permissions unless confirmed.
+
+## Acceptance Criteria
+
+- Reception has clearer operational controls.
+- Admin Settings remain admin-only.
+- REGISTRATION cannot edit system-wide settings.
+- The UI is clearer and more professional.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Verify reception can understand active/all package and inactive-customer display behavior.
+- Verify local view controls do not modify `GymSettings`.
+- Verify REGISTRATION remains blocked from `/admin/settings` and admin-only settings actions.
+
+## Completion Definition
+
+Phase 20 is complete when reception has useful workspace controls and read-only operational-rule visibility without gaining system-settings access.
+
+## Next Phase
+
+Phase 21 — Post-MVP Registration Regression and Client Review Preparation.
+
+---
+
+# Phase 21 — Post-MVP Registration Regression and Client Review Preparation
+
+## Goal
+
+Verify the improved Registration Panel after Phases 16 through 20 and prepare a client-review-ready version.
+
+## What Codex Should Build
+
+- Run final checks focused on Registration.
+- Verify search, customer card, packages, sessions, check-in, check-out, notes, occupancy, confirmed freeze/reactivation behavior, and permissions.
+- Verify mobile, tablet, and desktop layouts.
+- Verify public privacy.
+- Update README or a short Registration workflow note if useful.
+- Fix only small bugs found during this review.
+
+## What Codex Must Not Build
+
+- Do not add new features.
+- Do not add new dashboards.
+- Do not create Phase 22 unless the documentation is manually updated again.
+
+## Acceptance Criteria
+
+- Registration Panel matches the uploaded specification better.
+- All confirmed operational actions work.
+- UI is professional enough for client demo.
+- Public/private data separation remains safe.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Run the complete Registration workflow with representative customer/package states.
+- Verify REGISTRATION and ADMIN permissions.
+- Verify full admin logs and system settings remain ADMIN-only.
+- Verify public routes expose no private Registration data.
+- Verify responsive layouts and production build.
+
+## Completion Definition
+
+Phase 21 is complete when the improved Registration Panel is regression-tested, privacy-safe, and ready for client review.
+
+## Next Phase
+
+None. Any phase after Phase 21 requires another manual update to this document by the project owner.
+
+---
+
 ## 6. Phase Dependency Rules
 
 - Phase 1 depends on Phase 0 because styling and layouts need the base app.
@@ -1771,6 +2125,12 @@ None. Phase 15 is the final phase in this document.
 - Phase 13 depends on Phase 12 because exports should include core operational data and notes/logs if available.
 - Phase 14 depends on Phase 13 because analytics depend on check-in/check-out and occupancy data already working.
 - Phase 15 depends on all earlier phases because it verifies the full MVP.
+- Phase 16 depends on the completed MVP because it audits the real Registration Panel before further changes.
+- Phase 17 depends on Phase 16 because the redesign must use the verified gap list and existing operational sections.
+- Phase 18 depends on Phase 17 because notes and activity polish belong inside the redesigned customer workspace.
+- Phase 19 depends on Phase 18 and the project owner's explicit freeze/reactivation permission decision.
+- Phase 20 depends on Phase 19 because workspace controls should describe the final confirmed reception behavior.
+- Phase 21 depends on Phases 16 through 20 because it verifies the complete post-MVP Registration improvement sequence.
 
 Specific business workflow dependencies:
 
@@ -1834,22 +2194,28 @@ Codex should also follow these rules:
 
 | Phase | Status | Completed Date | Notes |
 |---|---|---|---|
-| Phase 0 — Project Setup and Repository Baseline | Not Started |  |  |
-| Phase 1 — Design System and App Layout | Not Started |  |  |
-| Phase 2 — Database and Prisma Foundation | Not Started |  |  |
-| Phase 3 — Authentication and Route Protection | Not Started |  |  |
-| Phase 4 — Public Website Pages | Not Started |  |  |
-| Phase 5 — Public Our App and Live Occupancy Page | Not Started |  |  |
-| Phase 6 — Admin Shell, Settings, and Public Content | Not Started |  |  |
-| Phase 7 — Admin Coaches and Packages | Not Started |  |  |
-| Phase 8 — Admin Customers and Package Assignment | Not Started |  |  |
-| Phase 9 — Registration Search and Customer Card | Not Started |  |  |
-| Phase 10 — Check-In Workflow | Not Started |  |  |
-| Phase 11 — Check-Out and Occupancy Correction | Not Started |  |  |
-| Phase 12 — Notes and Admin Logs | Not Started |  |  |
-| Phase 13 — Excel Export | Not Started |  |  |
-| Phase 14 — Basic Analytics | Not Started |  |  |
-| Phase 15 — Final Testing and Deployment Preparation | Not Started |  |  |
+| Phase 0 — Project Setup and Repository Baseline | Complete |  | Original MVP |
+| Phase 1 — Design System and App Layout | Complete |  | Original MVP |
+| Phase 2 — Database and Prisma Foundation | Complete |  | Original MVP |
+| Phase 3 — Authentication and Route Protection | Complete |  | Original MVP |
+| Phase 4 — Public Website Pages | Complete |  | Original MVP |
+| Phase 5 — Public Our App and Live Occupancy Page | Complete |  | Original MVP |
+| Phase 6 — Admin Shell, Settings, and Public Content | Complete |  | Original MVP |
+| Phase 7 — Admin Coaches and Packages | Complete |  | Original MVP |
+| Phase 8 — Admin Customers and Package Assignment | Complete |  | Original MVP |
+| Phase 9 — Registration Search and Customer Card | Complete |  | Original MVP |
+| Phase 10 — Check-In Workflow | Complete |  | Original MVP |
+| Phase 11 — Check-Out and Occupancy Correction | Complete |  | Original MVP |
+| Phase 12 — Notes and Admin Logs | Complete |  | Original MVP |
+| Phase 13 — Excel Export | Complete |  | Original MVP |
+| Phase 14 — Basic Analytics | Complete |  | Original MVP |
+| Phase 15 — Final Testing and Deployment Preparation | Complete |  | Original MVP final phase |
+| Phase 16 — Registration Gap Audit and Missing Section Fixes | Not Started |  | Manually added post-MVP phase |
+| Phase 17 — Registration Customer Workspace Redesign | Not Started |  | Manually added post-MVP phase |
+| Phase 18 — Registration Notes and Activity Experience Polish | Not Started |  | Manually added post-MVP phase |
+| Phase 19 — Registration Package Freeze and Reactivation | Not Started |  | Permission decision required |
+| Phase 20 — Reception Workspace Controls and Operational Rules Display | Not Started |  | Manually added post-MVP phase |
+| Phase 21 — Post-MVP Registration Regression and Client Review Preparation | Not Started |  | Current final approved phase |
 
 ---
 
@@ -1861,7 +2227,7 @@ The following items should not be forced into implementation phases until confir
 2. Whether Gallery images are uploaded through Admin Panel or provided as external URLs.
 3. Whether reception staff can delete notes or only create/edit them.
 4. Whether note edits/deletions must create separate logs.
-5. Whether package freezing should be implemented in MVP or delayed.
+5. Whether REGISTRATION staff are permitted to freeze/reactivate packages in Phase 19.
 6. Whether package freezing extends expiration date.
 7. Who can freeze/reactivate packages: admin, reception, or both.
 8. Whether package reactivation and renewal are the same workflow or separate workflows.
@@ -1882,8 +2248,9 @@ The following items should not be forced into implementation phases until confir
 23. Exact analytics formulas beyond current occupancy, daily check-ins, and peak hours.
 24. Whether admin can access `/registration` as a receptionist.
 25. Whether public coach contact information should be shown or kept admin-only.
+26. Whether reception staff should ever be allowed to edit true system settings; this requires a separate permission decision and is not part of Phase 16 through Phase 21.
 
-These unclear items must not create additional phases. They can only be added to the phase plan after this document is manually updated.
+These unclear items must not create additional phases beyond the manually approved Phase 16 through Phase 21 sequence. Any new phase requires another manual update to this document.
 
 ---
 
@@ -1926,7 +2293,7 @@ The following features are not included in the current MVP phase plan because th
 
 ## 11. Final Completion Definition
 
-The Smartfit.am MVP is considered complete only when all fixed phases from Phase 0 through Phase 15 are completed and verified.
+The Smartfit.am MVP is complete because all original fixed phases from Phase 0 through Phase 15 have been completed and verified. Phase 16 through Phase 21 are separately approved post-MVP Registration Panel improvements.
 
 The final MVP must satisfy these completion points:
 
@@ -1963,6 +2330,6 @@ The final MVP must satisfy these completion points:
 - The project builds successfully.
 - Deployment preparation is complete.
 - No unconfirmed feature has been accidentally added.
-- No phase beyond Phase 15 has been created.
+- No unapproved phase beyond Phase 21 has been created.
 
-**Final rule:** After Phase 15, the Smartfit.am MVP phase plan is complete. Any new work requires a manual update to this document, not automatic creation of new phases.
+**Final rule:** Phase 0 through Phase 15 remain the completed original MVP. Phase 16 through Phase 21 are the only manually approved post-MVP Registration improvement phases. Any phase after Phase 21 requires another manual update to this document.

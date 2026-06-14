@@ -29,6 +29,15 @@ class Phase11Error extends Error {
   }
 }
 
+class PackageStatusError extends Error {
+  code: string;
+
+  constructor(code: string) {
+    super(code);
+    this.code = code;
+  }
+}
+
 class NoteMutationError extends Error {
   code: "STALE" | "UNAVAILABLE" | "VALIDATION_ERROR";
 
@@ -311,28 +320,37 @@ function customerPath(
   customerCode: string,
   suffix: string,
   showAllPackages: boolean,
+  compact = false,
 ) {
-  return `${REGISTRATION_PATH}?customer=${encodeURIComponent(customerCode)}${showAllPackages ? "&showAll=1" : ""}&${suffix}`;
+  return `${REGISTRATION_PATH}?customer=${encodeURIComponent(customerCode)}${showAllPackages ? "&showAll=1" : ""}${compact ? "&view=compact" : ""}&${suffix}`;
 }
 
-function checkInPath(customerCode: string, suffix: string) {
-  return `${REGISTRATION_PATH}?customer=${encodeURIComponent(customerCode)}&${suffix}`;
+function checkInPath(
+  customerCode: string,
+  suffix: string,
+  showAllPackages: boolean,
+  compact: boolean,
+) {
+  return customerPath(customerCode, suffix, showAllPackages, compact);
 }
 
 function registrationPath(
   customerCode: string | null,
   suffix: string,
   showAllPackages = false,
+  compact = false,
 ) {
   return customerCode
-    ? customerPath(customerCode, suffix, showAllPackages)
-    : `${REGISTRATION_PATH}?${suffix}`;
+    ? customerPath(customerCode, suffix, showAllPackages, compact)
+    : `${REGISTRATION_PATH}?${showAllPackages ? "showAll=1&" : ""}${compact ? "view=compact&" : ""}${suffix}`;
 }
 
 export async function checkInAction(formData: FormData) {
   const user = await requireStaffUser();
   const customerId = optionalText(formData, "customerId", 100);
   const customerCode = optionalText(formData, "customerCode", 100);
+  const compact = formData.get("view") === "compact";
+  const showAllPackages = formData.get("showAllPackages") === "1";
   const selectedPackageIds = [
     ...new Set(
       formData
@@ -413,6 +431,14 @@ export async function checkInAction(formData: FormData) {
       const selectedPackages = customerPackages.filter((customerPackage) =>
         selectedPackageIds.includes(customerPackage.id),
       );
+
+      if (
+        selectedPackages.some(
+          (customerPackage) => customerPackage.status === "FROZEN",
+        )
+      ) {
+        throw new CheckInError("frozen-package");
+      }
 
       if (
         selectedPackages.length !== selectedPackageIds.length ||
@@ -568,19 +594,25 @@ export async function checkInAction(formData: FormData) {
   } catch (error) {
     const errorCode =
       error instanceof CheckInError ? error.code : "check-in-unavailable";
-    redirect(checkInPath(customerCode, `error=${errorCode}`));
+    redirect(
+      checkInPath(customerCode, `error=${errorCode}`, showAllPackages, compact),
+    );
   }
 
   revalidatePath(REGISTRATION_PATH);
+  revalidatePath("/registration/in-gym");
   revalidatePath("/admin");
   revalidatePath("/our-app");
-  redirect(checkInPath(customerCode, "status=checked-in"));
+  redirect(
+    checkInPath(customerCode, "status=checked-in", showAllPackages, compact),
+  );
 }
 
 export async function checkOutAction(formData: FormData) {
   const user = await requireStaffUser();
   const customerId = optionalText(formData, "customerId", 100);
   const customerCode = optionalText(formData, "customerCode", 100);
+  const compact = formData.get("view") === "compact";
   const showAllPackages = formData.get("showAllPackages") === "1";
 
   if (!customerId || !customerCode) {
@@ -717,30 +749,41 @@ export async function checkOutAction(formData: FormData) {
     const errorCode =
       error instanceof Phase11Error ? error.code : "check-out-unavailable";
     redirect(
-      customerPath(customerCode, `error=${errorCode}`, showAllPackages),
+      customerPath(customerCode, `error=${errorCode}`, showAllPackages, compact),
     );
   }
 
   revalidatePath(REGISTRATION_PATH);
+  revalidatePath("/registration/in-gym");
   revalidatePath("/admin");
   revalidatePath("/our-app");
-  redirect(customerPath(customerCode, "status=checked-out", showAllPackages));
+  redirect(
+    customerPath(customerCode, "status=checked-out", showAllPackages, compact),
+  );
 }
 
 export async function saveOccupancyCorrectionAction(formData: FormData) {
   const user = await requireStaffUser();
   const customerCode = optionalText(formData, "customerCode", 100);
+  const returnPath =
+    formData.get("returnPath") === "/registration/occupancy"
+      ? "/registration/occupancy"
+      : null;
+  const compact = formData.get("view") === "compact";
   const showAllPackages = formData.get("showAllPackages") === "1";
   const previousCount = nonNegativeInteger(formData, "previousCount");
   const newCount = nonNegativeInteger(formData, "newCount");
 
   if (previousCount === null || newCount === null) {
     redirect(
-      registrationPath(
-        customerCode,
-        "error=invalid-occupancy-correction",
-        showAllPackages,
-      ),
+      returnPath
+        ? `${returnPath}?error=invalid-occupancy-correction`
+        : registrationPath(
+            customerCode,
+            "error=invalid-occupancy-correction",
+            showAllPackages,
+            compact,
+          ),
     );
   }
 
@@ -828,28 +871,36 @@ export async function saveOccupancyCorrectionAction(formData: FormData) {
         ? error.code
         : "occupancy-correction-unavailable";
     redirect(
-      registrationPath(
-        customerCode,
-        `error=${errorCode}`,
-        showAllPackages,
-      ),
+      returnPath
+        ? `${returnPath}?error=${errorCode}`
+        : registrationPath(
+            customerCode,
+            `error=${errorCode}`,
+            showAllPackages,
+            compact,
+          ),
     );
   }
 
   revalidatePath(REGISTRATION_PATH);
+  revalidatePath("/registration/occupancy");
   revalidatePath("/admin");
   revalidatePath("/our-app");
   redirect(
-    registrationPath(
-      customerCode,
-      changed ? "status=occupancy-corrected" : "status=occupancy-no-change",
-      showAllPackages,
-    ),
+    returnPath
+      ? `${returnPath}?status=${changed ? "occupancy-corrected" : "occupancy-no-change"}`
+      : registrationPath(
+          customerCode,
+          changed ? "status=occupancy-corrected" : "status=occupancy-no-change",
+          showAllPackages,
+          compact,
+        ),
   );
 }
 
 export async function saveSessionCorrectionAction(formData: FormData) {
   const user = await requireStaffUser();
+  const compact = formData.get("view") === "compact";
   const showAllPackages = formData.get("showAllPackages") === "1";
   const customerPackageId = optionalText(formData, "customerPackageId", 100);
   const previousRemainingSessions = nonNegativeInteger(
@@ -907,13 +958,19 @@ export async function saveSessionCorrectionAction(formData: FormData) {
         customer.customerCode,
         "error=stale-correction",
         showAllPackages,
+        compact,
       ),
     );
   }
 
   if (newRemainingSessions === previousRemainingSessions) {
     redirect(
-      customerPath(customer.customerCode, "status=no-change", showAllPackages),
+      customerPath(
+        customer.customerCode,
+        "status=no-change",
+        showAllPackages,
+        compact,
+      ),
     );
   }
 
@@ -971,7 +1028,12 @@ export async function saveSessionCorrectionAction(formData: FormData) {
         : "correction-unavailable";
 
     redirect(
-      customerPath(customer.customerCode, `error=${errorCode}`, showAllPackages),
+      customerPath(
+        customer.customerCode,
+        `error=${errorCode}`,
+        showAllPackages,
+        compact,
+      ),
     );
   }
 
@@ -981,6 +1043,251 @@ export async function saveSessionCorrectionAction(formData: FormData) {
       customer.customerCode,
       "status=correction-saved",
       showAllPackages,
+      compact,
+    ),
+  );
+}
+
+export async function freezeCustomerPackageAction(formData: FormData) {
+  const user = await requireStaffUser();
+  const customerId = optionalText(formData, "customerId", 100);
+  const customerCode = optionalText(formData, "customerCode", 100);
+  const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const compact = formData.get("view") === "compact";
+
+  if (!customerId || !customerCode || !customerPackageId) {
+    redirect(`${REGISTRATION_PATH}?error=invalid-package-action`);
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const customerPackage = await transaction.customerPackage.findFirst({
+        select: {
+          customer: {
+            select: {
+              customerCode: true,
+              fullName: true,
+              id: true,
+            },
+          },
+          expirationDate: true,
+          frozenAt: true,
+          id: true,
+          package: {
+            select: {
+              deletedAt: true,
+              isActive: true,
+              name: true,
+            },
+          },
+          reactivatedAt: true,
+          remainingSessions: true,
+          status: true,
+        },
+        where: {
+          customer: { deletedAt: null },
+          customerId,
+          deletedAt: null,
+          id: customerPackageId,
+        },
+      });
+
+      if (
+        !customerPackage ||
+        customerPackage.customer.customerCode !== customerCode
+      ) {
+        throw new PackageStatusError("invalid-package-action");
+      }
+
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+
+      if (
+        customerPackage.status !== "ACTIVE" ||
+        customerPackage.expirationDate < today ||
+        customerPackage.remainingSessions <= 0 ||
+        customerPackage.package.deletedAt ||
+        !customerPackage.package.isActive
+      ) {
+        throw new PackageStatusError("package-not-freezable");
+      }
+
+      const frozenAt = new Date();
+      const update = await transaction.customerPackage.updateMany({
+        data: {
+          frozenAt,
+          status: "FROZEN",
+        },
+        where: {
+          customerId,
+          deletedAt: null,
+          id: customerPackage.id,
+          status: "ACTIVE",
+        },
+      });
+
+      if (update.count !== 1) {
+        throw new PackageStatusError("package-status-stale");
+      }
+
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_FREEZE",
+        actorId: user.id,
+        customerId: customerPackage.customer.id,
+        description: `Froze ${customerPackage.package.name} for ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName}.`,
+        newValue: {
+          expirationDate: customerPackage.expirationDate,
+          frozenAt,
+          reactivatedAt: customerPackage.reactivatedAt,
+          remainingSessions: customerPackage.remainingSessions,
+          status: "FROZEN",
+        },
+        oldValue: {
+          expirationDate: customerPackage.expirationDate,
+          frozenAt: customerPackage.frozenAt,
+          reactivatedAt: customerPackage.reactivatedAt,
+          remainingSessions: customerPackage.remainingSessions,
+          status: customerPackage.status,
+        },
+        targetId: customerPackage.id,
+        targetType: "CustomerPackage",
+      });
+    });
+  } catch (error) {
+    const errorCode =
+      error instanceof PackageStatusError
+        ? error.code
+        : "package-freeze-unavailable";
+    redirect(customerPath(customerCode, `error=${errorCode}`, true, compact));
+  }
+
+  revalidatePath(REGISTRATION_PATH);
+  revalidatePath("/admin/logs");
+  redirect(customerPath(customerCode, "status=package-frozen", true, compact));
+}
+
+export async function reactivateCustomerPackageAction(formData: FormData) {
+  const user = await requireStaffUser();
+  const customerId = optionalText(formData, "customerId", 100);
+  const customerCode = optionalText(formData, "customerCode", 100);
+  const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const compact = formData.get("view") === "compact";
+  const showAllPackages = formData.get("showAllPackages") === "1";
+
+  if (!customerId || !customerCode || !customerPackageId) {
+    redirect(`${REGISTRATION_PATH}?error=invalid-package-action`);
+  }
+
+  let reactivatedStatus: "ACTIVE" | "EXPIRED";
+
+  try {
+    reactivatedStatus = await db.$transaction(async (transaction) => {
+      const customerPackage = await transaction.customerPackage.findFirst({
+        select: {
+          customer: {
+            select: {
+              customerCode: true,
+              fullName: true,
+              id: true,
+            },
+          },
+          expirationDate: true,
+          frozenAt: true,
+          id: true,
+          package: {
+            select: { name: true },
+          },
+          reactivatedAt: true,
+          remainingSessions: true,
+          status: true,
+        },
+        where: {
+          customer: { deletedAt: null },
+          customerId,
+          deletedAt: null,
+          id: customerPackageId,
+        },
+      });
+
+      if (
+        !customerPackage ||
+        customerPackage.customer.customerCode !== customerCode
+      ) {
+        throw new PackageStatusError("invalid-package-action");
+      }
+
+      if (customerPackage.status !== "FROZEN") {
+        throw new PackageStatusError("package-not-frozen");
+      }
+
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const reactivatedAt = new Date();
+      const nextStatus =
+        customerPackage.expirationDate < today ? "EXPIRED" : "ACTIVE";
+
+      const update = await transaction.customerPackage.updateMany({
+        data: {
+          reactivatedAt,
+          status: nextStatus,
+        },
+        where: {
+          customerId,
+          deletedAt: null,
+          id: customerPackage.id,
+          status: "FROZEN",
+        },
+      });
+
+      if (update.count !== 1) {
+        throw new PackageStatusError("package-status-stale");
+      }
+
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_REACTIVATION",
+        actorId: user.id,
+        customerId: customerPackage.customer.id,
+        description: `Reactivated ${customerPackage.package.name} for ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName}${nextStatus === "EXPIRED" ? " as expired" : ""}.`,
+        newValue: {
+          expirationDate: customerPackage.expirationDate,
+          frozenAt: customerPackage.frozenAt,
+          reactivatedAt,
+          remainingSessions: customerPackage.remainingSessions,
+          status: nextStatus,
+        },
+        oldValue: {
+          expirationDate: customerPackage.expirationDate,
+          frozenAt: customerPackage.frozenAt,
+          reactivatedAt: customerPackage.reactivatedAt,
+          remainingSessions: customerPackage.remainingSessions,
+          status: customerPackage.status,
+        },
+        targetId: customerPackage.id,
+        targetType: "CustomerPackage",
+      });
+
+      return nextStatus;
+    });
+  } catch (error) {
+    const errorCode =
+      error instanceof PackageStatusError
+        ? error.code
+        : "package-reactivation-unavailable";
+    redirect(
+      customerPath(customerCode, `error=${errorCode}`, showAllPackages, compact),
+    );
+  }
+
+  revalidatePath(REGISTRATION_PATH);
+  revalidatePath("/admin/logs");
+  redirect(
+    customerPath(
+      customerCode,
+      reactivatedStatus === "EXPIRED"
+        ? "status=package-reactivated-expired"
+        : "status=package-reactivated",
+      showAllPackages,
+      compact,
     ),
   );
 }

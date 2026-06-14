@@ -2,16 +2,18 @@ import { checkOutAction } from "../../app/registration/actions";
 import { Button } from "../ui/button";
 
 export function CheckOutPanel({
+  compact,
   customerCode,
   customerId,
   showAllPackages,
 }: {
+  compact: boolean;
   customerCode: string;
   customerId: string;
   showAllPackages: boolean;
 }) {
   return (
-    <section className="mt-8 rounded-2xl border border-status-medium bg-card p-5 sm:p-6">
+    <section className="mt-4 rounded-2xl border border-status-medium bg-card p-5 shadow-sm sm:p-6">
       <p className="text-sm font-bold uppercase tracking-[0.16em] text-button-warning">
         Check out
       </p>
@@ -30,7 +32,8 @@ export function CheckOutPanel({
           type="hidden"
           value={showAllPackages ? "1" : "0"}
         />
-        <Button type="submit" variant="warning">
+        {compact ? <input name="view" type="hidden" value="compact" /> : null}
+        <Button className="w-full sm:w-auto" type="submit" variant="warning">
           Check out customer
         </Button>
       </form>

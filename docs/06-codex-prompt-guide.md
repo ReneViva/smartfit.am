@@ -93,7 +93,9 @@ Document roles:
 - `docs/06-codex-prompt-guide.md` controls how Codex should behave while implementing.
 - `docs/design-colors.md` provides Smartfit.am design tokens and color definitions.
 
-`docs/05-development-phases.md` is the official phase plan. It contains exactly **16 phases: Phase 0 through Phase 15**. Codex and ChatGPT must not create Phase 16 or any later phase unless the project owner manually updates that document first.
+`docs/05-development-phases.md` is the official phase plan. Phase 0 through Phase 15 are the completed original MVP phases. The project owner manually extended the plan with post-MVP Registration Panel improvement phases, Phase 16 through Phase 21. Codex and ChatGPT must not create Phase 22 or any later phase unless the project owner manually updates that document again.
+
+The post-MVP phases exist only because the project owner reviewed the completed Registration Panel against the uploaded specification and explicitly approved a focused improvement sequence. They do not weaken the anti-hallucination, simplicity, privacy, permission, or phase-control rules.
 
 ---
 
@@ -254,7 +256,7 @@ When ChatGPT generates a Codex prompt for a phase, it must:
 17. Not add extra tasks.
 18. Not invent missing requirements.
 19. Not add extra phase numbers.
-20. Not continue beyond Phase 15 unless `docs/05-development-phases.md` is manually updated first.
+20. Not continue beyond the final approved phase in `docs/05-development-phases.md`.
 
 ---
 
@@ -299,8 +301,9 @@ Complete / Partially Complete / Blocked
 Review rules:
 
 - If the phase is complete, ChatGPT may generate the next phase prompt only if there is a next phase in `docs/05-development-phases.md`.
-- If Phase 15 is complete, ChatGPT must not suggest Phase 16.
-- If something remains after Phase 15, ChatGPT should create a `Remaining Issues` list, not a new phase.
+- If Phase 15 is complete, ChatGPT may move to Phase 16 only because the project owner manually added Phase 16 through Phase 21 to `docs/05-development-phases.md`.
+- If Phase 21 is complete, ChatGPT must not suggest Phase 22.
+- If something remains after Phase 21, ChatGPT should create a `Remaining Issues` list, not a new phase.
 
 ---
 
@@ -405,7 +408,7 @@ Do not add unconfirmed features.
 Make the prompt guide Codex toward the simplest correct implementation.
 ```
 
-ChatGPT must check the official phase index before responding. If the completed phase is Phase 15, there is no next phase unless `docs/05-development-phases.md` has been manually updated.
+ChatGPT must check the official phase index before responding. The current plan has been manually extended through Phase 21. If the completed phase is Phase 21, there is no next phase unless `docs/05-development-phases.md` is manually updated again.
 
 ---
 
@@ -416,13 +419,16 @@ Phase hallucination means ChatGPT or Codex invents new phase numbers, skips the 
 Strict rules:
 
 - Always check the Full Phase Index in `docs/05-development-phases.md`.
-- The current plan contains exactly **Phase 0 through Phase 15**.
+- The current approved plan contains **Phase 0 through Phase 21**.
+- Phase 0 through Phase 15 are the completed original MVP phases.
+- Phase 16 through Phase 21 are manually approved post-MVP Registration Panel improvement phases.
 - Never continue beyond the final phase.
-- If the plan ends at Phase 15, stop at Phase 15.
-- Do not create Phase 16, Phase 17, Phase 18, Phase 21, Phase 22, or any other extra phase.
-- If something is left unfinished after the final phase, create a `Remaining Issues` list, not Phase 16.
+- The current plan ends at Phase 21, so stop at Phase 21.
+- Do not create Phase 22 or any later phase.
+- If something is left unfinished after the final phase, create a `Remaining Issues` list, not Phase 22.
 - New phases require manual update to `docs/05-development-phases.md`.
-- ChatGPT must never say “next is Phase 16” unless the phase document was manually updated first.
+- ChatGPT may refer to Phase 16 through Phase 21 because the phase document has now been manually updated.
+- ChatGPT must never say “next is Phase 22” unless the phase document is manually updated again.
 - Codex must not add phase numbers in its output unless it is referring to the official phase being implemented.
 - If a feature does not fit into the fixed phase plan, state that `docs/05-development-phases.md` must be manually updated first.
 
@@ -446,6 +452,12 @@ Official phase index:
 | Phase 13 | Excel Export |
 | Phase 14 | Basic Analytics |
 | Phase 15 | Final Testing and Deployment Preparation |
+| Phase 16 | Registration Gap Audit and Missing Section Fixes |
+| Phase 17 | Registration Customer Workspace Redesign |
+| Phase 18 | Registration Notes and Activity Experience Polish |
+| Phase 19 | Registration Package Freeze and Reactivation |
+| Phase 20 | Reception Workspace Controls and Operational Rules Display |
+| Phase 21 | Post-MVP Registration Regression and Client Review Preparation |
 
 ---
 
@@ -487,7 +499,6 @@ Confirmed MVP work should stay focused on:
 - Coaches.
 - Packages and package time restrictions.
 - Customer package assignment.
-- Package freezing and reactivation in both Admin Panel and Registration Panel.
 - Check-in/check-out.
 - Manual session and occupancy corrections.
 - Notes.
@@ -496,7 +507,16 @@ Confirmed MVP work should stay focused on:
 - Basic analytics.
 - Final testing and deployment preparation.
 
-**Important:** Package freezing and reactivation are **confirmed MVP features**, not future-only or unclear. Both admin/manager users and registration/reception users can freeze and reactivate customer packages. Frozen packages cannot be used for check-in or session deduction. Freezing/reactivation must create admin-visible logs.
+Confirmed post-MVP Registration work must stay focused on Phase 16 through Phase 21:
+
+- Registration gap audit and missing-section fixes.
+- Registration customer workspace redesign.
+- Notes and safe customer-specific activity polish.
+- Package freeze/reactivation only after the project owner confirms REGISTRATION permission.
+- Reception view controls and read-only operational-rule display.
+- Registration regression testing and client-review preparation.
+
+**Important:** Admin Settings remain admin-only. Reception view controls must not become a true system-settings editor. Any future request to let REGISTRATION edit system-wide settings requires a separate permission decision and another manual documentation update.
 
 ---
 
@@ -771,5 +791,5 @@ These unclear points must not be solved by guessing inside Codex prompts. If a p
 ## 18. Final Rule
 
 ```txt
-Codex and ChatGPT must follow docs/05-development-phases.md exactly. No new phases, no unconfirmed features, no unrelated refactors, and no over-engineered implementations are allowed unless the project owner manually updates the documentation.
+Codex and ChatGPT must follow docs/05-development-phases.md exactly. Phase 16 through Phase 21 are the only manually approved post-MVP phases. No Phase 22, unconfirmed feature, unrelated refactor, or over-engineered implementation is allowed unless the project owner manually updates the documentation again.
 ```

@@ -51,6 +51,14 @@ function displayDateTime(value: string) {
   }).format(new Date(value));
 }
 
+function latestNoteUpdate(notes: CustomerNoteView[]) {
+  return notes.reduce<string | null>(
+    (latest, note) =>
+      !latest || note.updatedAt > latest ? note.updatedAt : latest,
+    null,
+  );
+}
+
 export function NotesSection({
   customerId,
   initialNotes,
@@ -59,7 +67,7 @@ export function NotesSection({
   initialNotes: CustomerNoteView[];
 }) {
   const [externalChange, setExternalChange] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [notes, setNotes] = useState(initialNotes);
   const [newNoteDraft, setNewNoteDraft] = useState("");
@@ -71,6 +79,7 @@ export function NotesSection({
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [isPending, startTransition] = useTransition();
   const currentMetadata = useMemo(() => noteMetadata(notes), [notes]);
+  const latestUpdatedAt = useMemo(() => latestNoteUpdate(notes), [notes]);
   const hasDraft = Boolean(newNoteDraft.trim() || editingNote);
 
   async function refreshNotes() {
@@ -143,7 +152,11 @@ export function NotesSection({
   }
 
   function deleteNote(note: CustomerNoteView) {
-    if (!window.confirm("Delete this note? The action will be logged.")) {
+    if (
+      !window.confirm(
+        "Delete this customer note? It will disappear from the workspace and the action will be logged.",
+      )
+    ) {
       return;
     }
 
@@ -177,7 +190,7 @@ export function NotesSection({
   useEffect(() => {
     setEditingNote(null);
     setExternalChange(false);
-    setIsOpen(false);
+    setIsOpen(true);
     setMessage(null);
     setNewNoteDraft("");
     setNotes(initialNotes);
@@ -235,25 +248,57 @@ export function NotesSection({
   }, [currentMetadata, customerId, hasDraft, isOpen]);
 
   return (
-    <section className="mt-8 border-t border-border pt-6">
+    <section className="smooth-panel rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
+            Reception reminders and internal context
+          </p>
           <h3 className="text-2xl font-bold text-foreground">Customer notes</h3>
           <p className="mt-1 text-sm text-secondary">
-            Shared operational notes for admin and registration staff.
+            Customer-specific operational notes shared with admin and
+            registration staff.
           </p>
         </div>
-        <Button onClick={() => setIsOpen((open) => !open)} variant="neutral">
-          {isOpen ? "Close notes" : `Open notes (${notes.length})`}
-        </Button>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <Button
+            className="flex-1 sm:flex-none"
+            disabled={isPending}
+            onClick={manualRefresh}
+            variant="neutral"
+          >
+            Refresh notes
+          </Button>
+          <Button
+            className="flex-1 sm:flex-none"
+            onClick={() => setIsOpen((open) => !open)}
+            variant="neutral"
+          >
+            {isOpen ? "Close notes" : `Open notes (${notes.length})`}
+          </Button>
+        </div>
       </div>
 
       {isOpen ? (
-        <div className="mt-5">
+        <div className="animate-soft-enter mt-5">
+          <div className="smooth-panel flex flex-wrap gap-x-5 gap-y-2 rounded-xl border border-border bg-page px-4 py-3 text-xs font-semibold text-secondary">
+            <span>
+              {notes.length} note{notes.length === 1 ? "" : "s"} · newest first
+            </span>
+            <span>
+              {updatedAt
+                ? `Notes updated just now (${displayDateTime(updatedAt.toISOString())})`
+                : latestUpdatedAt
+                  ? `Latest note update ${displayDateTime(latestUpdatedAt)}`
+                  : "No note updates yet"}
+            </span>
+            <span>Automatic update checks run while notes are open.</span>
+          </div>
           {externalChange ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-status-medium bg-page px-4 py-3">
+            <div className="animate-soft-enter smooth-panel mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-status-medium bg-page px-4 py-3">
               <p className="text-sm font-semibold text-foreground">
-                Notes were updated by another user. Refresh notes.
+                Notes changed by another user. Your current draft was kept.
+                Refresh when ready.
               </p>
               <Button
                 disabled={isPending}
@@ -266,24 +311,18 @@ export function NotesSection({
           ) : null}
           {message ? (
             <p
-              className="mt-3 rounded-xl border border-border bg-page px-4 py-3 text-sm font-semibold text-foreground"
+              className="animate-soft-enter smooth-panel mt-3 rounded-xl border border-border bg-page px-4 py-3 text-sm font-semibold text-foreground"
               role="status"
             >
               {message}
             </p>
           ) : null}
-          {updatedAt ? (
-            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted">
-              Notes refreshed {displayDateTime(updatedAt.toISOString())}
-            </p>
-          ) : null}
-
           <form
-            className="mt-5 rounded-xl border border-border bg-page p-4"
+            className="smooth-panel mt-5 rounded-xl border border-border bg-page p-4"
             onSubmit={createNote}
           >
             <label className="block text-sm font-semibold text-foreground">
-              Add note
+              Add customer note
               <textarea
                 className="mt-2 min-h-28 w-full resize-y rounded-lg border border-input-border bg-card px-3 py-2 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue"
                 maxLength={4000}
@@ -292,8 +331,16 @@ export function NotesSection({
                 value={newNoteDraft}
               />
             </label>
+            <p className="mt-2 text-xs leading-5 text-muted">
+              Add a reception reminder or internal customer context. Notes stay
+              private.
+            </p>
             <div className="mt-3 flex justify-end">
-              <Button disabled={isPending || !newNoteDraft.trim()} type="submit">
+              <Button
+                className="w-full sm:w-auto"
+                disabled={isPending || !newNoteDraft.trim()}
+                type="submit"
+              >
                 {isPending ? "Saving..." : "Add note"}
               </Button>
             </div>
@@ -303,13 +350,16 @@ export function NotesSection({
             <div className="mt-5 space-y-4">
               {notes.map((note) => (
                 <article
-                  className="rounded-xl border border-border bg-page p-4"
+                  className={`animate-list-item-in rounded-xl border p-4 ${editingNote?.id === note.id ? "border-brand bg-soft-blue" : "border-border bg-page"}`}
                   key={note.id}
                 >
                   {editingNote?.id === note.id ? (
                     <form onSubmit={updateNote}>
+                      <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-primary-active">
+                        Editing customer note
+                      </p>
                       <label className="block text-sm font-semibold text-foreground">
-                        Edit note
+                        Note content
                         <textarea
                           autoFocus
                           className="mt-2 min-h-28 w-full resize-y rounded-lg border border-input-border bg-card px-3 py-2 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue"
@@ -323,6 +373,10 @@ export function NotesSection({
                           value={editingNote.content}
                         />
                       </label>
+                      <p className="mt-2 text-xs leading-5 text-secondary">
+                        Saving updates this note only. Changes made elsewhere
+                        are protected by stale-edit checks.
+                      </p>
                       <div className="mt-3 flex flex-wrap justify-end gap-2">
                         <Button
                           disabled={isPending}
@@ -370,14 +424,14 @@ export function NotesSection({
                             }
                             variant="neutral"
                           >
-                            Edit
+                            Edit note
                           </Button>
                           <Button
                             disabled={isPending}
                             onClick={() => deleteNote(note)}
                             variant="danger"
                           >
-                            Delete
+                            Delete note
                           </Button>
                         </div>
                       </div>
@@ -387,9 +441,15 @@ export function NotesSection({
               ))}
             </div>
           ) : (
-            <p className="mt-5 rounded-xl border border-dashed border-border bg-page px-5 py-8 text-center text-secondary">
-              No customer notes yet.
-            </p>
+            <div className="animate-panel-in smooth-panel mt-5 rounded-xl border border-dashed border-border bg-page px-5 py-8">
+              <p className="font-semibold text-foreground">
+                No notes yet for this customer.
+              </p>
+              <p className="mt-2 text-sm leading-6 text-secondary">
+                Add a note for reception reminders or internal customer
+                context.
+              </p>
+            </div>
           )}
         </div>
       ) : null}

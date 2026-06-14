@@ -17,20 +17,24 @@ type CheckInPackageOption = {
 };
 
 export function CheckInPanel({
+  compact,
   customerCode,
   customerId,
   packages,
+  showAllPackages,
 }: {
+  compact: boolean;
   customerCode: string;
   customerId: string;
   packages: CheckInPackageOption[];
+  showAllPackages: boolean;
 }) {
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const usablePackages = packages.filter((gymPackage) => gymPackage.usable);
   const allowsNoPackageCheckIn = usablePackages.length === 0;
 
   return (
-    <section className="mt-8 rounded-2xl border border-brand bg-soft-blue p-5 sm:p-6">
+    <section className="mt-4 rounded-2xl border border-brand bg-card p-5 shadow-sm sm:p-6">
       <p className="text-sm font-bold uppercase tracking-[0.16em] text-primary-active">
         Check in
       </p>
@@ -41,12 +45,18 @@ export function CheckInPanel({
       <form action={checkInAction} className="mt-5">
         <input name="customerCode" type="hidden" value={customerCode} />
         <input name="customerId" type="hidden" value={customerId} />
+        <input
+          name="showAllPackages"
+          type="hidden"
+          value={showAllPackages ? "1" : "0"}
+        />
+        {compact ? <input name="view" type="hidden" value="compact" /> : null}
 
         {packages.length ? (
           <div className="grid gap-3 lg:grid-cols-2">
             {packages.map((gymPackage) => (
               <label
-                className={`rounded-xl border p-4 ${gymPackage.usable ? "cursor-pointer border-border bg-card" : "cursor-not-allowed border-status-high bg-card opacity-75"}`}
+                className={`rounded-xl border p-4 transition-colors ${gymPackage.usable ? selectedPackages.includes(gymPackage.id) ? "cursor-pointer border-brand bg-soft-blue" : "cursor-pointer border-border bg-page hover:border-brand" : "cursor-not-allowed border-status-high bg-page opacity-75"}`}
                 key={gymPackage.id}
               >
                 <div className="flex items-start gap-3">
@@ -103,7 +113,7 @@ export function CheckInPanel({
         )}
 
         <Button
-          className="mt-5"
+          className="mt-5 w-full sm:w-auto"
           disabled={!allowsNoPackageCheckIn && selectedPackages.length === 0}
           type="submit"
           variant="success"

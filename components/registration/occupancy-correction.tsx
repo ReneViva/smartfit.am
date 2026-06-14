@@ -7,24 +7,28 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 
 export function OccupancyCorrection({
+  compact,
   currentCount,
   customerCode,
+  returnPath,
   showAllPackages,
 }: {
+  compact: boolean;
   currentCount: number;
   customerCode: string | null;
+  returnPath?: "/registration/occupancy";
   showAllPackages: boolean;
 }) {
   const [draftCount, setDraftCount] = useState(currentCount);
 
   return (
-    <Card className="mt-6">
+    <Card className="scroll-mt-6 p-5 sm:p-6" id="occupancy">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
-            Live occupancy correction
+            Supporting control · Live occupancy correction
           </p>
-          <h3 className="mt-2 text-2xl font-bold text-foreground">
+          <h3 className="mt-2 text-xl font-bold text-foreground">
             {currentCount} people currently inside
           </h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
@@ -38,6 +42,9 @@ export function OccupancyCorrection({
           className="flex flex-col gap-3 sm:items-end"
         >
           <input name="previousCount" type="hidden" value={currentCount} />
+          {returnPath ? (
+            <input name="returnPath" type="hidden" value={returnPath} />
+          ) : null}
           <input
             name="customerCode"
             type="hidden"
@@ -48,6 +55,7 @@ export function OccupancyCorrection({
             type="hidden"
             value={showAllPackages ? "1" : "0"}
           />
+          {compact ? <input name="view" type="hidden" value="compact" /> : null}
           <div className="flex items-center gap-2">
             <Button
               aria-label="Decrease draft occupancy"
