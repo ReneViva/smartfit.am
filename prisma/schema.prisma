@@ -96,6 +96,8 @@ model GymSettings {
   id                                    String   @id @default(cuid())
   gymName                               String
   logoUrl                               String?
+  ourAppLogoLightUrl                    String?
+  ourAppLogoDarkUrl                     String?
   contactNumber                         String?
   whatsappLink                          String?
   instagramLink                         String?

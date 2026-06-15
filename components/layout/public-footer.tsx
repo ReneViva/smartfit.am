@@ -47,7 +47,7 @@ export function PublicFooter({
         <div>
           <Link
             aria-label="Smartfit.am home"
-            className="inline-flex rounded-lg bg-logo-surface px-2 py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className="inline-flex focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             href="/"
           >
             <SmartfitLogo className="h-12 w-auto max-w-44 object-contain" />

@@ -72,11 +72,11 @@ export function PublicHeader() {
         <div className="flex min-w-0 items-center gap-2">
           <Link
             aria-label="Smartfit.am home"
-            className="mr-auto block shrink-0 rounded-lg bg-logo-surface px-2 py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className="mr-auto block shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             href="/"
             onClick={() => setMenuOpen(false)}
           >
-            <SmartfitLogo className="h-10 w-auto max-w-36 object-contain" />
+            <SmartfitLogo className="h-12 w-auto max-w-44 object-contain sm:h-20 sm:max-w-52" />
           </Link>
 
           <nav

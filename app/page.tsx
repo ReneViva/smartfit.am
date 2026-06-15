@@ -1,8 +1,10 @@
 import Link from "next/link";
 
 import { PublicLayout } from "../components/layout/public-layout";
+import { CoachPhoto } from "../components/public/coach-photo";
 import { EmptyState } from "../components/public/empty-state";
 import { GalleryGrid } from "../components/public/gallery-grid";
+import { JsonLd } from "../components/public/json-ld";
 import { PublicContentCarousel } from "../components/public/public-content-carousel";
 import { PublicContentImage } from "../components/public/public-content-image";
 import { Card } from "../components/ui/card";
@@ -15,8 +17,19 @@ import {
   getPublicAppData,
   getPublicSettings,
 } from "../lib/public-data";
+import {
+  createPublicMetadata,
+  DEFAULT_SITE_DESCRIPTION,
+  DEFAULT_SITE_TITLE,
+  getAbsoluteUrl,
+} from "../lib/seo";
 
 export const dynamic = "force-dynamic";
+export const metadata = createPublicMetadata({
+  description: DEFAULT_SITE_DESCRIPTION,
+  path: "/",
+  title: DEFAULT_SITE_TITLE,
+});
 
 const primaryCta =
   "inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-5 py-2.5 text-sm font-bold text-white transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-primary-hover hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
@@ -65,6 +78,53 @@ export default async function Home() {
       getPublicAppData(),
     ]);
   const gymName = settings?.gymName ?? appData.gymName;
+  const siteUrl = getAbsoluteUrl("/");
+  const organizationId = `${siteUrl}#organization`;
+  const sameAs = [settings?.instagramLink, settings?.whatsappLink].filter(
+    (link): link is string => Boolean(link),
+  );
+  const gymStructuredData: Record<string, unknown> = {
+    "@id": organizationId,
+    "@type": "ExerciseGym",
+    logo: settings?.logoUrl ?? getAbsoluteUrl("/logo/Logo.svg"),
+    name: gymName,
+    url: siteUrl,
+  };
+
+  if (settings?.contactNumber) {
+    gymStructuredData.telephone = settings.contactNumber;
+  }
+
+  if (settings?.address) {
+    gymStructuredData.address = {
+      "@type": "PostalAddress",
+      streetAddress: settings.address,
+    };
+  }
+
+  if (settings?.mapLink) {
+    gymStructuredData.hasMap = settings.mapLink;
+  }
+
+  if (sameAs.length) {
+    gymStructuredData.sameAs = sameAs;
+  }
+
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@id": `${siteUrl}#website`,
+        "@type": "WebSite",
+        name: gymName,
+        publisher: {
+          "@id": organizationId,
+        },
+        url: siteUrl,
+      },
+      gymStructuredData,
+    ],
+  };
   const heroContent = content.find((item) => item.type === "HERO");
   const offers = content.filter((item) => item.type !== "HERO");
   const occupancyStatusClasses = {
@@ -75,6 +135,8 @@ export default async function Home() {
 
   return (
     <PublicLayout>
+      <JsonLd data={structuredData} />
+
       <section className="public-section-enter">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -235,20 +297,12 @@ export default async function Home() {
                 className="public-interactive-card overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
                 key={coach.id}
               >
-                {coach.photoUrl ? (
-                  <div className="public-image-card overflow-hidden">
-                    <PublicContentImage
-                      alt={`${coach.firstName} ${coach.lastName}`}
-                      className="aspect-[4/3] w-full"
-                      src={coach.photoUrl}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex aspect-[4/3] items-center justify-center bg-soft-blue text-5xl font-bold text-brand">
-                    {coach.firstName.charAt(0)}
-                    {coach.lastName.charAt(0)}
-                  </div>
-                )}
+                <div className="public-image-card overflow-hidden">
+                  <CoachPhoto
+                    name={`${coach.firstName} ${coach.lastName}`}
+                    photoUrl={coach.photoUrl}
+                  />
+                </div>
                 <div className="p-6">
                   <p className="text-sm font-bold text-brand">
                     {coach.specialty}

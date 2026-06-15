@@ -447,6 +447,22 @@ select {
   color-scheme: dark;
 }
 
+.smartfit-logo-light {
+  display: block;
+}
+
+.smartfit-logo-dark {
+  display: none;
+}
+
+.dark .smartfit-logo-light {
+  display: none;
+}
+
+.dark .smartfit-logo-dark {
+  display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

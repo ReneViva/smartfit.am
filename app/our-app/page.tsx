@@ -1,13 +1,24 @@
 import { PublicLayout } from "../../components/layout/public-layout";
 import { SmartfitLogo } from "../../components/brand/smartfit-logo";
+import { JsonLd } from "../../components/public/json-ld";
 import { Card } from "../../components/ui/card";
 import { StatusBadge } from "../../components/ui/status-badge";
 import {
   getPublicAppData,
   type PublicCrowdStatus,
 } from "../../lib/public-data";
+import {
+  createBreadcrumbJsonLd,
+  createPublicMetadata,
+} from "../../lib/seo";
 
 export const dynamic = "force-dynamic";
+export const metadata = createPublicMetadata({
+  description:
+    "Check Smartfit.am live gym occupancy, public contact links, and add the public app to your device home screen.",
+  path: "/our-app",
+  title: "Smartfit.am Our App — Live Gym Occupancy & Add to Home Screen",
+});
 
 const occupancyCircleClasses: Record<PublicCrowdStatus, string> = {
   high: "bg-status-high text-white",
@@ -82,17 +93,16 @@ export default async function OurAppPage() {
 
   return (
     <PublicLayout>
+      <JsonLd data={createBreadcrumbJsonLd("Our App", "/our-app")} />
+
       <div className="mx-auto max-w-3xl">
         <header className="text-center">
-          {appData.logoUrl ? (
-            <img
-              alt={`${appData.gymName} logo`}
-              className="mx-auto max-h-20 max-w-56 object-contain"
-              src={appData.logoUrl}
-            />
-          ) : (
-            <SmartfitLogo className="mx-auto max-h-20 max-w-56 object-contain" />
-          )}
+          <SmartfitLogo
+            alt={`${appData.gymName} logo`}
+            className="mx-auto max-h-20 max-w-56 object-contain"
+            darkSrc={appData.ourAppLogoDarkUrl ?? undefined}
+            lightSrc={appData.ourAppLogoLightUrl ?? undefined}
+          />
           <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-brand">
             Live gym status
           </p>

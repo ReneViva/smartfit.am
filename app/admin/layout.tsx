@@ -1,10 +1,14 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { AdminNav } from "../../components/admin/admin-nav";
 import { PrivateLayout } from "../../components/layout/private-layout";
 import { Button } from "../../components/ui/button";
 import { requireStaffRole } from "../../lib/auth";
+import { createPrivateMetadata } from "../../lib/seo";
 import { logoutAction } from "../login/actions";
+
+export const metadata: Metadata = createPrivateMetadata("Smartfit.am Admin");
 
 export default async function AdminLayout({
   children,

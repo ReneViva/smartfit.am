@@ -1,17 +1,30 @@
 import { PublicLayout } from "../../components/layout/public-layout";
 import { EmptyState } from "../../components/public/empty-state";
+import { JsonLd } from "../../components/public/json-ld";
 import { PageIntro } from "../../components/public/page-intro";
 import { Card } from "../../components/ui/card";
 import { packageTypeLabel } from "../../lib/package-types";
 import { getActivePackages } from "../../lib/public-data";
+import {
+  createBreadcrumbJsonLd,
+  createPublicMetadata,
+} from "../../lib/seo";
 
 export const dynamic = "force-dynamic";
+export const metadata = createPublicMetadata({
+  description:
+    "Explore active Smartfit.am gym memberships, service packages, session options, and training plans.",
+  path: "/packages",
+  title: "Smartfit.am Packages — Gym Memberships, Services & Training Plans",
+});
 
 export default async function PackagesPage() {
   const packages = await getActivePackages();
 
   return (
     <PublicLayout>
+      <JsonLd data={createBreadcrumbJsonLd("Packages", "/packages")} />
+
       <PageIntro
         description="Explore active Smartfit.am gym access, training, and service package options."
         eyebrow="Packages and services"

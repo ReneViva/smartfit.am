@@ -1,11 +1,14 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { getCurrentStaffUser, staffHome } from "../../lib/auth";
+import { createPrivateMetadata } from "../../lib/seo";
 import { loginAction } from "./actions";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = createPrivateMetadata("Smartfit.am Staff Login");
 
 type LoginPageProps = {
   searchParams: Promise<{

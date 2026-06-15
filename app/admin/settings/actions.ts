@@ -54,6 +54,8 @@ export async function saveSettingsAction(formData: FormData) {
   const yellowMax = threshold(formData, "occupancyYellowMax");
   const rawUrlFields = [
     "logoUrl",
+    "ourAppLogoLightUrl",
+    "ourAppLogoDarkUrl",
     "whatsappLink",
     "instagramLink",
     "mapLink",
@@ -77,8 +79,27 @@ export async function saveSettingsAction(formData: FormData) {
       redirect(`${SETTINGS_PATH}?error=upload-${imageUploadErrorCode(error)}`);
     },
   );
+  const uploadedOurAppLogoLightUrl = await uploadImageFromForm(
+    formData,
+    "ourAppLogoLightUpload",
+  ).catch((error) => {
+    redirect(`${SETTINGS_PATH}?error=upload-${imageUploadErrorCode(error)}`);
+  });
+  const uploadedOurAppLogoDarkUrl = await uploadImageFromForm(
+    formData,
+    "ourAppLogoDarkUpload",
+  ).catch((error) => {
+    redirect(`${SETTINGS_PATH}?error=upload-${imageUploadErrorCode(error)}`);
+  });
+  const uploadedUrls: Partial<
+    Record<(typeof rawUrlFields)[number], string | null>
+  > = {
+    logoUrl: uploadedLogoUrl,
+    ourAppLogoDarkUrl: uploadedOurAppLogoDarkUrl,
+    ourAppLogoLightUrl: uploadedOurAppLogoLightUrl,
+  };
   const hasInvalidUrl = rawUrlFields.some((field) => {
-    if (field === "logoUrl" && uploadedLogoUrl) {
+    if (uploadedUrls[field]) {
       return false;
     }
 
@@ -107,6 +128,10 @@ export async function saveSettingsAction(formData: FormData) {
     motivationalText: optionalText(formData, "motivationalText", 1000),
     occupancyGreenMax: greenMax,
     occupancyYellowMax: yellowMax,
+    ourAppLogoDarkUrl:
+      uploadedOurAppLogoDarkUrl ?? urls.ourAppLogoDarkUrl,
+    ourAppLogoLightUrl:
+      uploadedOurAppLogoLightUrl ?? urls.ourAppLogoLightUrl,
     showInstagramInPublicApp:
       formData.get("showInstagramInPublicApp") === "on",
     showLocationInPublicApp:

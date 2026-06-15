@@ -44,6 +44,7 @@ Open [http://localhost:3000](http://localhost:3000).
 |---|---|---|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `AUTH_SECRET` | Yes | Long random secret used to sign staff sessions |
+| `NEXT_PUBLIC_SITE_URL` | Yes for deployment | Public site origin used for canonical, sitemap, and social metadata URLs |
 | `SEED_ADMIN_USERNAME` | For intentional seed runs | Initial admin username |
 | `SEED_ADMIN_EMAIL` | For intentional seed runs | Initial admin email |
 | `SEED_ADMIN_PASSWORD` | For intentional seed runs | Initial admin password |
@@ -124,6 +125,9 @@ For a complete public, customer, package, guest, service, and access review,
 use the [post-MVP client review checklist](docs/08-post-mvp-client-review-checklist.md).
 
 ## Production Deployment
+
+Set `NEXT_PUBLIC_SITE_URL` to the deployed HTTPS origin, such as
+`https://smartfit.am`, before building the production application.
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for environment, migration, seed, HTTPS, backup, security, and smoke-test steps.
 

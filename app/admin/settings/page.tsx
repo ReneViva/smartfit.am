@@ -245,7 +245,25 @@ export default async function SettingsPage({
           <h3 className="text-xl font-bold text-foreground">
             Public app display
           </h3>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            Set separate Our App wordmarks for light and dark themes. The
+            bundled Smartfit logos are used when a field is empty.
+          </p>
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <ImageInput
+              defaultValue={settings?.ourAppLogoLightUrl ?? ""}
+              label="Our App logo - light theme"
+              name="ourAppLogoLightUrl"
+              uploadName="ourAppLogoLightUpload"
+            />
+            <ImageInput
+              defaultValue={settings?.ourAppLogoDarkUrl ?? ""}
+              label="Our App logo - dark theme"
+              name="ourAppLogoDarkUrl"
+              uploadName="ourAppLogoDarkUpload"
+            />
+          </div>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
             {toggleFields.map(({ defaultChecked, label, name }) => (
               <label
                 className="flex items-center gap-3 rounded-lg bg-neutral px-4 py-3 text-sm font-semibold text-foreground"

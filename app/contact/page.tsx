@@ -1,15 +1,28 @@
 import { PublicLayout } from "../../components/layout/public-layout";
+import { JsonLd } from "../../components/public/json-ld";
 import { PageIntro } from "../../components/public/page-intro";
 import { Card } from "../../components/ui/card";
 import { getPublicSettings } from "../../lib/public-data";
+import {
+  createBreadcrumbJsonLd,
+  createPublicMetadata,
+} from "../../lib/seo";
 
 export const dynamic = "force-dynamic";
+export const metadata = createPublicMetadata({
+  description:
+    "Find Smartfit.am contact details, address, working hours, phone, WhatsApp, Instagram, and map directions when available.",
+  path: "/contact",
+  title: "Contact Smartfit.am — Address, Working Hours, Phone & WhatsApp",
+});
 
 export default async function ContactPage() {
   const settings = await getPublicSettings();
 
   return (
     <PublicLayout>
+      <JsonLd data={createBreadcrumbJsonLd("Contact", "/contact")} />
+
       <PageIntro
         description="Find the available contact, location, and working-hours information for Smartfit.am."
         eyebrow="Contact"

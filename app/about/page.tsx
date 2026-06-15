@@ -1,11 +1,22 @@
 import Link from "next/link";
 
 import { PublicLayout } from "../../components/layout/public-layout";
+import { JsonLd } from "../../components/public/json-ld";
 import { PageIntro } from "../../components/public/page-intro";
 import { Card } from "../../components/ui/card";
 import { getPublicSettings } from "../../lib/public-data";
+import {
+  createBreadcrumbJsonLd,
+  createPublicMetadata,
+} from "../../lib/seo";
 
 export const dynamic = "force-dynamic";
+export const metadata = createPublicMetadata({
+  description:
+    "Learn about Smartfit.am's training atmosphere, gym services, and practical approach to building a consistent fitness routine.",
+  path: "/about",
+  title: "About Smartfit.am — Gym, Training Atmosphere & Services",
+});
 
 export default async function AboutPage() {
   const settings = await getPublicSettings();
@@ -13,6 +24,8 @@ export default async function AboutPage() {
 
   return (
     <PublicLayout>
+      <JsonLd data={createBreadcrumbJsonLd("About", "/about")} />
+
       <PageIntro
         description={`${gymName} is a welcoming place for focused training, steady progress, and a healthier daily routine.`}
         eyebrow="About us"

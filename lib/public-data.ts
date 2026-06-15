@@ -63,12 +63,13 @@ export async function getPublicAppData() {
           contactNumber: true,
           gymName: true,
           instagramLink: true,
-          logoUrl: true,
           mapEmbedUrl: true,
           mapLink: true,
           motivationalText: true,
           occupancyGreenMax: true,
           occupancyYellowMax: true,
+          ourAppLogoDarkUrl: true,
+          ourAppLogoLightUrl: true,
           showInstagramInPublicApp: true,
           showLocationInPublicApp: true,
           showMotivationalTextInPublicApp: true,
@@ -121,7 +122,8 @@ export async function getPublicAppData() {
 
   return {
     gymName: settings?.gymName ?? "Smartfit.am",
-    logoUrl: safePublicUrl(settings?.logoUrl ?? null),
+    ourAppLogoDarkUrl: safePublicUrl(settings?.ourAppLogoDarkUrl ?? null),
+    ourAppLogoLightUrl: safePublicUrl(settings?.ourAppLogoLightUrl ?? null),
     motivationalText: settings?.showMotivationalTextInPublicApp
       ? settings.motivationalText
       : null,
