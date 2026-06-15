@@ -2,10 +2,12 @@ import Link from "next/link";
 
 import { CustomerNotesOverview } from "../../../components/registration/customer-notes-overview";
 import { GeneralNotesSection } from "../../../components/registration/general-notes-section";
+import { NotesLiveRefresh } from "../../../components/registration/notes-live-refresh";
 import { Card } from "../../../components/ui/card";
 import {
   getCustomerNotesOverview,
   getGeneralNotes,
+  getLatestNoteChangeAt,
 } from "../../../lib/notes-overview";
 
 type RegistrationNotesPageProps = {
@@ -27,9 +29,10 @@ export default async function RegistrationNotesPage({
 }: RegistrationNotesPageProps) {
   const params = await searchParams;
   const query = params.q?.trim().slice(0, 200) ?? "";
-  const [generalNotes, customerNotes] = await Promise.all([
+  const [generalNotes, customerNotes, latestChangedAt] = await Promise.all([
     getGeneralNotes(),
     getCustomerNotesOverview(query),
+    getLatestNoteChangeAt(),
   ]);
   const message = params.status
     ? messages[params.status]
@@ -38,7 +41,7 @@ export default async function RegistrationNotesPage({
       : null;
 
   return (
-    <>
+    <NotesLiveRefresh latestChangedAt={latestChangedAt}>
       <header>
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
           Notes
@@ -104,6 +107,6 @@ export default async function RegistrationNotesPage({
           </div>
         </div>
       </div>
-    </>
+    </NotesLiveRefresh>
   );
 }

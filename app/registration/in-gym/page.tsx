@@ -34,6 +34,8 @@ export default async function InGymPage({ searchParams }: InGymPageProps) {
     orderBy: { checkedInAt: "asc" },
     select: {
       checkedInAt: true,
+      guestCountUsed: true,
+      occupancyDelta: true,
       customer: {
         select: {
           assignedCoach: {
@@ -124,6 +126,13 @@ export default async function InGymPage({ searchParams }: InGymPageProps) {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge status="inGym">in gym</StatusBadge>
+                      {visit.guestCountUsed > 0 ? (
+                        <StatusBadge status="active">
+                          +{visit.guestCountUsed} guest
+                          {visit.guestCountUsed === 1 ? "" : "s"} · party{" "}
+                          {visit.occupancyDelta}
+                        </StatusBadge>
+                      ) : null}
                       <span className="text-sm font-semibold text-secondary">
                         Member ID: {visit.customer.customerCode}
                       </span>

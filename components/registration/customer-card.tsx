@@ -6,6 +6,7 @@ import type {
 import Link from "next/link";
 
 import { packageUsability } from "../../lib/registration/package-usability";
+import { packageTypeLabel } from "../../lib/package-types";
 import type { CustomerNoteView } from "../../lib/notes";
 import type { CustomerRecentActivityItem } from "../../lib/registration/recent-activity";
 import { Card } from "../ui/card";
@@ -36,8 +37,10 @@ type PackageCardValue = {
     hasTimeRestriction: boolean;
     isActive: boolean;
     name: string;
+    packageType: string;
     timeRestrictionLabel: string | null;
   };
+  remainingGuestPasses: number;
   remainingSessions: number;
   reactivatedAt: Date | null;
   status: CustomerPackageStatus;
@@ -48,7 +51,9 @@ type CustomerCardValue = {
     firstName: string;
     lastName: string;
   } | null;
+  birthDate: Date | null;
   customerCode: string;
+  emergencyPhone: string | null;
   fullName: string;
   gymPresenceStatus: GymPresenceStatus;
   id: string;
@@ -56,6 +61,7 @@ type CustomerCardValue = {
   lastCheckOutAt: Date | null;
   notes: CustomerNoteView[];
   packages: PackageCardValue[];
+  phone: string | null;
   status: CustomerStatus;
 };
 
@@ -154,7 +160,9 @@ export function RegistrationCustomerCard({
       expirationLabel: displayDate(customerPackage.expirationDate),
       id: customerPackage.id,
       name: customerPackage.package.name,
+      packageType: packageTypeLabel(customerPackage.package.packageType),
       reason: usability.reason,
+      remainingGuestPasses: customerPackage.remainingGuestPasses,
       remainingSessions: customerPackage.remainingSessions,
       timeRule: packageTimeRule(customerPackage),
       usable: usability.usable,
@@ -198,7 +206,33 @@ export function RegistrationCustomerCard({
             </div>
           </div>
         </div>
-        <dl className="grid gap-px bg-border sm:grid-cols-3">
+        <dl className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">
+          <div className="bg-card px-5 py-4 sm:px-6">
+            <dt className="text-xs font-bold uppercase tracking-wide text-secondary">
+              Birth date
+            </dt>
+            <dd className="mt-1 font-semibold text-foreground">
+              {customer.birthDate
+                ? displayDate(customer.birthDate)
+                : "Missing birth date"}
+            </dd>
+          </div>
+          <div className="bg-card px-5 py-4 sm:px-6">
+            <dt className="text-xs font-bold uppercase tracking-wide text-secondary">
+              Phone
+            </dt>
+            <dd className="mt-1 font-semibold text-foreground">
+              {customer.phone ?? "Not provided"}
+            </dd>
+          </div>
+          <div className="bg-card px-5 py-4 sm:px-6">
+            <dt className="text-xs font-bold uppercase tracking-wide text-secondary">
+              Emergency phone
+            </dt>
+            <dd className="mt-1 font-semibold text-foreground">
+              {customer.emergencyPhone ?? "Not provided"}
+            </dd>
+          </div>
           <div className="bg-card px-5 py-4 sm:px-6">
             <dt className="text-xs font-bold uppercase tracking-wide text-secondary">
               Assigned coach
@@ -268,10 +302,10 @@ export function RegistrationCustomerCard({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
-              Packages and sessions
+              Packages, services, and sessions
             </p>
             <h3 className="mt-1 text-2xl font-bold text-foreground">
-              Customer packages
+              Customer packages / services
             </h3>
             <p className="mt-1 text-sm leading-6 text-secondary">
               {showAllPackages
@@ -314,9 +348,14 @@ export function RegistrationCustomerCard({
                   key={customerPackage.id}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h4 className="min-w-0 break-words text-xl font-bold text-foreground">
-                      {customerPackage.package.name}
-                    </h4>
+                    <div className="min-w-0">
+                      <span className="inline-flex rounded-full bg-soft-blue px-3 py-1 text-xs font-semibold text-primary-active">
+                        {packageTypeLabel(customerPackage.package.packageType)}
+                      </span>
+                      <h4 className="mt-2 break-words text-xl font-bold text-foreground">
+                        {customerPackage.package.name}
+                      </h4>
+                    </div>
                     <StatusBadge status={displayStatus.status}>
                       {displayStatus.label}
                     </StatusBadge>
@@ -329,6 +368,10 @@ export function RegistrationCustomerCard({
                     </p>
                     <p className="mt-1 text-sm text-secondary">
                       remaining sessions
+                    </p>
+                    <p className="mt-3 w-fit rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
+                      Guest passes: {customerPackage.remainingGuestPasses}{" "}
+                      remaining
                     </p>
                   </div>
                   <dl className="mt-4 grid gap-3 text-sm">

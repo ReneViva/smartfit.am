@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import {
+  PrivateNavBadge,
+  usePrivateNavBadges,
+} from "../layout/private-nav-badge";
+
 const registrationLinks = [
   { href: "/registration", label: "Customer Lookup" },
   { href: "/registration/in-gym", label: "Currently In Gym" },
@@ -13,6 +18,7 @@ const registrationLinks = [
 
 export function RegistrationNav() {
   const pathname = usePathname();
+  const { inGymCount, unseenNotesCount } = usePrivateNavBadges();
 
   return (
     <>
@@ -40,7 +46,12 @@ export function RegistrationNav() {
               href={link.href}
               key={link.href}
             >
-              {link.label}
+              <span>{link.label}</span>
+              {link.href === "/registration/in-gym" ? (
+                <PrivateNavBadge count={inGymCount} showZero />
+              ) : link.href === "/registration/notes" ? (
+                <PrivateNavBadge count={unseenNotesCount} />
+              ) : null}
             </Link>
           );
         })}

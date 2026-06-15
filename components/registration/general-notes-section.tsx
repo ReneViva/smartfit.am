@@ -41,7 +41,11 @@ export function GeneralNotesSection({
           Notes here are not attached to a customer. They are visible to Admin
           and Registration staff.
         </p>
-        <form action={createGeneralNoteAction} className="mt-5">
+        <form
+          action={createGeneralNoteAction}
+          className="mt-5"
+          data-note-draft-form
+        >
           <input name="returnPath" type="hidden" value={returnPath} />
           <label className="block text-sm font-semibold text-foreground">
             Quick general note
@@ -84,7 +88,11 @@ export function GeneralNotesSection({
                 <summary className="min-h-11 cursor-pointer rounded-lg bg-neutral px-3 py-2 text-sm font-semibold text-foreground hover:bg-neutral-hover">
                   Edit or delete note
                 </summary>
-                <form action={updateGeneralNoteAction} className="mt-3">
+                <form
+                  action={updateGeneralNoteAction}
+                  className="mt-3"
+                  data-note-draft-form
+                >
                   <input name="noteId" type="hidden" value={note.id} />
                   <input
                     name="updatedAt"

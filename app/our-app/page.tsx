@@ -16,7 +16,61 @@ const occupancyCircleClasses: Record<PublicCrowdStatus, string> = {
 };
 
 const publicLinkClasses =
-  "flex min-h-12 items-center justify-between rounded-xl bg-neutral px-4 py-3 font-semibold text-foreground transition-colors hover:bg-neutral-hover";
+  "group flex min-h-24 min-w-0 flex-col items-center justify-center gap-2 rounded-xl border border-border bg-neutral px-3 py-4 text-center font-semibold text-foreground transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-brand hover:bg-soft-blue hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+const iconClasses =
+  "size-7 fill-none stroke-current stroke-[1.8] transition-transform group-hover:scale-105";
+
+function PhoneIcon() {
+  return (
+    <svg aria-hidden="true" className={iconClasses} viewBox="0 0 24 24">
+      <path
+        d="M7.4 3.5 10 7.4 8.3 9.2a15.8 15.8 0 0 0 6.5 6.5l1.8-1.7 3.9 2.6v3.1c0 .7-.6 1.3-1.3 1.3A16.2 16.2 0 0 1 3 4.8c0-.7.6-1.3 1.3-1.3h3.1Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg aria-hidden="true" className={iconClasses} viewBox="0 0 24 24">
+      <path
+        d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.4-4.2a8.5 8.5 0 1 1 15.6-4.6Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.3 7.8c.2 3.8 2.1 5.7 5.9 5.9l1.2-1.3 2.1 1.3c-.4 1.4-1.3 2.1-2.7 2.1-4.1-.2-6.4-2.5-6.6-6.6 0-.7 0-1.1.1-1.4Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg aria-hidden="true" className={iconClasses} viewBox="0 0 24 24">
+      <rect height="17" rx="5" width="17" x="3.5" y="3.5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle className="fill-current stroke-none" cx="17.5" cy="6.8" r="1" />
+    </svg>
+  );
+}
+
+function LocationIcon() {
+  return (
+    <svg aria-hidden="true" className={iconClasses} viewBox="0 0 24 24">
+      <path
+        d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
 
 export default async function OurAppPage() {
   const appData = await getPublicAppData();
@@ -91,57 +145,80 @@ export default async function OurAppPage() {
           </Card>
         ) : null}
 
-        {hasPublicLinks ? (
+        {hasPublicLinks || appData.location?.address ? (
           <Card className="mt-6">
-            <h2 className="text-2xl font-bold text-foreground">Quick links</h2>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {appData.links.phone ? (
-                <a
-                  className={publicLinkClasses}
-                  href={appData.links.phone.href}
-                >
-                  <span>Call us</span>
-                  <span className="text-sm text-secondary">
-                    {appData.links.phone.label}
-                  </span>
-                </a>
-              ) : null}
-              {appData.links.whatsapp ? (
-                <a
-                  className={publicLinkClasses}
-                  href={appData.links.whatsapp}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <span>WhatsApp</span>
-                  <span aria-hidden="true">Open</span>
-                </a>
-              ) : null}
-              {appData.links.instagram ? (
-                <a
-                  className={publicLinkClasses}
-                  href={appData.links.instagram}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <span>Instagram</span>
-                  <span aria-hidden="true">Open</span>
-                </a>
-              ) : null}
-              {appData.links.location ? (
-                <a
-                  className={publicLinkClasses}
-                  href={appData.links.location.href}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <span>Location</span>
-                  <span className="text-sm text-secondary">
-                    {appData.links.location.label}
-                  </span>
-                </a>
-              ) : null}
-            </div>
+            {hasPublicLinks ? (
+              <>
+                <h2 className="text-2xl font-bold text-foreground">
+                  Quick links
+                </h2>
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {appData.links.phone ? (
+                    <a
+                      aria-label={`Call ${appData.gymName}`}
+                      className={publicLinkClasses}
+                      href={appData.links.phone.href}
+                      title={`Call ${appData.links.phone.label}`}
+                    >
+                      <PhoneIcon />
+                      <span>Call</span>
+                    </a>
+                  ) : null}
+                  {appData.links.whatsapp ? (
+                    <a
+                      aria-label={`Open ${appData.gymName} on WhatsApp`}
+                      className={publicLinkClasses}
+                      href={appData.links.whatsapp}
+                      rel="noreferrer"
+                      target="_blank"
+                      title="Open WhatsApp"
+                    >
+                      <WhatsAppIcon />
+                      <span>WhatsApp</span>
+                    </a>
+                  ) : null}
+                  {appData.links.instagram ? (
+                    <a
+                      aria-label={`Open ${appData.gymName} on Instagram`}
+                      className={publicLinkClasses}
+                      href={appData.links.instagram}
+                      rel="noreferrer"
+                      target="_blank"
+                      title="Open Instagram"
+                    >
+                      <InstagramIcon />
+                      <span>Instagram</span>
+                    </a>
+                  ) : null}
+                  {appData.links.location ? (
+                    <a
+                      aria-label={`Get directions to ${appData.gymName}`}
+                      className={publicLinkClasses}
+                      href={appData.links.location.href}
+                      rel="noreferrer"
+                      target="_blank"
+                      title="Open directions"
+                    >
+                      <LocationIcon />
+                      <span>Directions</span>
+                    </a>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+
+            {appData.location?.address ? (
+              <div
+                className={`max-w-xl ${hasPublicLinks ? "mt-6 border-t border-border pt-5" : ""}`}
+              >
+                <p className="text-sm font-semibold uppercase tracking-[0.14em] text-brand">
+                  Location
+                </p>
+                <p className="mt-2 [overflow-wrap:anywhere] text-sm leading-6 text-secondary">
+                  {appData.location.address}
+                </p>
+              </div>
+            ) : null}
           </Card>
         ) : null}
 
@@ -179,6 +256,29 @@ export default async function OurAppPage() {
             </Card>
           </div>
         </section>
+
+        {appData.location?.mapEmbedUrl ? (
+          <section className="mt-10">
+            <div className="text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+                Location
+              </p>
+              <h2 className="mt-2 text-3xl font-bold text-foreground">
+                Find us
+              </h2>
+            </div>
+            <Card className="mt-6 overflow-hidden p-0">
+              <iframe
+                allowFullScreen
+                className="block h-[270px] w-full border-0 sm:h-[360px]"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                src={appData.location.mapEmbedUrl}
+                title={`${appData.gymName} map`}
+              />
+            </Card>
+          </section>
+        ) : null}
 
         {!appData.settingsAvailable ? (
           <p className="mt-8 text-center text-sm leading-6 text-secondary">

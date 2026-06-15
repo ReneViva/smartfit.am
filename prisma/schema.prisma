@@ -101,6 +101,7 @@ model GymSettings {
   instagramLink                         String?
   address                               String?
   mapLink                               String?
+  mapEmbedUrl                           String?
   workingDays                           String?
   workingHours                          String?
   occupancyGreenMax                     Int?
@@ -141,7 +142,9 @@ model Customer {
   firstName         String?
   lastName          String?
   fullName          String
+  birthDate         DateTime?
   phone             String?
+  emergencyPhone    String?
   status            CustomerStatus    @default(ACTIVE)
   gymPresenceStatus GymPresenceStatus @default(NOT_IN_GYM)
   assignedCoachId   String?
@@ -189,6 +192,7 @@ model Package {
   description          String?
   price                Decimal   @db.Decimal(10, 2)
   sessionCount         Int
+  defaultGuestPasses   Int       @default(0)
   packageType          String
   assignedCoachId      String?
   assignedCoach        Coach?    @relation(fields: [assignedCoachId], references: [id])
@@ -210,23 +214,25 @@ model Package {
 }
 
 model CustomerPackage {
-  id                String                @id @default(cuid())
-  customerId        String
-  customer          Customer              @relation(fields: [customerId], references: [id])
-  packageId         String
-  package           Package               @relation(fields: [packageId], references: [id])
-  coachId           String?
-  coach             Coach?                @relation(fields: [coachId], references: [id])
-  activationDate    DateTime
-  expirationDate    DateTime
-  initialSessions   Int
-  remainingSessions Int
-  status            CustomerPackageStatus @default(ACTIVE)
-  frozenAt          DateTime?
-  reactivatedAt     DateTime?
-  deletedAt         DateTime?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  id                   String                @id @default(cuid())
+  customerId           String
+  customer             Customer              @relation(fields: [customerId], references: [id])
+  packageId            String
+  package              Package               @relation(fields: [packageId], references: [id])
+  coachId              String?
+  coach                Coach?                @relation(fields: [coachId], references: [id])
+  activationDate       DateTime
+  expirationDate       DateTime
+  initialSessions      Int
+  remainingSessions    Int
+  initialGuestPasses   Int                   @default(0)
+  remainingGuestPasses Int                   @default(0)
+  status               CustomerPackageStatus @default(ACTIVE)
+  frozenAt             DateTime?
+  reactivatedAt        DateTime?
+  deletedAt            DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
   visitUsages    VisitPackageUsage[]
   sessionChanges PackageSessionChange[]
@@ -249,6 +255,8 @@ model GymVisit {
   checkedInBy            StaffUser  @relation("VisitCheckedInBy", fields: [checkedInById], references: [id])
   checkedOutById         String?
   checkedOutBy           StaffUser? @relation("VisitCheckedOutBy", fields: [checkedOutById], references: [id])
+  guestCountUsed         Int        @default(0)
+  occupancyDelta         Int        @default(1)
   occupancyAfterCheckIn  Int?
   occupancyAfterCheckOut Int?
   createdAt              DateTime   @default(now())
@@ -271,8 +279,9 @@ model VisitPackageUsage {
   visit             GymVisit        @relation(fields: [visitId], references: [id])
   customerPackageId String
   customerPackage   CustomerPackage @relation(fields: [customerPackageId], references: [id])
-  sessionsDeducted  Int             @default(1)
-  createdAt         DateTime        @default(now())
+  sessionsDeducted    Int             @default(1)
+  guestPassesDeducted Int             @default(0)
+  createdAt           DateTime        @default(now())
 
   sessionChange PackageSessionChange?
 

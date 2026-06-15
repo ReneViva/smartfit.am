@@ -15,6 +15,11 @@ const quickLinks = [
     label: "Public Content",
   },
   {
+    description: "Public gym photography, visibility, and display order.",
+    href: "/admin/gallery",
+    label: "Gallery",
+  },
+  {
     description: "Public coach profiles and their active status.",
     href: "/admin/coaches",
     label: "Coaches",

@@ -28,6 +28,17 @@ function nonNegativeInteger(formData: FormData, name: string) {
   return Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+function nonNegativeIntegerOrZero(formData: FormData, name: string) {
+  const rawValue = optionalText(formData, name, 20);
+
+  if (rawValue === null) {
+    return 0;
+  }
+
+  const value = Number(rawValue);
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
 function timeLabel(startTime: string | null, endTime: string | null) {
   if (startTime && endTime) {
     return `Available ${startTime} - ${endTime}`;
@@ -43,6 +54,10 @@ export async function savePackageAction(formData: FormData) {
   const packageType = optionalText(formData, "packageType", 200);
   const price = optionalText(formData, "price", 30);
   const sessionCount = nonNegativeInteger(formData, "sessionCount");
+  const defaultGuestPasses = nonNegativeIntegerOrZero(
+    formData,
+    "defaultGuestPasses",
+  );
   const assignedCoachId = optionalText(formData, "assignedCoachId", 100);
   const hasTimeRestriction = formData.get("hasTimeRestriction") === "on";
   const rawStartTime = optionalText(formData, "allowedStartTime", 5);
@@ -63,6 +78,10 @@ export async function savePackageAction(formData: FormData) {
 
   if (sessionCount === null) {
     redirect(`${PACKAGES_PATH}?error=invalid-sessions`);
+  }
+
+  if (defaultGuestPasses === null) {
+    redirect(`${PACKAGES_PATH}?error=invalid-guest-passes`);
   }
 
   if (
@@ -109,6 +128,7 @@ export async function savePackageAction(formData: FormData) {
     allowedEndTime,
     allowedStartTime,
     assignedCoachId,
+    defaultGuestPasses,
     description: optionalText(formData, "description", 2000),
     hasTimeRestriction,
     isActive: formData.get("isActive") === "on",

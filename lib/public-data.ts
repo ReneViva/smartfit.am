@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { normalizeMapEmbedUrl } from "./map-embed";
 
 function safePublicUrl(value: string | null) {
   if (!value) {
@@ -63,6 +64,7 @@ export async function getPublicAppData() {
           gymName: true,
           instagramLink: true,
           logoUrl: true,
+          mapEmbedUrl: true,
           mapLink: true,
           motivationalText: true,
           occupancyGreenMax: true,
@@ -113,6 +115,9 @@ export async function getPublicAppData() {
   const mapLink = settings?.showLocationInPublicApp
     ? safePublicUrl(settings.mapLink)
     : null;
+  const mapEmbedUrl = settings?.showLocationInPublicApp
+    ? normalizeMapEmbedUrl(settings.mapEmbedUrl)
+    : null;
 
   return {
     gymName: settings?.gymName ?? "Smartfit.am",
@@ -121,12 +126,17 @@ export async function getPublicAppData() {
       ? settings.motivationalText
       : null,
     settingsAvailable: Boolean(settings),
+    location: settings?.showLocationInPublicApp
+      ? {
+          address: settings.address,
+          mapEmbedUrl,
+        }
+      : null,
     links: {
       instagram: instagramLink,
       location: mapLink
         ? {
             href: mapLink,
-            label: settings?.address ?? "Open location",
           }
         : null,
       phone: phoneHref
@@ -263,6 +273,7 @@ export async function getActivePackages(limit?: number) {
           },
         },
         description: true,
+        defaultGuestPasses: true,
         id: true,
         name: true,
         packageType: true,
@@ -276,6 +287,7 @@ export async function getActivePackages(limit?: number) {
 
     return packages.map((gymPackage) => ({
       description: gymPackage.description,
+      defaultGuestPasses: gymPackage.defaultGuestPasses,
       id: gymPackage.id,
       name: gymPackage.name,
       packageType: gymPackage.packageType,
@@ -310,12 +322,18 @@ export async function getActiveGalleryImages(limit?: number) {
       take: limit,
     });
 
-    return images
-      .map((image) => ({
-        ...image,
-        imageUrl: safePublicUrl(image.imageUrl),
-      }))
-      .filter((image) => image.imageUrl);
+    return images.flatMap((image) => {
+      const imageUrl = safePublicUrl(image.imageUrl);
+
+      return imageUrl
+        ? [
+            {
+              ...image,
+              imageUrl,
+            },
+          ]
+        : [];
+    });
   } catch {
     return [];
   }

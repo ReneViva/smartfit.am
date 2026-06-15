@@ -50,6 +50,8 @@ const toggleFields = [
 const errorMessages: Record<string, string> = {
   "invalid-thresholds":
     "Thresholds must be non-negative whole numbers, and green cannot exceed yellow.",
+  "invalid-map-embed":
+    "Map embed must be a valid HTTPS URL or iframe code with an HTTPS src.",
   "invalid-url": "Logo and public links must use valid http or https URLs.",
   "missing-name": "Gym name is required.",
   "upload-configuration":
@@ -185,6 +187,20 @@ export default async function SettingsPage({
                 placeholder="https://..."
                 type="url"
               />
+            </label>
+            <label className={`${labelClass} md:col-span-2`}>
+              Map embed URL
+              <textarea
+                className={`${inputClass} min-h-24`}
+                defaultValue={settings?.mapEmbedUrl ?? ""}
+                maxLength={5000}
+                name="mapEmbedUrl"
+                placeholder="https://... or paste Google Maps/Yandex Maps iframe code"
+              />
+              <span className="mt-2 block text-sm font-normal leading-6 text-secondary">
+                Paste a Google Maps/Yandex Maps embed URL. If you paste an
+                iframe code, only the src URL will be used.
+              </span>
             </label>
           </div>
         </Card>

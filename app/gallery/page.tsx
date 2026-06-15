@@ -1,7 +1,7 @@
 import { PublicLayout } from "../../components/layout/public-layout";
 import { EmptyState } from "../../components/public/empty-state";
+import { GalleryGrid } from "../../components/public/gallery-grid";
 import { PageIntro } from "../../components/public/page-intro";
-import { Card } from "../../components/ui/card";
 import { getActiveGalleryImages } from "../../lib/public-data";
 
 export const dynamic = "force-dynamic";
@@ -11,32 +11,21 @@ export default async function GalleryPage() {
 
   return (
     <PublicLayout>
-      <PageIntro
-        description="A public-safe look at the Smartfit.am gym, equipment, training areas, and atmosphere."
-        eyebrow="Gallery"
-        title="See the space"
-      />
+      <div className="rounded-2xl border border-border bg-soft-blue px-6 py-10 sm:px-10 sm:py-14">
+        <PageIntro
+          description="Explore the spaces, equipment, atmosphere, and energy that make every Smartfit.am training day feel focused."
+          eyebrow="Inside Smartfit.am"
+          title="A place built to move"
+        />
+      </div>
 
-      <section className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="mt-10">
         {images.length ? (
-          images.map((image) => (
-            <Card className="overflow-hidden p-0" key={image.id}>
-              <img
-                alt={image.altText ?? image.title ?? "Smartfit.am gallery image"}
-                className="aspect-[4/3] w-full object-cover"
-                src={image.imageUrl ?? ""}
-              />
-              {image.title ? (
-                <p className="p-4 font-semibold text-foreground">
-                  {image.title}
-                </p>
-              ) : null}
-            </Card>
-          ))
+          <GalleryGrid images={images} />
         ) : (
-          <div className="sm:col-span-2 lg:col-span-3">
-            <EmptyState>Gallery images will be available soon.</EmptyState>
-          </div>
+          <EmptyState>
+            Fresh views from the gym floor will be available soon.
+          </EmptyState>
         )}
       </section>
     </PublicLayout>

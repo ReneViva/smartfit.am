@@ -284,12 +284,42 @@ const packages = [
     price: 45000,
     sessionCount: 12,
   },
+  {
+    ...ALL_DAY_RESTRICTION,
+    description: "Swimming access package with 12 visits.",
+    durationDays: 30,
+    name: "Swimming Access — 12 Visits",
+    packageType: "SWIMMING",
+    price: 18000,
+    sessionCount: 12,
+  },
+  {
+    ...ALL_DAY_RESTRICTION,
+    description: "Cardio-focused access package with 12 visits.",
+    durationDays: 30,
+    name: "Cardio Package — 12 Visits",
+    packageType: "CARDIO",
+    price: 18000,
+    sessionCount: 12,
+  },
+  {
+    ...ALL_DAY_RESTRICTION,
+    assignedCoachName: "Aram Petrosyan",
+    description: "Fitness trainer package with 8 coached sessions.",
+    durationDays: 90,
+    name: "Fitness Trainer Sessions — 8 Classes",
+    packageType: "FITNESS_TRAINER",
+    price: 50000,
+    sessionCount: 8,
+  },
 ];
 
 const customers = [
   {
     assignedCoachName: "Davit Hakobyan",
+    birthDate: "1992-04-12",
     customerCode: "0012",
+    emergencyPhone: "+374 77 101 012",
     firstName: "Rene",
     lastName: "Vartanian",
     packages: [
@@ -308,7 +338,9 @@ const customers = [
   },
   {
     assignedCoachName: "Ani Grigoryan",
+    birthDate: "1996-09-21",
     customerCode: "0001",
+    emergencyPhone: "+374 77 101 001",
     firstName: "Mariam",
     lastName: "Sargsyan",
     packages: [
@@ -322,7 +354,9 @@ const customers = [
   },
   {
     assignedCoachName: null,
+    birthDate: "1988-02-08",
     customerCode: "0002",
+    emergencyPhone: "+374 77 101 002",
     firstName: "Narek",
     lastName: "Hovhannisyan",
     packages: [
@@ -336,7 +370,9 @@ const customers = [
   },
   {
     assignedCoachName: "Ani Grigoryan",
+    birthDate: "1999-11-14",
     customerCode: "0003",
+    emergencyPhone: "+374 77 101 003",
     firstName: "Lilit",
     lastName: "Grigoryan",
     packages: [
@@ -350,7 +386,9 @@ const customers = [
   },
   {
     assignedCoachName: "Aram Petrosyan",
+    birthDate: "1991-06-30",
     customerCode: "0004",
+    emergencyPhone: "+374 77 101 004",
     firstName: "Gor",
     lastName: "Khachatryan",
     packages: [
@@ -364,7 +402,9 @@ const customers = [
   },
   {
     assignedCoachName: null,
+    birthDate: "1985-01-19",
     customerCode: "0005",
+    emergencyPhone: "+374 77 101 005",
     firstName: "Anahit",
     lastName: "Petrosyan",
     packages: [],
@@ -372,7 +412,9 @@ const customers = [
   },
   {
     assignedCoachName: "Davit Hakobyan",
+    birthDate: "1994-08-05",
     customerCode: "0006",
+    emergencyPhone: "+374 77 101 006",
     firstName: "Tigran",
     lastName: "Mkrtchyan",
     packages: [
@@ -386,7 +428,9 @@ const customers = [
   },
   {
     assignedCoachName: null,
+    birthDate: "1997-03-27",
     customerCode: "0007",
+    emergencyPhone: "+374 77 101 007",
     firstName: "Sona",
     lastName: "Harutyunyan",
     packages: [
@@ -471,6 +515,7 @@ async function seedPackage(gymPackage, coachIdsByName) {
   });
   const data = {
     ...packageData,
+    defaultGuestPasses: gymPackage.name.includes("Couple") ? 2 : 0,
     assignedCoachId: assignedCoachName
       ? coachIdsByName.get(assignedCoachName)
       : null,
@@ -497,8 +542,10 @@ async function seedCustomer(customer, coachIdsByName) {
       assignedCoachId: customer.assignedCoachName
         ? coachIdsByName.get(customer.assignedCoachName)
         : null,
+      birthDate: new Date(`${customer.birthDate}T00:00:00.000Z`),
       customerCode: customer.customerCode,
       deletedAt: null,
+      emergencyPhone: customer.emergencyPhone,
       firstName: customer.firstName,
       fullName: `${customer.firstName} ${customer.lastName}`,
       gymPresenceStatus: "NOT_IN_GYM",
@@ -511,7 +558,9 @@ async function seedCustomer(customer, coachIdsByName) {
       assignedCoachId: customer.assignedCoachName
         ? coachIdsByName.get(customer.assignedCoachName)
         : null,
+      birthDate: new Date(`${customer.birthDate}T00:00:00.000Z`),
       deletedAt: null,
+      emergencyPhone: customer.emergencyPhone,
       firstName: customer.firstName,
       fullName: `${customer.firstName} ${customer.lastName}`,
       lastName: customer.lastName,
@@ -546,8 +595,10 @@ async function seedCustomerPackage({
     expirationDate,
     frozenAt: assignment.status === "FROZEN" ? new Date() : null,
     initialSessions: packageRecord.sessionCount,
+    initialGuestPasses: packageRecord.defaultGuestPasses,
     reactivatedAt: null,
     remainingSessions: assignment.remainingSessions,
+    remainingGuestPasses: packageRecord.defaultGuestPasses,
     status: assignment.status,
   };
 

@@ -7,11 +7,10 @@ import {
 import Link from "next/link";
 
 import { CustomerForm } from "../../../components/admin/customer-form";
-import { CustomerPackageAssignmentForm } from "../../../components/admin/customer-package-assignment-form";
-import { CustomerPackageOverview } from "../../../components/admin/customer-package-overview";
 import { Card } from "../../../components/ui/card";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { db } from "../../../lib/db";
+import { packageTypeLabel } from "../../../lib/package-types";
 
 type CustomersPageProps = {
   searchParams: Promise<{
@@ -32,16 +31,12 @@ const inputClass =
 const labelClass = "block text-sm font-semibold text-foreground";
 
 const errorMessages: Record<string, string> = {
-  "assignment-unavailable":
-    "The package assignment could not be saved. Please try again.",
   "customer-unavailable": "The customer could not be saved. Please try again.",
   "duplicate-code": "That member code is already assigned to another customer.",
-  "invalid-assignment":
-    "Choose a customer package and enter valid dates, sessions, and status.",
+  "invalid-birth-date": "Birth date cannot be in the future.",
   "invalid-coach": "The selected coach is not available.",
-  "invalid-customer": "Member code, full name, and a valid status are required.",
-  "invalid-date-order": "Expiration date cannot be before activation date.",
-  "invalid-package": "Choose an active package definition.",
+  "invalid-customer":
+    "Member code, full name, birth date, and a valid status are required.",
 };
 
 function selectedEnum<T extends string>(
@@ -49,6 +44,15 @@ function selectedEnum<T extends string>(
   values: readonly T[],
 ) {
   return value && values.includes(value as T) ? (value as T) : null;
+}
+
+function displayDate(value: Date | null) {
+  return value
+    ? new Intl.DateTimeFormat("en", {
+        dateStyle: "medium",
+        timeZone: "UTC",
+      }).format(value)
+    : "Missing";
 }
 
 export default async function CustomersPage({
@@ -77,6 +81,8 @@ export default async function CustomersPage({
       OR: [
         { customerCode: { contains: query, mode: "insensitive" } },
         { fullName: { contains: query, mode: "insensitive" } },
+        { phone: { contains: query, mode: "insensitive" } },
+        { emergencyPhone: { contains: query, mode: "insensitive" } },
       ],
     });
   }
@@ -128,6 +134,10 @@ export default async function CustomersPage({
     });
   }
 
+  if (params.attention === "missing-birth-date") {
+    conditions.push({ birthDate: null });
+  }
+
   const where: Prisma.CustomerWhereInput = {
     deletedAt: null,
     ...(conditions.length ? { AND: conditions } : {}),
@@ -136,32 +146,33 @@ export default async function CustomersPage({
   const [
     customers,
     coaches,
-    activePackages,
     packageDefinitions,
     totalCustomers,
     activeCustomers,
     customersInGym,
     attentionPackages,
+    missingBirthDates,
   ] = await Promise.all([
     db.customer.findMany({
-      include: {
+      orderBy: [{ fullName: "asc" }, { customerCode: "asc" }],
+      select: {
+        _count: {
+          select: {
+            notes: { where: { deletedAt: null } },
+            packages: { where: { deletedAt: null } },
+          },
+        },
         assignedCoach: {
           select: { firstName: true, lastName: true },
         },
-        packages: {
-          include: {
-            coach: {
-              select: { firstName: true, lastName: true },
-            },
-            package: {
-              select: { name: true, packageType: true },
-            },
-          },
-          orderBy: { createdAt: "desc" },
-          where: { deletedAt: null },
-        },
+        birthDate: true,
+        customerCode: true,
+        fullName: true,
+        gymPresenceStatus: true,
+        id: true,
+        phone: true,
+        status: true,
       },
-      orderBy: [{ fullName: "asc" }, { customerCode: "asc" }],
       where,
     }),
     db.coach.findMany({
@@ -177,20 +188,10 @@ export default async function CustomersPage({
     db.package.findMany({
       orderBy: { name: "asc" },
       select: {
-        assignedCoachId: true,
-        id: true,
-        name: true,
-        packageType: true,
-        sessionCount: true,
-      },
-      where: { deletedAt: null, isActive: true },
-    }),
-    db.package.findMany({
-      orderBy: { name: "asc" },
-      select: {
         id: true,
         isActive: true,
         name: true,
+        packageType: true,
       },
       where: { deletedAt: null },
     }),
@@ -209,20 +210,15 @@ export default async function CustomersPage({
         ],
       },
     }),
+    db.customer.count({ where: { birthDate: null, deletedAt: null } }),
   ]);
-
   const errorMessage = params.error ? errorMessages[params.error] : null;
-  const statusMessage =
-    params.status === "customer-saved"
-      ? "Customer saved."
-      : params.status === "package-assigned"
-        ? "Package assigned. A new package history record was created."
-        : null;
   const stats = [
     { label: "Total customers", value: totalCustomers },
     { label: "Active customers", value: activeCustomers },
     { label: "Currently in gym", value: customersInGym },
     { label: "Packages needing attention", value: attentionPackages },
+    { label: "Missing birth dates", value: missingBirthDates },
   ];
 
   return (
@@ -232,17 +228,17 @@ export default async function CustomersPage({
           Customers
         </p>
         <h2 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-          Customer and package management
+          Customer management
         </h2>
         <p className="mt-3 max-w-3xl leading-7 text-secondary">
-          Manage member profiles, assigned coaches, and package history. Member
-          codes remain separate from generated internal database IDs.
+          Find a member and open their dedicated workspace for profile,
+          packages, history, and important notes.
         </p>
       </header>
 
-      {statusMessage ? (
+      {params.status === "customer-saved" ? (
         <p className="mt-6 rounded-xl border border-status-low bg-card px-4 py-3 text-sm font-semibold text-foreground">
-          {statusMessage}
+          Customer created successfully.
         </p>
       ) : null}
       {errorMessage ? (
@@ -254,27 +250,28 @@ export default async function CustomersPage({
         </p>
       ) : null}
 
-      <section className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {stats.map((stat) => (
-          <Card key={stat.label}>
+          <Card className="p-5" key={stat.label}>
             <p className="text-sm font-semibold text-secondary">{stat.label}</p>
-            <p className="mt-3 text-4xl font-bold tracking-tight text-foreground">
+            <p className="mt-3 text-3xl font-bold tracking-tight text-foreground">
               {stat.value}
             </p>
           </Card>
         ))}
       </section>
 
-      <Card className="mt-8">
-        <h3 className="text-xl font-bold text-foreground">Create customer</h3>
-        <p className="mt-2 text-sm leading-6 text-secondary">
-          Required fields are member code, full name, and status. New customers
-          always start as not in gym.
-        </p>
-        <div className="mt-6">
+      <details className="smooth-panel mt-8 rounded-2xl border border-border bg-card shadow-sm open:border-brand">
+        <summary className="cursor-pointer list-none rounded-2xl px-5 py-4 font-bold text-foreground transition-colors hover:bg-soft-blue sm:px-6">
+          Create a new customer
+          <span className="mt-1 block text-sm font-normal text-secondary">
+            Opens the customer registration form.
+          </span>
+        </summary>
+        <div className="animate-panel-in border-t border-border p-5 sm:p-6">
           <CustomerForm coaches={coaches} />
         </div>
-      </Card>
+      </details>
 
       <Card className="mt-8">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -283,7 +280,7 @@ export default async function CustomersPage({
               Search and filter
             </h3>
             <p className="mt-2 text-sm text-secondary">
-              Search by full name or member code.
+              Search by name, member code, phone, or emergency phone.
             </p>
           </div>
           <Link
@@ -295,7 +292,7 @@ export default async function CustomersPage({
         </div>
         <form className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <label className={`${labelClass} md:col-span-2`}>
-            Name or member code
+            Name, member code, or phone
             <input
               className={inputClass}
               defaultValue={query}
@@ -349,7 +346,7 @@ export default async function CustomersPage({
             </select>
           </label>
           <label className={labelClass}>
-            Package definition
+            Package / service
             <select
               className={inputClass}
               defaultValue={params.packageId ?? ""}
@@ -358,7 +355,8 @@ export default async function CustomersPage({
               <option value="">All packages</option>
               {packageDefinitions.map((gymPackage) => (
                 <option key={gymPackage.id} value={gymPackage.id}>
-                  {gymPackage.name}
+                  {gymPackage.name} ·{" "}
+                  {packageTypeLabel(gymPackage.packageType)}
                   {gymPackage.isActive ? "" : " (inactive)"}
                 </option>
               ))}
@@ -380,15 +378,16 @@ export default async function CustomersPage({
             </select>
           </label>
           <label className={labelClass}>
-            Package attention
+            Needs attention
             <select
               className={inputClass}
               defaultValue={params.attention ?? ""}
               name="attention"
             >
-              <option value="">All packages</option>
+              <option value="">All customers</option>
               <option value="expired">Expired packages</option>
               <option value="zero">Zero-session packages</option>
+              <option value="missing-birth-date">Missing birth date</option>
             </select>
           </label>
           <button
@@ -404,7 +403,7 @@ export default async function CustomersPage({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h3 className="text-2xl font-bold text-foreground">
-              Customer package overview
+              Customer directory
             </h3>
             <p className="mt-2 text-sm text-secondary">
               Showing {customers.length} matching customer
@@ -414,73 +413,85 @@ export default async function CustomersPage({
         </div>
 
         {customers.length ? (
-          <div className="mt-5 space-y-6">
+          <div className="mt-5 grid gap-4 xl:grid-cols-2">
             {customers.map((customer) => (
-              <Card key={customer.id}>
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-bold uppercase tracking-wide text-brand">
+              <Link
+                className="animate-list-item-in group rounded-2xl border border-border bg-card p-5 shadow-sm hover:border-brand hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                href={`/admin/customers/${customer.id}`}
+                key={customer.id}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
                       Member ID: {customer.customerCode}
                     </p>
-                    <h4 className="mt-1 text-2xl font-bold text-foreground">
+                    <h4 className="mt-2 break-words text-xl font-bold text-foreground">
                       {customer.fullName}
                     </h4>
                     <p className="mt-2 text-sm text-secondary">
-                      Assigned coach:{" "}
                       {customer.assignedCoach
-                        ? `${customer.assignedCoach.firstName} ${customer.assignedCoach.lastName}`
-                        : "Not assigned"}
+                        ? `Coach: ${customer.assignedCoach.firstName} ${customer.assignedCoach.lastName}`
+                        : "No assigned coach"}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <StatusBadge
-                      status={
-                        customer.status === "ACTIVE" ? "active" : "notInGym"
-                      }
-                    >
-                      {customer.status.toLowerCase()}
+                  <span className="text-sm font-bold text-brand transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
+                    Open workspace →
+                  </span>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <StatusBadge
+                    status={
+                      customer.status === "ACTIVE" ? "active" : "notInGym"
+                    }
+                  >
+                    {customer.status.toLowerCase()}
+                  </StatusBadge>
+                  <StatusBadge
+                    status={
+                      customer.gymPresenceStatus === "IN_GYM"
+                        ? "inGym"
+                        : "notInGym"
+                    }
+                  >
+                    {customer.gymPresenceStatus
+                      .toLowerCase()
+                      .replaceAll("_", " ")}
+                  </StatusBadge>
+                  {!customer.birthDate ? (
+                    <StatusBadge status="medium">
+                      missing birth date
                     </StatusBadge>
-                    <StatusBadge
-                      status={
-                        customer.gymPresenceStatus === "IN_GYM"
-                          ? "inGym"
-                          : "notInGym"
-                      }
-                    >
-                      {customer.gymPresenceStatus
-                        .toLowerCase()
-                        .replaceAll("_", " ")}
-                    </StatusBadge>
+                  ) : null}
+                </div>
+
+                <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4 text-sm sm:grid-cols-4">
+                  <div>
+                    <dt className="font-semibold text-secondary">Birth date</dt>
+                    <dd className="mt-1 text-foreground">
+                      {displayDate(customer.birthDate)}
+                    </dd>
                   </div>
-                </div>
-
-                <div className="mt-6">
-                  <CustomerPackageOverview packages={customer.packages} />
-                </div>
-
-                <div className="mt-6 grid gap-4 xl:grid-cols-2">
-                  <details className="rounded-xl border border-border bg-page p-5">
-                    <summary className="cursor-pointer font-bold text-foreground">
-                      Edit customer profile
-                    </summary>
-                    <div className="mt-5">
-                      <CustomerForm coaches={coaches} customer={customer} />
-                    </div>
-                  </details>
-                  <details className="rounded-xl border border-border bg-page p-5">
-                    <summary className="cursor-pointer font-bold text-foreground">
-                      Assign or renew package
-                    </summary>
-                    <div className="mt-5">
-                      <CustomerPackageAssignmentForm
-                        coaches={coaches}
-                        customerId={customer.id}
-                        packages={activePackages}
-                      />
-                    </div>
-                  </details>
-                </div>
-              </Card>
+                  <div>
+                    <dt className="font-semibold text-secondary">Phone</dt>
+                    <dd className="mt-1 break-words text-foreground">
+                      {customer.phone ?? "Not provided"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold text-secondary">Packages</dt>
+                    <dd className="mt-1 text-foreground">
+                      {customer._count.packages}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold text-secondary">Notes</dt>
+                    <dd className="mt-1 text-foreground">
+                      {customer._count.notes}
+                    </dd>
+                  </div>
+                </dl>
+              </Link>
             ))}
           </div>
         ) : (

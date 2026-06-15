@@ -3,7 +3,7 @@
 **Document path:** `docs/05-development-phases.md`  
 **Project:** Smartfit.am  
 **Document type:** Controlled development phase plan  
-**Purpose:** Official controlled implementation order for the completed Smartfit.am MVP and the manually approved post-MVP Registration Panel improvement phases.
+**Purpose:** Official controlled implementation order for the completed Smartfit.am MVP and the manually approved post-MVP phases.
 
 ---
 
@@ -44,9 +44,10 @@ This file is the official controlled development phase plan for Smartfit.am.
 - Future changes require manually updating this document.
 - If a feature does not fit into the approved phases, it must be placed under **Blocked / Unclear Items** instead of creating a new phase.
 - Phase 0 through Phase 15 are the completed original MVP phases.
-- Phase 16 through Phase 21 were manually added after MVP completion for confirmed Registration Panel improvements.
+- Phase 16 through Phase 21 were manually added after MVP completion for confirmed Registration Panel improvements and are complete.
+- Phase 22 through Phase 29 were manually added by the project owner after Phase 21 for confirmed customer, package, guest, service, and public-offer expansion work.
 
-**This plan now contains Phase 0 through Phase 21. Phase 16 through Phase 21 were added manually by the project owner after MVP completion. Do not create Phase 22 or any later phase unless this document is manually updated again.**
+**This plan now contains Phase 0 through Phase 29. Phase 22 through Phase 29 are official only because the project owner manually approved this documentation update. Codex must follow them one at a time. Do not create Phase 30 or any later phase unless this document is manually updated again.**
 
 ---
 
@@ -70,8 +71,9 @@ This file is the official controlled development phase plan for Smartfit.am.
 16. Public routes must never expose private customer, package ownership, notes, logs, or staff data.
 17. Admin and Registration/Reception access must stay separated according to the uploaded requirements.
 18. Phase 15 remains the final original MVP phase.
-19. Post-MVP work must stay inside the manually approved Registration Panel improvement phases, Phase 16 through Phase 21.
-20. Do not create Phase 22 or any later phase without another manual documentation update.
+19. Post-MVP work must stay inside the manually approved phases, Phase 16 through Phase 29.
+20. Phases 22 through 29 must be implemented one at a time, beginning with Phase 23 after this documentation-only Phase 22.
+21. Do not create Phase 30 or any later phase without another manual documentation update.
 
 ---
 
@@ -95,16 +97,25 @@ This file is the official controlled development phase plan for Smartfit.am.
 | Phase 13 | Excel Export | Add basic admin Excel exports for confirmed data categories | Phase 12 | Complete |
 | Phase 14 | Basic Analytics | Add MVP analytics: current occupancy, daily check-ins, and peak hours | Phase 13 | Complete |
 | Phase 15 | Final Testing and Deployment Preparation | Verify MVP completeness, security, private data protection, and deployment readiness | Phase 14 | Complete |
-| Phase 16 | Registration Gap Audit and Missing Section Fixes | Audit and expose missing or hidden confirmed Registration Panel sections | Phase 15 | Planned |
-| Phase 17 | Registration Customer Workspace Redesign | Redesign `/registration` as a professional daily reception workspace | Phase 16 | Planned |
-| Phase 18 | Registration Notes and Activity Experience Polish | Improve customer notes and safe recent operational context | Phase 17 | Planned |
-| Phase 19 | Registration Package Freeze and Reactivation | Add the simplest confirmed freeze/reactivation workflow after permission confirmation | Phase 18 | Planned |
-| Phase 20 | Reception Workspace Controls and Operational Rules Display | Add reception-side view controls and read-only operational rules | Phase 19 | Planned |
-| Phase 21 | Post-MVP Registration Regression and Client Review Preparation | Verify and prepare the improved Registration Panel for client review | Phase 20 | Planned |
+| Phase 16 | Registration Gap Audit and Missing Section Fixes | Audit and expose missing or hidden confirmed Registration Panel sections | Phase 15 | Complete |
+| Phase 17 | Registration Customer Workspace Redesign | Redesign `/registration` as a professional daily reception workspace | Phase 16 | Complete |
+| Phase 18 | Registration Notes and Activity Experience Polish | Improve customer notes and safe recent operational context | Phase 17 | Complete |
+| Phase 19 | Registration Package Freeze and Reactivation | Add the simplest confirmed freeze/reactivation workflow after permission confirmation | Phase 18 | Complete |
+| Phase 20 | Reception Workspace Controls and Operational Rules Display | Add reception-side view controls and read-only operational rules | Phase 19 | Complete |
+| Phase 21 | Post-MVP Registration Regression and Client Review Preparation | Verify and prepare the improved Registration Panel for client review | Phase 20 | Complete |
+| Phase 22 | Post-MVP Scope Documentation Update | Make the confirmed customer, package, guest, service, and offer expansion phases official | Phase 21 | Complete |
+| Phase 23 | Public Content Carousel for Offers and Promotions | Show multiple active homepage offers in a responsive accessible carousel | Phase 22 | Planned |
+| Phase 24 | Package Guest Allowance Data Support | Store and manage default and remaining guest allowance data | Phase 23 | Planned |
+| Phase 25 | Expanded Customer Profile Fields | Add required birth date and emergency phone to real customer registration fields | Phase 24 | Planned |
+| Phase 26 | Guest Check-In and Occupancy Integration | Record guest usage, decrement allowance, and increase occupancy by customer plus guests | Phase 25 | Planned |
+| Phase 27 | Flexible Customer Package Editing and Upgrade Workflow | Edit assigned packages safely while logging old and new values | Phase 26 | Planned |
+| Phase 28 | Services as Flexible Packages | Manage service-style offerings through the existing package system | Phase 27 | Planned |
+| Phase 29 | Customer/Package/Guest Regression, Exports, Demo Data, and Client Review | Verify the complete expansion sequence and prepare client review | Phase 28 | Planned |
 
 **Original MVP phases:** Phase 0 through Phase 15, complete.
-**Manually approved post-MVP phases:** Phase 16 through Phase 21.
-**Current final approved phase:** Phase 21 — Post-MVP Registration Regression and Client Review Preparation.
+**Completed Registration improvement phases:** Phase 16 through Phase 21.
+**Manually approved customer/package/guest/offer expansion phases:** Phase 22 through Phase 29.
+**Current final approved phase:** Phase 29 — Customer/Package/Guest Regression, Exports, Demo Data, and Client Review.
 
 ---
 
@@ -1773,7 +1784,7 @@ These phases were added manually by the project owner after completion of the or
 - They must follow the same anti-hallucination, simplicity, privacy, server-side permission, and phase-control rules as the original phases.
 - They do not authorize customer login, coach login, payments, QR check-in, notifications, ecommerce, multi-branch, platform owner logic, or any other unconfirmed product area.
 - Admin Settings remain admin-only. Registration may receive view controls and read-only operational-rule visibility, but not a true system-settings editor.
-- The original Phase 15 wording above is preserved as historical MVP phase content. This manually added section authorizes only Phase 16 through Phase 21.
+- The original Phase 15 wording above is preserved as historical MVP phase content. This subsection authorizes Phase 16 through Phase 21; the later expansion section separately authorizes Phase 22 through Phase 29.
 
 ---
 
@@ -2080,7 +2091,7 @@ Verify the improved Registration Panel after Phases 16 through 20 and prepare a 
 
 - Do not add new features.
 - Do not add new dashboards.
-- Do not create Phase 22 unless the documentation is manually updated again.
+- Do not implement expansion features before the manually approved Phase 22 documentation update.
 
 ## Acceptance Criteria
 
@@ -2104,7 +2115,392 @@ Phase 21 is complete when the improved Registration Panel is regression-tested, 
 
 ## Next Phase
 
-None. Any phase after Phase 21 requires another manual update to this document by the project owner.
+Phase 22 — Post-MVP Scope Documentation Update.
+
+---
+
+# Post-MVP Customer, Package, Guest, and Offer Expansion Phases
+
+These phases were manually added by the project owner after Phase 21. They are now official only because this documentation update is being made.
+
+- Codex must follow Phase 22 through Phase 29 one at a time.
+- Phase 22 is documentation-only. Implementation begins in Phase 23.
+- Guest count is operational, but occupancy behavior must not change before Phase 26.
+- Package upgrades edit the existing assigned customer package and log old/new values.
+- Swimming, cardio, trainer, group-training, and similar services remain packages for now.
+- Birth date is required for new customer registration when Phase 25 is implemented.
+- No Phase 30 or later exists unless the project owner manually updates this document again.
+- Do not implement any of these phases during the Phase 22 documentation task.
+
+---
+
+# Phase 22 — Post-MVP Scope Documentation Update
+
+## Goal
+
+Update the official project documentation so the new post-MVP customer, package, guest, service, and public-offer requirements become controlled implementation phases.
+
+## Confirmed Owner Decisions
+
+- Guest count affects check-in and occupancy after Phase 26.
+- Guest allowance decreases when guests are actually used.
+- Package upgrades edit the existing assigned customer package and log old/new values.
+- Services are handled through the existing `Package` and `CustomerPackage` system for now.
+- Birth date is required for new customer registration after Phase 25.
+
+## What Codex Should Do
+
+- Update `docs/05-development-phases.md`.
+- Update `docs/06-codex-prompt-guide.md`.
+- Add and control Phase 22 through Phase 29.
+- Make clear that implementation begins only in Phase 23.
+
+## What Codex Must Not Build
+
+- Do not change application code.
+- Do not change database schema.
+- Do not create migrations.
+- Do not implement UI.
+- Do not create Phase 30.
+
+## Acceptance Criteria
+
+- Docs include the corrected Phase 22 through Phase 29 plan.
+- The prompt guide recognizes these as official post-MVP phases.
+- The confirmed owner decisions are recorded.
+- No implementation files are changed.
+
+## Completion Definition
+
+Phase 22 is complete when the two official control documents contain the corrected plan and no implementation work has begun.
+
+## Next Phase
+
+Phase 23 — Public Content Carousel for Offers and Promotions.
+
+---
+
+# Phase 23 — Public Content Carousel for Offers and Promotions
+
+## Goal
+
+Show multiple active public content items as a professional homepage carousel.
+
+## Why This Phase Exists
+
+The homepage can already show active public offers and promotions, but multiple items should rotate in a focused carousel instead of appearing only as static separate cards.
+
+## What Codex Should Build
+
+- Build a homepage offer/promotion carousel using the existing `PublicContent` model and public content loading.
+- Auto-swap every 5 seconds.
+- Add accessible left/right arrow controls.
+- Add dot indicators if simple.
+- Pause on hover and focus if simple.
+- Support keyboard interaction.
+- Keep responsive desktop and mobile behavior.
+- Continue supporting no-image, horizontal, vertical, square, SVG/logo, and uploaded image URL content.
+- Preserve existing admin public-content create/edit/upload behavior.
+- Keep public/private data separation.
+
+## What Codex Must Not Build
+
+- Do not create a new marketing system.
+- Do not add a carousel dependency unless absolutely necessary.
+- Do not redesign scheduling or content lifecycle.
+- Do not expose private customer or operational data.
+
+## Acceptance Criteria
+
+- Multiple active offers display in the homepage carousel.
+- Offers auto-change every 5 seconds and support manual navigation.
+- Image and no-image layouts remain professional.
+- Mobile layout works.
+- Public pages expose no private data.
+
+## Next Phase
+
+Phase 24 — Package Guest Allowance Data Support.
+
+---
+
+# Phase 24 — Package Guest Allowance Data Support
+
+## Goal
+
+Add guest allowance data to package definitions and customer package assignments before operational guest check-in is implemented.
+
+## Confirmed Business Decision
+
+Guest count is operational, not display-only. This phase stores and manages the data, while Phase 26 implements deduction and occupancy behavior.
+
+## Data Meaning
+
+- A package definition stores the default included guest allowance.
+- A customer package assignment stores the customer-specific remaining guest allowance.
+- The assignment copies the package default and may be adjusted by admin.
+
+## What Codex Should Build
+
+- Add a default guest allowance field to `Package`.
+- Add a remaining guest allowance field to `CustomerPackage`.
+- Add guest allowance to Admin Packages create/edit and summary views.
+- Copy the default allowance during customer package assignment.
+- Allow admin to adjust remaining allowance during assignment/editing.
+- Show remaining guest allowance on Registration package cards.
+- Show public package guest count only when it is public-safe and understandable.
+- Update relevant Excel exports and demo seed if useful.
+
+## What Codex Must Not Build
+
+- Do not change occupancy behavior.
+- Do not add guest check-in or decrement guest allowance yet.
+- Do not add guest profiles, names, login, history, or multi-person accounts.
+- Do not add payments.
+
+## Acceptance Criteria
+
+- Package definitions can store a default guest allowance.
+- Customer package assignments can store remaining guest allowance.
+- Admin can manage the fields and Registration can view them.
+- Check-in and occupancy behavior remain unchanged in this phase.
+- Typecheck and build pass.
+
+## Next Phase
+
+Phase 25 — Expanded Customer Profile Fields.
+
+---
+
+# Phase 25 — Expanded Customer Profile Fields
+
+## Goal
+
+Update customer profiles with the confirmed fields needed for real customer registration.
+
+## Confirmed Business Decision
+
+Birth date is required for new customer registration.
+
+## Customer Fields
+
+- Existing `customerCode` remains the customer/member ID.
+- First name.
+- Surname / last name.
+- Full name.
+- Birth date.
+- Phone number.
+- Emergency phone number.
+- Customer status.
+- Assigned coach if applicable.
+- Current gym presence status.
+
+## Birth Date Handling
+
+- New customer create/edit UI must require birth date after this phase.
+- Do not invent fake birth dates for legacy customers.
+- Use a safe migration path: backfill known demo/test records or allow legacy null while clearly marking missing required data.
+- Codex must explain the selected migration path.
+
+## What Codex Should Build
+
+- Add `birthDate` and `emergencyPhone` using the safest schema approach.
+- Update Admin customer create/edit forms and validation.
+- Update customer cards/details and Registration header where useful.
+- Update customer exports.
+- Update demo seed if useful.
+- Preserve leading-zero `customerCode` behavior.
+- Keep customer data private.
+
+## What Codex Must Not Build
+
+- Do not add customer login, QR codes, membership cards, medical fields, or unnecessary sensitive data.
+- Do not expose customer data publicly.
+
+## Acceptance Criteria
+
+- New customer forms include required birth date and emergency phone.
+- Existing customer/member ID behavior remains.
+- Legacy records are handled safely without fabricated data.
+- Exports include the new fields.
+- Public pages expose no private customer data.
+- Typecheck and build pass.
+
+## Next Phase
+
+Phase 26 — Guest Check-In and Occupancy Integration.
+
+---
+
+# Phase 26 — Guest Check-In and Occupancy Integration
+
+## Goal
+
+Allow Registration staff to use a customer package's remaining guest allowance during check-in.
+
+## Confirmed Business Rule
+
+When a customer uses guest access:
+
+- Remaining guest allowance decreases by the actual guest count used.
+- Occupancy increases by the customer plus guests.
+- Example: customer plus 1 guest increases occupancy by 2.
+- Occupancy must not multiply from package guest allowance automatically; staff must select the actual guest count.
+
+## What Codex Should Build
+
+- Add a guest-count input/selector to Registration check-in when an eligible selected package has guest allowance.
+- Show remaining guest allowance.
+- Prevent using more guests than remain.
+- Validate guest usage server-side.
+- Decrement remaining guest allowance transactionally.
+- Increase occupancy by `1 + guestCountUsed`.
+- Store guest count used on the visit or related usage record if needed.
+- Add clear visit, occupancy, and audit logging.
+- Show guest count in Currently In Gym and exports if useful.
+
+## What Codex Must Not Build
+
+- Do not add guest names, profiles, login, package ownership, payments, or QR check-in.
+- Do not apply guest occupancy without staff explicitly selecting guest usage.
+
+## Acceptance Criteria
+
+- Registration can check in with zero or an allowed number of guests.
+- Remaining guest allowance decreases correctly.
+- Occupancy increases by customer plus guests.
+- Overuse is rejected server-side.
+- Guest usage is logged.
+- Check-out does not deduct additional sessions or guest allowance.
+- Public occupancy exposes only the updated aggregate count.
+- Typecheck and build pass.
+
+## Next Phase
+
+Phase 27 — Flexible Customer Package Editing and Upgrade Workflow.
+
+---
+
+# Phase 27 — Flexible Customer Package Editing and Upgrade Workflow
+
+## Goal
+
+Allow admins to edit a customer's assigned packages safely after registration.
+
+## Confirmed Business Decision
+
+Package upgrade/editing updates the existing assigned `CustomerPackage` and logs old/new values. Renewal may still create a new assignment where the existing renewal workflow is used.
+
+## What Codex Should Build
+
+- Edit an existing assigned customer package.
+- Change package definition, start date, end date, status, remaining sessions, remaining guest allowance, and assigned coach where applicable.
+- Add a new package/service to the same customer.
+- Preserve support for multiple active packages.
+- Provide clear actions such as Add package/service, Edit assigned package, Extend date, Change package, Freeze/reactivate, and Mark expired/inactive.
+- Log every important edit with old/new values.
+
+## What Codex Must Not Build
+
+- Do not add payments, invoices, automatic price-difference/refund calculations, ecommerce, or customer-facing package editing.
+- Do not silently erase package history.
+
+## Acceptance Criteria
+
+- Admin can edit and upgrade an assigned package.
+- Admin can edit dates, status, sessions, guest allowance, and coach where supported.
+- Important edits create audit logs with old/new values.
+- Registration sees updated packages correctly.
+- Multiple active packages continue to work.
+- Typecheck and build pass.
+
+## Next Phase
+
+Phase 28 — Services as Flexible Packages.
+
+---
+
+# Phase 28 — Services as Flexible Packages
+
+## Goal
+
+Make swimming, cardio, coach sessions, group training, swimming trainer, fitness trainer, and similar offerings manageable through the existing package system.
+
+## Confirmed Business Decision
+
+Use `Package` and `CustomerPackage` for services. Do not create a separate Services database system unless the owner later confirms it.
+
+## What Codex Should Build
+
+- Improve Admin Packages for service-like package types through the existing package type/free-text package type.
+- Improve customer package assignment so adding services is easy.
+- Add package/service search and filters where useful.
+- Allow many active services/packages per customer.
+- Continue letting Registration select which packages/services are used during check-in.
+- Clearly show service/package type and remaining sessions.
+- Add simple presets only if they do not require a new model.
+
+## What Codex Must Not Build
+
+- Do not create a separate Service model without later owner confirmation.
+- Do not add group class scheduling, capacity, trainer calendars, customer booking, payments, or ecommerce.
+
+## Acceptance Criteria
+
+- Services can be created and assigned as packages.
+- Multiple active services/packages work.
+- Registration can deduct selected service/package sessions.
+- UI remains easy to understand.
+- Typecheck and build pass.
+
+## Next Phase
+
+Phase 29 — Customer/Package/Guest Regression, Exports, Demo Data, and Client Review.
+
+---
+
+# Phase 29 — Customer/Package/Guest Regression, Exports, Demo Data, and Client Review
+
+## Goal
+
+Verify the complete customer, package, guest, service, and offer expansion and prepare it for client review.
+
+## What Codex Should Verify
+
+- Public offer carousel.
+- Package default and remaining guest allowance.
+- Guest check-in, allowance deduction, and occupancy behavior.
+- Admin package and customer create/edit flows.
+- Required birth date and emergency phone.
+- Customer package edit/upgrade workflow.
+- Multiple active packages/services.
+- Registration lookup, package display, selected-package check-in, guest check-in, check-out, freeze/reactivation, and notes.
+- Exports, demo data, and public privacy.
+
+## Documentation Updates
+
+- Update README if needed.
+- Update demo seed if needed.
+- Update Registration/Admin manual test checklist.
+- Update Excel export checklist where exports changed.
+
+## What Codex Must Not Build
+
+- Do not add new product features.
+- Do not create Phase 30.
+- Do not add payments, customer login, QR code, or a separate services system.
+
+## Acceptance Criteria
+
+- All new flows work and guest occupancy behavior is verified.
+- Exports include implemented new fields.
+- Public pages expose no private data.
+- A manual test checklist exists.
+- Typecheck and build pass.
+
+## Next Phase
+
+None. No Phase 30 or later exists unless the project owner manually updates this document again.
 
 ---
 
@@ -2131,6 +2527,14 @@ None. Any phase after Phase 21 requires another manual update to this document b
 - Phase 19 depends on Phase 18 and the project owner's explicit freeze/reactivation permission decision.
 - Phase 20 depends on Phase 19 because workspace controls should describe the final confirmed reception behavior.
 - Phase 21 depends on Phases 16 through 20 because it verifies the complete post-MVP Registration improvement sequence.
+- Phase 22 depends on Phase 21 because the new confirmed scope must be documented before implementation.
+- Phase 23 depends on Phase 22 because the homepage carousel is the first approved implementation phase in the new sequence.
+- Phase 24 depends on Phase 23 and adds guest allowance data without changing operational check-in behavior.
+- Phase 25 depends on Phase 24 and expands customer registration fields before guest check-in workflow changes.
+- Phase 26 depends on Phase 24 guest allowance data and Phase 25 customer-profile updates.
+- Phase 27 depends on Phase 26 because flexible assigned-package editing must preserve the final guest-allowance behavior.
+- Phase 28 depends on Phase 27 because service-style package assignment should reuse the flexible package editing workflow.
+- Phase 29 depends on Phases 23 through 28 because it verifies the complete expansion sequence.
 
 Specific business workflow dependencies:
 
@@ -2210,12 +2614,20 @@ Codex should also follow these rules:
 | Phase 13 — Excel Export | Complete |  | Original MVP |
 | Phase 14 — Basic Analytics | Complete |  | Original MVP |
 | Phase 15 — Final Testing and Deployment Preparation | Complete |  | Original MVP final phase |
-| Phase 16 — Registration Gap Audit and Missing Section Fixes | Not Started |  | Manually added post-MVP phase |
-| Phase 17 — Registration Customer Workspace Redesign | Not Started |  | Manually added post-MVP phase |
-| Phase 18 — Registration Notes and Activity Experience Polish | Not Started |  | Manually added post-MVP phase |
-| Phase 19 — Registration Package Freeze and Reactivation | Not Started |  | Permission decision required |
-| Phase 20 — Reception Workspace Controls and Operational Rules Display | Not Started |  | Manually added post-MVP phase |
-| Phase 21 — Post-MVP Registration Regression and Client Review Preparation | Not Started |  | Current final approved phase |
+| Phase 16 — Registration Gap Audit and Missing Section Fixes | Complete |  | Completed post-MVP Registration phase |
+| Phase 17 — Registration Customer Workspace Redesign | Complete |  | Completed post-MVP Registration phase |
+| Phase 18 — Registration Notes and Activity Experience Polish | Complete |  | Completed post-MVP Registration phase |
+| Phase 19 — Registration Package Freeze and Reactivation | Complete |  | Completed post-MVP Registration phase |
+| Phase 20 — Reception Workspace Controls and Operational Rules Display | Complete |  | Completed post-MVP Registration phase |
+| Phase 21 — Post-MVP Registration Regression and Client Review Preparation | Complete |  | Completed Registration improvement phase |
+| Phase 22 — Post-MVP Scope Documentation Update | Complete |  | Documentation-only expansion approval |
+| Phase 23 — Public Content Carousel for Offers and Promotions | Not Started |  | First implementation phase in expansion sequence |
+| Phase 24 — Package Guest Allowance Data Support | Not Started |  | Data support only; no occupancy changes |
+| Phase 25 — Expanded Customer Profile Fields | Not Started |  | Birth date required for new registrations |
+| Phase 26 — Guest Check-In and Occupancy Integration | Not Started |  | Operational guest usage and occupancy |
+| Phase 27 — Flexible Customer Package Editing and Upgrade Workflow | Not Started |  | Existing assignment edits with old/new logs |
+| Phase 28 — Services as Flexible Packages | Not Started |  | Reuse Package and CustomerPackage |
+| Phase 29 — Customer/Package/Guest Regression, Exports, Demo Data, and Client Review | Not Started |  | Current final approved phase |
 
 ---
 
@@ -2236,7 +2648,7 @@ The following items should not be forced into implementation phases until confir
 11. Whether manual occupancy changes require admin password/approval.
 12. Whether manual session corrections require a written reason.
 13. Whether manual occupancy corrections require a written reason.
-14. Exact customer personal information fields.
+14. Any customer personal information fields beyond the Phase 25 confirmed list.
 15. Exact customer ID format.
 16. Whether customer IDs should later support QR codes or membership cards.
 17. Whether package time restrictions support only before/after time or full ranges.
@@ -2248,9 +2660,9 @@ The following items should not be forced into implementation phases until confir
 23. Exact analytics formulas beyond current occupancy, daily check-ins, and peak hours.
 24. Whether admin can access `/registration` as a receptionist.
 25. Whether public coach contact information should be shown or kept admin-only.
-26. Whether reception staff should ever be allowed to edit true system settings; this requires a separate permission decision and is not part of Phase 16 through Phase 21.
+26. Whether reception staff should ever be allowed to edit true system settings; this requires a separate permission decision and is not part of any approved phase.
 
-These unclear items must not create additional phases beyond the manually approved Phase 16 through Phase 21 sequence. Any new phase requires another manual update to this document.
+These unclear items must not create additional phases beyond the manually approved Phase 16 through Phase 29 sequence. Any Phase 30 or later requires another manual update to this document.
 
 ---
 
@@ -2293,7 +2705,7 @@ The following features are not included in the current MVP phase plan because th
 
 ## 11. Final Completion Definition
 
-The Smartfit.am MVP is complete because all original fixed phases from Phase 0 through Phase 15 have been completed and verified. Phase 16 through Phase 21 are separately approved post-MVP Registration Panel improvements.
+The Smartfit.am MVP is complete because all original fixed phases from Phase 0 through Phase 15 have been completed and verified. Phase 16 through Phase 21 are completed post-MVP Registration Panel improvements. Phase 22 through Phase 29 are the official manually approved expansion sequence.
 
 The final MVP must satisfy these completion points:
 
@@ -2330,6 +2742,6 @@ The final MVP must satisfy these completion points:
 - The project builds successfully.
 - Deployment preparation is complete.
 - No unconfirmed feature has been accidentally added.
-- No unapproved phase beyond Phase 21 has been created.
+- No unapproved phase beyond Phase 29 has been created.
 
-**Final rule:** Phase 0 through Phase 15 remain the completed original MVP. Phase 16 through Phase 21 are the only manually approved post-MVP Registration improvement phases. Any phase after Phase 21 requires another manual update to this document.
+**Final rule:** Phase 0 through Phase 15 remain the completed original MVP. Phase 16 through Phase 21 are completed post-MVP Registration improvement phases. Phase 22 through Phase 29 are the manually approved customer/package/guest/offer expansion sequence. No Phase 30 or later exists unless the project owner manually updates this document again.

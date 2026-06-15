@@ -27,6 +27,7 @@ export async function getCustomerRecentActivity(customerId: string) {
         checkedInBy: { select: { name: true, username: true } },
         checkedOutAt: true,
         checkedOutBy: { select: { name: true, username: true } },
+        guestCountUsed: true,
       },
       take: 5,
       where: { customerId },
@@ -69,7 +70,9 @@ export async function getCustomerRecentActivity(customerId: string) {
   for (const visit of visits) {
     activity.push({
       actorName: staffName(visit.checkedInBy),
-      description: "Customer entered the gym.",
+      description: visit.guestCountUsed
+        ? `Customer entered the gym with ${visit.guestCountUsed} guest${visit.guestCountUsed === 1 ? "" : "s"}.`
+        : "Customer entered the gym.",
       occurredAt: visit.checkedInAt,
       type: "CHECK_IN",
     });
@@ -79,7 +82,9 @@ export async function getCustomerRecentActivity(customerId: string) {
         actorName: visit.checkedOutBy
           ? staffName(visit.checkedOutBy)
           : "Staff user",
-        description: "Customer exited the gym.",
+        description: visit.guestCountUsed
+          ? `Customer exited the gym with ${visit.guestCountUsed} guest${visit.guestCountUsed === 1 ? "" : "s"}.`
+          : "Customer exited the gym.",
         occurredAt: visit.checkedOutAt,
         type: "CHECK_OUT",
       });

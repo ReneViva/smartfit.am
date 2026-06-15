@@ -92,6 +92,10 @@ const errorMessages: Record<string, string> = {
   "correction-unavailable":
     "The session correction could not be saved. Please try again.",
   "invalid-check-in": "The selected customer is unavailable.",
+  "invalid-guest-source":
+    "The guest-pass source must be a selected, usable customer package.",
+  "invalid-guest-count":
+    "Guest count must be a non-negative whole number.",
   "invalid-correction":
     "Enter a valid non-negative whole number for remaining sessions.",
   "invalid-check-out": "The selected customer is unavailable for check-out.",
@@ -99,8 +103,14 @@ const errorMessages: Record<string, string> = {
     "Enter a valid non-negative whole number for occupancy.",
   "invalid-package":
     "One or more selected packages are not usable for check-in.",
+  "guest-passes-insufficient":
+    "The selected package does not have enough remaining guest passes.",
+  "guest-source-required":
+    "Choose which selected package provides the guest passes.",
   "frozen-package":
     "Frozen packages cannot be selected or used for check-in.",
+  "invalid-freeze-days":
+    "Freeze duration must be a positive whole number of days.",
   "invalid-package-action":
     "The selected package is unavailable for that action.",
   "open-visit": "This customer already has an open gym visit.",
@@ -110,7 +120,7 @@ const errorMessages: Record<string, string> = {
   "occupancy-correction-unavailable":
     "The occupancy correction could not be saved. Please try again.",
   "occupancy-zero":
-    "Occupancy is already zero. Correct the live count before checking out.",
+    "Live occupancy is lower than this visit's recorded party size. Correct the live count before checking out.",
   "package-selection-required":
     "Select at least one usable package before check-in.",
   "package-freeze-unavailable":
@@ -161,6 +171,8 @@ export default async function RegistrationPage({
       OR: [
         { customerCode: { contains: query, mode: "insensitive" } },
         { fullName: { contains: query, mode: "insensitive" } },
+        { phone: { contains: query, mode: "insensitive" } },
+        { emergencyPhone: { contains: query, mode: "insensitive" } },
       ],
     });
   }
@@ -176,6 +188,7 @@ export default async function RegistrationPage({
   } else if (customerFilter === "needs-attention") {
     customerConditions.push({
       OR: [
+        { birthDate: null },
         { packages: { none: { deletedAt: null } } },
         {
           packages: {
@@ -200,6 +213,7 @@ export default async function RegistrationPage({
         assignedCoach: {
           select: { firstName: true, lastName: true },
         },
+        birthDate: true,
         customerCode: true,
         fullName: true,
         gymPresenceStatus: true,
@@ -211,6 +225,7 @@ export default async function RegistrationPage({
           },
           where: { deletedAt: null },
         },
+        phone: true,
         status: true,
       },
       where: {
@@ -244,6 +259,7 @@ export default async function RegistrationPage({
                     hasTimeRestriction: true,
                     isActive: true,
                     name: true,
+                    packageType: true,
                     timeRestrictionLabel: true,
                   },
                 },
@@ -274,11 +290,11 @@ export default async function RegistrationPage({
       : params.status === "checked-out"
         ? "Customer checked out successfully."
         : params.status === "package-frozen"
-          ? "Package frozen. Expiration and remaining sessions were not changed."
+          ? "Package frozen. Its expiration date was extended by the selected duration."
           : params.status === "package-reactivated"
             ? "Package reactivated. Normal package eligibility rules still apply."
             : params.status === "package-reactivated-expired"
-              ? "Package reactivated as expired. Its expiration date was not extended."
+              ? "Package reactivated as expired. Reactivation did not change its expiration date."
         : params.status === "correction-saved"
         ? "Remaining sessions updated and logged."
         : params.status === "occupancy-corrected"
@@ -349,7 +365,7 @@ export default async function RegistrationPage({
             </h3>
             <p className="mt-2 text-sm leading-6 text-secondary">
               Browse all customers or narrow the visible list by name, member
-              ID, status, or package attention.
+              ID, phone, status, or profile/package attention.
             </p>
           </div>
           <CustomerLookupControls

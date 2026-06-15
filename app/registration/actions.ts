@@ -154,6 +154,10 @@ export async function createCustomerNoteAction(
     return noteErrorResult(error);
   }
 
+  revalidatePath(`/admin/customers/${encodeURIComponent(customerId)}`);
+  revalidatePath("/admin/notes");
+  revalidatePath("/registration");
+  revalidatePath("/registration/notes");
   return { message: "Note created.", ok: true };
 }
 
@@ -316,6 +320,24 @@ function nonNegativeInteger(formData: FormData, name: string) {
   return Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+function positiveInteger(formData: FormData, name: string) {
+  const rawValue = optionalText(formData, name, 20);
+
+  if (!rawValue || !/^[1-9]\d*$/.test(rawValue)) {
+    return null;
+  }
+
+  const value = Number(rawValue);
+  return Number.isSafeInteger(value) ? value : null;
+}
+
+function addUtcCalendarDays(value: Date, days: number) {
+  const result = new Date(value);
+  result.setUTCDate(result.getUTCDate() + days);
+
+  return Number.isNaN(result.getTime()) ? null : result;
+}
+
 function customerPath(
   customerCode: string,
   suffix: string,
@@ -349,6 +371,12 @@ export async function checkInAction(formData: FormData) {
   const user = await requireStaffUser();
   const customerId = optionalText(formData, "customerId", 100);
   const customerCode = optionalText(formData, "customerCode", 100);
+  const guestCount = nonNegativeInteger(formData, "guestCount");
+  const guestSourcePackageId = optionalText(
+    formData,
+    "guestSourcePackageId",
+    100,
+  );
   const compact = formData.get("view") === "compact";
   const showAllPackages = formData.get("showAllPackages") === "1";
   const selectedPackageIds = [
@@ -363,6 +391,17 @@ export async function checkInAction(formData: FormData) {
 
   if (!customerId || !customerCode) {
     redirect(`${REGISTRATION_PATH}?error=invalid-check-in`);
+  }
+
+  if (guestCount === null) {
+    redirect(
+      checkInPath(
+        customerCode,
+        "error=invalid-guest-count",
+        showAllPackages,
+        compact,
+      ),
+    );
   }
 
   try {
@@ -449,6 +488,34 @@ export async function checkInAction(formData: FormData) {
         throw new CheckInError("invalid-package");
       }
 
+      const guestSourcePackage =
+        guestCount > 0
+          ? selectedPackages.find(
+              (customerPackage) =>
+                customerPackage.id === guestSourcePackageId,
+            )
+          : null;
+
+      if (guestCount > 0 && !guestSourcePackageId) {
+        throw new CheckInError("guest-source-required");
+      }
+
+      if (
+        guestCount > 0 &&
+        (!guestSourcePackage ||
+          !packageUsability(guestSourcePackage, now).usable)
+      ) {
+        throw new CheckInError("invalid-guest-source");
+      }
+
+      if (
+        guestSourcePackage &&
+        guestCount > guestSourcePackage.remainingGuestPasses
+      ) {
+        throw new CheckInError("guest-passes-insufficient");
+      }
+
+      const occupancyDelta = 1 + guestCount;
       const presenceUpdate = await transaction.customer.updateMany({
         data: {
           gymPresenceStatus: "IN_GYM",
@@ -470,31 +537,50 @@ export async function checkInAction(formData: FormData) {
           checkedInAt: now,
           checkedInById: user.id,
           customerId: customer.id,
+          guestCountUsed: guestCount,
+          occupancyDelta,
         },
       });
 
       for (const customerPackage of selectedPackages) {
         const previousRemainingSessions = customerPackage.remainingSessions;
         const newRemainingSessions = previousRemainingSessions - 1;
+        const guestPassesDeducted =
+          customerPackage.id === guestSourcePackage?.id ? guestCount : 0;
+        const previousRemainingGuestPasses =
+          customerPackage.remainingGuestPasses;
+        const newRemainingGuestPasses =
+          previousRemainingGuestPasses - guestPassesDeducted;
         const deduction = await transaction.customerPackage.updateMany({
           data: {
+            ...(guestPassesDeducted
+              ? { remainingGuestPasses: newRemainingGuestPasses }
+              : {}),
             remainingSessions: newRemainingSessions,
           },
           where: {
             deletedAt: null,
             id: customerPackage.id,
+            ...(guestPassesDeducted
+              ? { remainingGuestPasses: previousRemainingGuestPasses }
+              : {}),
             remainingSessions: previousRemainingSessions,
             status: "ACTIVE",
           },
         });
 
-        if (deduction.count !== 1 || newRemainingSessions < 0) {
+        if (
+          deduction.count !== 1 ||
+          newRemainingSessions < 0 ||
+          newRemainingGuestPasses < 0
+        ) {
           throw new CheckInError("package-stale");
         }
 
         const usage = await transaction.visitPackageUsage.create({
           data: {
             customerPackageId: customerPackage.id,
+            guestPassesDeducted,
             sessionsDeducted: 1,
             visitId: visit.id,
           },
@@ -528,6 +614,25 @@ export async function checkInAction(formData: FormData) {
           targetId: customerPackage.id,
           targetType: "CustomerPackage",
         });
+
+        if (guestPassesDeducted) {
+          await writeAuditLog(transaction, {
+            actionType: "CUSTOMER_CHECK_IN",
+            actorId: user.id,
+            customerId: customer.id,
+            description: `Deducted ${guestPassesDeducted} guest pass${guestPassesDeducted === 1 ? "" : "es"} from ${customerPackage.package.name} for ${customer.customerCode}: ${customer.fullName}.`,
+            newValue: {
+              guestPassesDeducted,
+              remainingGuestPasses: newRemainingGuestPasses,
+              visitPackageUsageId: usage.id,
+            },
+            oldValue: {
+              remainingGuestPasses: previousRemainingGuestPasses,
+            },
+            targetId: customerPackage.id,
+            targetType: "CustomerPackage",
+          });
+        }
       }
 
       const existingOccupancy = await transaction.occupancyState.findFirst({
@@ -537,7 +642,7 @@ export async function checkInAction(formData: FormData) {
       const occupancy = existingOccupancy
         ? await transaction.occupancyState.update({
             data: {
-              currentCount: { increment: 1 },
+              currentCount: { increment: occupancyDelta },
               updatedById: user.id,
             },
             select: { currentCount: true },
@@ -545,12 +650,12 @@ export async function checkInAction(formData: FormData) {
           })
         : await transaction.occupancyState.create({
             data: {
-              currentCount: 1,
+              currentCount: occupancyDelta,
               updatedById: user.id,
             },
             select: { currentCount: true },
           });
-      const previousCount = occupancy.currentCount - 1;
+      const previousCount = occupancy.currentCount - occupancyDelta;
 
       await transaction.gymVisit.update({
         data: {
@@ -561,11 +666,14 @@ export async function checkInAction(formData: FormData) {
       await transaction.occupancyEvent.create({
         data: {
           changedById: user.id,
-          delta: 1,
+          delta: occupancyDelta,
           eventType: "CHECK_IN",
           newCount: occupancy.currentCount,
           previousCount,
-          reason: null,
+          reason:
+            guestCount > 0
+              ? `Customer plus ${guestCount} guest${guestCount === 1 ? "" : "s"}`
+              : null,
           visitId: visit.id,
         },
       });
@@ -573,11 +681,12 @@ export async function checkInAction(formData: FormData) {
         actionType: "CUSTOMER_CHECK_IN",
         actorId: user.id,
         customerId: customer.id,
-        description: selectedPackages.length
-          ? `Checked in ${customer.customerCode}: ${customer.fullName} using ${selectedPackages.length} package${selectedPackages.length === 1 ? "" : "s"}.`
-          : `Checked in ${customer.customerCode}: ${customer.fullName} without package deduction.`,
+        description: `${selectedPackages.length ? `Checked in ${customer.customerCode}: ${customer.fullName} using ${selectedPackages.length} package${selectedPackages.length === 1 ? "" : "s"}` : `Checked in ${customer.customerCode}: ${customer.fullName} without package deduction`}${guestCount ? ` with ${guestCount} guest${guestCount === 1 ? "" : "s"}` : ""}.`,
         newValue: {
+          guestCountUsed: guestCount,
+          guestSourceCustomerPackageId: guestSourcePackage?.id ?? null,
           gymPresenceStatus: "IN_GYM",
+          occupancyDelta,
           occupancyAfterCheckIn: occupancy.currentCount,
           selectedCustomerPackageIds: selectedPackages.map(
             (customerPackage) => customerPackage.id,
@@ -647,7 +756,9 @@ export async function checkOutAction(formData: FormData) {
           checkedInAt: "desc",
         },
         select: {
+          guestCountUsed: true,
           id: true,
+          occupancyDelta: true,
         },
         where: {
           checkedOutAt: null,
@@ -669,12 +780,14 @@ export async function checkOutAction(formData: FormData) {
         },
       });
 
-      if (!occupancy || occupancy.currentCount <= 0) {
+      const occupancyDelta = Math.max(1, openVisit.occupancyDelta ?? 1);
+
+      if (!occupancy || occupancy.currentCount < occupancyDelta) {
         throw new Phase11Error("occupancy-zero");
       }
 
       const now = new Date();
-      const newCount = occupancy.currentCount - 1;
+      const newCount = occupancy.currentCount - occupancyDelta;
       const occupancyUpdate = await transaction.occupancyState.updateMany({
         data: {
           currentCount: newCount,
@@ -719,11 +832,14 @@ export async function checkOutAction(formData: FormData) {
       await transaction.occupancyEvent.create({
         data: {
           changedById: user.id,
-          delta: -1,
+          delta: -occupancyDelta,
           eventType: "CHECK_OUT",
           newCount,
           previousCount: occupancy.currentCount,
-          reason: null,
+          reason:
+            openVisit.guestCountUsed > 0
+              ? `Customer plus ${openVisit.guestCountUsed} guest${openVisit.guestCountUsed === 1 ? "" : "s"}`
+              : null,
           visitId: openVisit.id,
         },
       });
@@ -731,10 +847,12 @@ export async function checkOutAction(formData: FormData) {
         actionType: "CUSTOMER_CHECK_OUT",
         actorId: user.id,
         customerId: customer.id,
-        description: `Checked out ${customer.customerCode}: ${customer.fullName}.`,
+        description: `Checked out ${customer.customerCode}: ${customer.fullName}${openVisit.guestCountUsed ? ` with ${openVisit.guestCountUsed} guest${openVisit.guestCountUsed === 1 ? "" : "s"}` : ""}.`,
         newValue: {
           checkedOutAt: now,
+          guestCountUsed: openVisit.guestCountUsed,
           gymPresenceStatus: "NOT_IN_GYM",
+          occupancyDelta,
           occupancyAfterCheckOut: newCount,
         },
         oldValue: {
@@ -1053,10 +1171,36 @@ export async function freezeCustomerPackageAction(formData: FormData) {
   const customerId = optionalText(formData, "customerId", 100);
   const customerCode = optionalText(formData, "customerCode", 100);
   const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const freezeDays = positiveInteger(formData, "freezeDays");
   const compact = formData.get("view") === "compact";
+  const requestedReturnPath = optionalText(formData, "returnPath", 300);
+  const adminReturnPath =
+    user.role === "ADMIN" &&
+    customerId &&
+    requestedReturnPath ===
+      `/admin/customers/${encodeURIComponent(customerId)}`
+      ? requestedReturnPath
+      : null;
 
   if (!customerId || !customerCode || !customerPackageId) {
-    redirect(`${REGISTRATION_PATH}?error=invalid-package-action`);
+    redirect(
+      adminReturnPath
+        ? `${adminReturnPath}?error=invalid-package-action`
+        : `${REGISTRATION_PATH}?error=invalid-package-action`,
+    );
+  }
+
+  if (freezeDays === null) {
+    redirect(
+      adminReturnPath
+        ? `${adminReturnPath}?error=invalid-freeze-days`
+        : customerPath(
+            customerCode,
+            "error=invalid-freeze-days",
+            true,
+            compact,
+          ),
+    );
   }
 
   try {
@@ -1113,8 +1257,18 @@ export async function freezeCustomerPackageAction(formData: FormData) {
       }
 
       const frozenAt = new Date();
+      const extendedExpirationDate = addUtcCalendarDays(
+        customerPackage.expirationDate,
+        freezeDays,
+      );
+
+      if (!extendedExpirationDate) {
+        throw new PackageStatusError("invalid-freeze-days");
+      }
+
       const update = await transaction.customerPackage.updateMany({
         data: {
+          expirationDate: extendedExpirationDate,
           frozenAt,
           status: "FROZEN",
         },
@@ -1134,9 +1288,10 @@ export async function freezeCustomerPackageAction(formData: FormData) {
         actionType: "PACKAGE_FREEZE",
         actorId: user.id,
         customerId: customerPackage.customer.id,
-        description: `Froze ${customerPackage.package.name} for ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName}.`,
+        description: `Froze ${customerPackage.package.name} for ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName} for ${freezeDays} day${freezeDays === 1 ? "" : "s"}, extending expiration from ${customerPackage.expirationDate.toISOString()} to ${extendedExpirationDate.toISOString()}.`,
         newValue: {
-          expirationDate: customerPackage.expirationDate,
+          expirationDate: extendedExpirationDate,
+          freezeDays,
           frozenAt,
           reactivatedAt: customerPackage.reactivatedAt,
           remainingSessions: customerPackage.remainingSessions,
@@ -1158,12 +1313,24 @@ export async function freezeCustomerPackageAction(formData: FormData) {
       error instanceof PackageStatusError
         ? error.code
         : "package-freeze-unavailable";
-    redirect(customerPath(customerCode, `error=${errorCode}`, true, compact));
+    redirect(
+      adminReturnPath
+        ? `${adminReturnPath}?error=${errorCode}`
+        : customerPath(customerCode, `error=${errorCode}`, true, compact),
+    );
   }
 
   revalidatePath(REGISTRATION_PATH);
   revalidatePath("/admin/logs");
-  redirect(customerPath(customerCode, "status=package-frozen", true, compact));
+  revalidatePath("/admin/customers");
+  if (adminReturnPath) {
+    revalidatePath(adminReturnPath);
+  }
+  redirect(
+    adminReturnPath
+      ? `${adminReturnPath}?status=package-frozen`
+      : customerPath(customerCode, "status=package-frozen", true, compact),
+  );
 }
 
 export async function reactivateCustomerPackageAction(formData: FormData) {
@@ -1173,9 +1340,21 @@ export async function reactivateCustomerPackageAction(formData: FormData) {
   const customerPackageId = optionalText(formData, "customerPackageId", 100);
   const compact = formData.get("view") === "compact";
   const showAllPackages = formData.get("showAllPackages") === "1";
+  const requestedReturnPath = optionalText(formData, "returnPath", 300);
+  const adminReturnPath =
+    user.role === "ADMIN" &&
+    customerId &&
+    requestedReturnPath ===
+      `/admin/customers/${encodeURIComponent(customerId)}`
+      ? requestedReturnPath
+      : null;
 
   if (!customerId || !customerCode || !customerPackageId) {
-    redirect(`${REGISTRATION_PATH}?error=invalid-package-action`);
+    redirect(
+      adminReturnPath
+        ? `${adminReturnPath}?error=invalid-package-action`
+        : `${REGISTRATION_PATH}?error=invalid-package-action`,
+    );
   }
 
   let reactivatedStatus: "ACTIVE" | "EXPIRED";
@@ -1274,20 +1453,37 @@ export async function reactivateCustomerPackageAction(formData: FormData) {
         ? error.code
         : "package-reactivation-unavailable";
     redirect(
-      customerPath(customerCode, `error=${errorCode}`, showAllPackages, compact),
+      adminReturnPath
+        ? `${adminReturnPath}?error=${errorCode}`
+        : customerPath(
+            customerCode,
+            `error=${errorCode}`,
+            showAllPackages,
+            compact,
+          ),
     );
   }
 
   revalidatePath(REGISTRATION_PATH);
   revalidatePath("/admin/logs");
+  revalidatePath("/admin/customers");
+  if (adminReturnPath) {
+    revalidatePath(adminReturnPath);
+  }
   redirect(
-    customerPath(
-      customerCode,
-      reactivatedStatus === "EXPIRED"
-        ? "status=package-reactivated-expired"
-        : "status=package-reactivated",
-      showAllPackages,
-      compact,
-    ),
+    adminReturnPath
+      ? `${adminReturnPath}?${
+          reactivatedStatus === "EXPIRED"
+            ? "status=package-reactivated-expired"
+            : "status=package-reactivated"
+        }`
+      : customerPath(
+          customerCode,
+          reactivatedStatus === "EXPIRED"
+            ? "status=package-reactivated-expired"
+            : "status=package-reactivated",
+          showAllPackages,
+          compact,
+        ),
   );
 }

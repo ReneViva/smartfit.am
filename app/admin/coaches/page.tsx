@@ -1,6 +1,8 @@
+import { AdminExpandableCard } from "../../../components/admin/admin-expandable-card";
+import { ImageInput } from "../../../components/admin/image-input";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
-import { ImageInput } from "../../../components/admin/image-input";
+import { StatusBadge } from "../../../components/ui/status-badge";
 import { db } from "../../../lib/db";
 import { saveCoachAction } from "./actions";
 
@@ -167,21 +169,57 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
       <section className="mt-10">
         <h3 className="text-2xl font-bold text-foreground">Existing coaches</h3>
         {coaches.length ? (
-          <div className="mt-5 space-y-6">
+          <div className="mt-5 grid gap-4 xl:grid-cols-2">
             {coaches.map((coach) => (
-              <Card key={coach.id}>
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-brand">
-                      {coach.specialty}
-                    </p>
-                    <h4 className="mt-1 text-xl font-bold text-foreground">
-                      {coach.firstName} {coach.lastName}
-                    </h4>
+              <AdminExpandableCard
+                key={coach.id}
+                summary={
+                  <div className="flex min-w-0 gap-4 p-5">
+                    <div className="size-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-soft-blue">
+                      {coach.photoUrl ? (
+                        <img
+                          alt=""
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none"
+                          src={coach.photoUrl}
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-lg font-bold text-primary-active">
+                          {coach.firstName.charAt(0)}
+                          {coach.lastName.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="truncate text-lg font-bold text-foreground">
+                            {coach.firstName} {coach.lastName}
+                          </h4>
+                          <p className="mt-1 truncate text-sm font-semibold text-brand">
+                            {coach.specialty}
+                          </p>
+                        </div>
+                        <StatusBadge
+                          className="px-2.5 py-1 text-xs"
+                          status={coach.isActive ? "active" : "notInGym"}
+                        >
+                          {coach.isActive ? "Active" : "Inactive"}
+                        </StatusBadge>
+                      </div>
+                      <p className="mt-3 line-clamp-2 text-sm leading-6 text-secondary">
+                        {coach.description || "No coach description provided."}
+                      </p>
+                    </div>
                   </div>
-                  <span className="rounded-full bg-neutral px-3 py-1 text-xs font-semibold text-secondary">
-                    {coach.isActive ? "Active" : "Inactive"}
-                  </span>
+                }
+              >
+                <div className="mb-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
+                    Editing coach
+                  </p>
+                  <h4 className="mt-1 text-lg font-bold text-foreground">
+                    {coach.firstName} {coach.lastName}
+                  </h4>
                 </div>
                 <form action={saveCoachAction}>
                   <CoachFields coach={coach} />
@@ -189,7 +227,7 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
                     Save changes
                   </Button>
                 </form>
-              </Card>
+              </AdminExpandableCard>
             ))}
           </div>
         ) : (

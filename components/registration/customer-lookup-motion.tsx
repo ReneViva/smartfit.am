@@ -126,13 +126,13 @@ export function CustomerLookupControls({
         <input name="customer" type="hidden" value={selectedCustomerCode} />
       ) : null}
       <label className="block min-w-0 flex-1 text-sm font-semibold text-foreground">
-        Full name or member ID
+        Name, member ID, or phone
         <input
           autoFocus
           className="mt-2 min-h-12 w-full rounded-lg border border-input-border bg-card px-4 py-3 text-foreground outline-none transition-[border-color,box-shadow,opacity] duration-200 focus:border-brand focus:ring-2 focus:ring-soft-blue"
           name="q"
           onChange={(event) => setQueryValue(event.target.value)}
-          placeholder="Search by full name or member ID..."
+          placeholder="Search by name, member ID, or phone..."
           value={queryValue}
         />
       </label>

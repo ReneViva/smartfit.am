@@ -2,6 +2,7 @@ import { PublicLayout } from "../../components/layout/public-layout";
 import { EmptyState } from "../../components/public/empty-state";
 import { PageIntro } from "../../components/public/page-intro";
 import { Card } from "../../components/ui/card";
+import { packageTypeLabel } from "../../lib/package-types";
 import { getActivePackages } from "../../lib/public-data";
 
 export const dynamic = "force-dynamic";
@@ -12,17 +13,17 @@ export default async function PackagesPage() {
   return (
     <PublicLayout>
       <PageIntro
-        description="Explore active Smartfit.am package options and choose the training structure that fits your routine."
-        eyebrow="Packages"
-        title="A practical way to keep moving"
+        description="Explore active Smartfit.am gym access, training, and service package options."
+        eyebrow="Packages and services"
+        title="Choose the way you want to move"
       />
 
       <section className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {packages.length ? (
           packages.map((gymPackage) => (
-            <Card className="flex flex-col" key={gymPackage.id}>
-              <p className="text-sm font-semibold text-brand">
-                {gymPackage.packageType}
+            <Card className="public-interactive-card flex flex-col" key={gymPackage.id}>
+              <p className="w-fit rounded-full bg-soft-blue px-3 py-1 text-sm font-semibold text-primary-active">
+                {packageTypeLabel(gymPackage.packageType)}
               </p>
               <h2 className="mt-2 text-2xl font-bold text-foreground">
                 {gymPackage.name}
@@ -33,6 +34,12 @@ export default async function PackagesPage() {
               <p className="mt-1 text-sm text-secondary">
                 {gymPackage.sessionCount} sessions
               </p>
+              {gymPackage.defaultGuestPasses > 0 ? (
+                <p className="mt-2 w-fit rounded-full bg-soft-blue px-3 py-1 text-sm font-semibold text-primary-active">
+                  Includes {gymPackage.defaultGuestPasses} guest{" "}
+                  {gymPackage.defaultGuestPasses === 1 ? "pass" : "passes"}
+                </p>
+              ) : null}
               {gymPackage.description ? (
                 <p className="mt-4 text-sm leading-6 text-secondary">
                   {gymPackage.description}

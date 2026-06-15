@@ -17,7 +17,7 @@ const overviewNoteSelect = {
 
 export async function getGeneralNotes() {
   return db.note.findMany({
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     select: overviewNoteSelect,
     take: 100,
     where: { customerId: null, deletedAt: null },
@@ -26,7 +26,7 @@ export async function getGeneralNotes() {
 
 export async function getCustomerNotesOverview(query: string) {
   return db.note.findMany({
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     select: {
       ...overviewNoteSelect,
       customer: {
@@ -52,6 +52,15 @@ export async function getCustomerNotesOverview(query: string) {
       deletedAt: null,
     },
   });
+}
+
+export async function getLatestNoteChangeAt() {
+  const latest = await db.note.findFirst({
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    select: { updatedAt: true },
+  });
+
+  return latest?.updatedAt.toISOString() ?? null;
 }
 
 export function staffDisplayName(staff: {

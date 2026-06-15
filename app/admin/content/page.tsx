@@ -1,8 +1,10 @@
 import { PublicContentType } from "@prisma/client";
 
+import { AdminExpandableCard } from "../../../components/admin/admin-expandable-card";
+import { ImageInput } from "../../../components/admin/image-input";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
-import { ImageInput } from "../../../components/admin/image-input";
+import { StatusBadge } from "../../../components/ui/status-badge";
 import { db } from "../../../lib/db";
 import { savePublicContentAction } from "./actions";
 
@@ -37,6 +39,32 @@ function dateTimeValue(value: Date | null) {
 
   const localValue = new Date(value.getTime() - value.getTimezoneOffset() * 60000);
   return localValue.toISOString().slice(0, 16);
+}
+
+const summaryDateFormat = new Intl.DateTimeFormat("en", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+function contentTypeLabel(type: PublicContentType) {
+  return type.toLowerCase().replaceAll("_", " ");
+}
+
+function contentDateRange(startsAt: Date | null, endsAt: Date | null) {
+  if (startsAt && endsAt) {
+    return `${summaryDateFormat.format(startsAt)} - ${summaryDateFormat.format(endsAt)}`;
+  }
+
+  if (startsAt) {
+    return `Starts ${summaryDateFormat.format(startsAt)}`;
+  }
+
+  if (endsAt) {
+    return `Ends ${summaryDateFormat.format(endsAt)}`;
+  }
+
+  return "No date restrictions";
 }
 
 function ContentFields({
@@ -190,16 +218,57 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
       <section className="mt-10">
         <h3 className="text-2xl font-bold text-foreground">Existing content</h3>
         {content.length ? (
-          <div className="mt-5 space-y-6">
+          <div className="mt-5 grid gap-4 xl:grid-cols-2">
             {content.map((item) => (
-              <Card key={item.id}>
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold uppercase tracking-wide text-brand">
-                    {item.type.toLowerCase().replaceAll("_", " ")}
+              <AdminExpandableCard
+                key={item.id}
+                summary={
+                  <div className="grid min-w-0 gap-4 p-5 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
+                    <div className="overflow-hidden rounded-xl border border-border bg-soft-blue">
+                      {item.imageUrl ? (
+                        <img
+                          alt=""
+                          className="aspect-[4/3] h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transform-none"
+                          src={item.imageUrl}
+                        />
+                      ) : (
+                        <div className="flex aspect-[4/3] items-center justify-center px-3 text-center text-xs font-semibold text-secondary">
+                          No image
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-soft-blue px-2.5 py-1 text-xs font-bold capitalize text-primary-active">
+                          {contentTypeLabel(item.type)}
+                        </span>
+                        <StatusBadge
+                          className="px-2.5 py-1 text-xs"
+                          status={item.isActive ? "active" : "notInGym"}
+                        >
+                          {item.isActive ? "Active" : "Inactive"}
+                        </StatusBadge>
+                      </div>
+                      <h4 className="mt-3 line-clamp-2 text-lg font-bold text-foreground">
+                        {item.title}
+                      </h4>
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-secondary">
+                        {item.body || "No description provided."}
+                      </p>
+                      <p className="mt-3 text-xs font-semibold text-muted">
+                        {contentDateRange(item.startsAt, item.endsAt)}
+                      </p>
+                    </div>
+                  </div>
+                }
+              >
+                <div className="mb-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
+                    Editing content
                   </p>
-                  <span className="rounded-full bg-neutral px-3 py-1 text-xs font-semibold text-secondary">
-                    {item.isActive ? "Active" : "Inactive"}
-                  </span>
+                  <h4 className="mt-1 text-lg font-bold text-foreground">
+                    {item.title}
+                  </h4>
                 </div>
                 <form action={savePublicContentAction}>
                   <ContentFields content={item} />
@@ -207,7 +276,7 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
                     Save changes
                   </Button>
                 </form>
-              </Card>
+              </AdminExpandableCard>
             ))}
           </div>
         ) : (

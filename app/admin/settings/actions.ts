@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireStaffRole } from "../../../lib/auth";
 import { db } from "../../../lib/db";
 import { writeAuditLog } from "../../../lib/logging";
+import { normalizeMapEmbedUrl } from "../../../lib/map-embed";
 import {
   imageUploadErrorCode,
   uploadImageFromForm,
@@ -57,6 +58,8 @@ export async function saveSettingsAction(formData: FormData) {
     "instagramLink",
     "mapLink",
   ] as const;
+  const rawMapEmbedValue = optionalText(formData, "mapEmbedUrl", 5000);
+  const mapEmbedUrl = normalizeMapEmbedUrl(rawMapEmbedValue);
   const urls = Object.fromEntries(
     rawUrlFields.map((field) => [field, optionalPublicUrl(formData, field)]),
   ) as Record<(typeof rawUrlFields)[number], string | null>;
@@ -87,6 +90,10 @@ export async function saveSettingsAction(formData: FormData) {
     redirect(`${SETTINGS_PATH}?error=invalid-url`);
   }
 
+  if (rawMapEmbedValue && !mapEmbedUrl) {
+    redirect(`${SETTINGS_PATH}?error=invalid-map-embed`);
+  }
+
   const data = {
     address: optionalText(formData, "address"),
     contactNumber: optionalText(formData, "contactNumber", 120),
@@ -95,6 +102,7 @@ export async function saveSettingsAction(formData: FormData) {
       formData.get("hideInactiveCustomersFromRegistration") === "on",
     instagramLink: urls.instagramLink,
     logoUrl: uploadedLogoUrl ?? urls.logoUrl,
+    mapEmbedUrl,
     mapLink: urls.mapLink,
     motivationalText: optionalText(formData, "motivationalText", 1000),
     occupancyGreenMax: greenMax,

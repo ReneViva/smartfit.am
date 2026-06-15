@@ -120,6 +120,9 @@ There is currently no configured lint or automated test command. Complete the ma
 For a focused Registration Panel demo and regression pass, use the
 [Registration client review checklist](docs/07-registration-client-review-checklist.md).
 
+For a complete public, customer, package, guest, service, and access review,
+use the [post-MVP client review checklist](docs/08-post-mvp-client-review-checklist.md).
+
 ## Production Deployment
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for environment, migration, seed, HTTPS, backup, security, and smoke-test steps.

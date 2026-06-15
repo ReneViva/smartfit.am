@@ -20,7 +20,7 @@ export default async function CoachesPage() {
       <section className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {coaches.length ? (
           coaches.map((coach) => (
-            <Card className="overflow-hidden p-0" key={coach.id}>
+            <Card className="public-interactive-card overflow-hidden p-0" key={coach.id}>
               {coach.photoUrl ? (
                 <img
                   alt={`${coach.firstName} ${coach.lastName}`}

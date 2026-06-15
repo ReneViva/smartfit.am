@@ -18,9 +18,11 @@ export type RegistrationSearchResult = {
     firstName: string;
     lastName: string;
   } | null;
+  birthDate: Date | null;
   customerCode: string;
   fullName: string;
   gymPresenceStatus: GymPresenceStatus;
+  phone: string | null;
   packages: Array<{
     expirationDate: Date;
     remainingSessions: number;
@@ -228,6 +230,11 @@ export function CustomerSearchResults({
                         ? `${customer.assignedCoach.firstName} ${customer.assignedCoach.lastName}`
                         : "Not assigned"}
                     </p>
+                    {customer.phone ? (
+                      <p className="mt-1 text-sm text-secondary">
+                        Phone: {customer.phone}
+                      </p>
+                    ) : null}
                     <p className="mt-2 text-sm font-semibold text-foreground">
                       {activePackages} active package
                       {activePackages === 1 ? "" : "s"}
@@ -261,6 +268,9 @@ export function CustomerSearchResults({
                     ) : null}
                     {hasZeroSessions ? (
                       <StatusBadge status="high">zero sessions</StatusBadge>
+                    ) : null}
+                    {!customer.birthDate ? (
+                      <StatusBadge status="medium">missing birth date</StatusBadge>
                     ) : null}
                   </div>
                 </div>

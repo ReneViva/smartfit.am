@@ -93,9 +93,17 @@ Document roles:
 - `docs/06-codex-prompt-guide.md` controls how Codex should behave while implementing.
 - `docs/design-colors.md` provides Smartfit.am design tokens and color definitions.
 
-`docs/05-development-phases.md` is the official phase plan. Phase 0 through Phase 15 are the completed original MVP phases. The project owner manually extended the plan with post-MVP Registration Panel improvement phases, Phase 16 through Phase 21. Codex and ChatGPT must not create Phase 22 or any later phase unless the project owner manually updates that document again.
+`docs/05-development-phases.md` is the official phase plan. Phase 0 through Phase 15 are the completed original MVP phases. Phase 16 through Phase 21 are completed post-MVP Registration Panel improvement phases. The project owner manually added Phase 22 through Phase 29 for confirmed customer, package, guest, service, and public-offer expansion work. These phases are official only because the phase document has now been manually updated.
 
-The post-MVP phases exist only because the project owner reviewed the completed Registration Panel against the uploaded specification and explicitly approved a focused improvement sequence. They do not weaken the anti-hallucination, simplicity, privacy, permission, or phase-control rules.
+The post-MVP phases do not weaken the anti-hallucination, simplicity, privacy, permission, or phase-control rules. Codex must follow them one at a time. No Phase 30 or later exists unless the project owner manually updates the official phase document again.
+
+Confirmed expansion rules:
+
+- Guest count is operational, but it affects allowance and occupancy only after Phase 26 is implemented.
+- Phase 24 stores guest allowance data and must not change check-in or occupancy behavior.
+- Package upgrades edit the existing assigned customer package and log old/new values; renewal may still create a new assignment.
+- Swimming, cardio, trainer, group-training, and similar services remain packages unless the owner later confirms a separate Services system.
+- Birth date is required for new customer registration after Phase 25 is implemented.
 
 ---
 
@@ -301,9 +309,11 @@ Complete / Partially Complete / Blocked
 Review rules:
 
 - If the phase is complete, ChatGPT may generate the next phase prompt only if there is a next phase in `docs/05-development-phases.md`.
-- If Phase 15 is complete, ChatGPT may move to Phase 16 only because the project owner manually added Phase 16 through Phase 21 to `docs/05-development-phases.md`.
-- If Phase 21 is complete, ChatGPT must not suggest Phase 22.
-- If something remains after Phase 21, ChatGPT should create a `Remaining Issues` list, not a new phase.
+- If Phase 15 is complete, ChatGPT may move to Phase 16 because the project owner manually added Phase 16 through Phase 21.
+- If Phase 21 is complete, ChatGPT may move to Phase 22 because the project owner manually added Phase 22 through Phase 29.
+- Phase 22 is documentation-only; implementation begins in Phase 23.
+- If Phase 29 is complete, ChatGPT must not suggest Phase 30.
+- If something remains after Phase 29, ChatGPT should create a `Remaining Issues` list, not a new phase.
 
 ---
 
@@ -408,7 +418,7 @@ Do not add unconfirmed features.
 Make the prompt guide Codex toward the simplest correct implementation.
 ```
 
-ChatGPT must check the official phase index before responding. The current plan has been manually extended through Phase 21. If the completed phase is Phase 21, there is no next phase unless `docs/05-development-phases.md` is manually updated again.
+ChatGPT must check the official phase index before responding. The current plan has been manually extended through Phase 29. If the completed phase is Phase 29, there is no next phase unless `docs/05-development-phases.md` is manually updated again.
 
 ---
 
@@ -419,16 +429,18 @@ Phase hallucination means ChatGPT or Codex invents new phase numbers, skips the 
 Strict rules:
 
 - Always check the Full Phase Index in `docs/05-development-phases.md`.
-- The current approved plan contains **Phase 0 through Phase 21**.
+- The current approved plan contains **Phase 0 through Phase 29**.
 - Phase 0 through Phase 15 are the completed original MVP phases.
-- Phase 16 through Phase 21 are manually approved post-MVP Registration Panel improvement phases.
+- Phase 16 through Phase 21 are completed post-MVP Registration Panel improvement phases.
+- Phase 22 through Phase 29 are manually approved post-MVP customer/package/guest/offer expansion phases.
 - Never continue beyond the final phase.
-- The current plan ends at Phase 21, so stop at Phase 21.
-- Do not create Phase 22 or any later phase.
-- If something is left unfinished after the final phase, create a `Remaining Issues` list, not Phase 22.
+- The current plan ends at Phase 29, so stop at Phase 29.
+- Do not create Phase 30 or any later phase.
+- If something is left unfinished after the final phase, create a `Remaining Issues` list, not Phase 30.
 - New phases require manual update to `docs/05-development-phases.md`.
 - ChatGPT may refer to Phase 16 through Phase 21 because the phase document has now been manually updated.
-- ChatGPT must never say “next is Phase 22” unless the phase document is manually updated again.
+- ChatGPT may refer to Phase 22 through Phase 29 because this documentation update makes them official.
+- ChatGPT must never say “next is Phase 30” unless the phase document is manually updated again.
 - Codex must not add phase numbers in its output unless it is referring to the official phase being implemented.
 - If a feature does not fit into the fixed phase plan, state that `docs/05-development-phases.md` must be manually updated first.
 
@@ -458,6 +470,14 @@ Official phase index:
 | Phase 19 | Registration Package Freeze and Reactivation |
 | Phase 20 | Reception Workspace Controls and Operational Rules Display |
 | Phase 21 | Post-MVP Registration Regression and Client Review Preparation |
+| Phase 22 | Post-MVP Scope Documentation Update |
+| Phase 23 | Public Content Carousel for Offers and Promotions |
+| Phase 24 | Package Guest Allowance Data Support |
+| Phase 25 | Expanded Customer Profile Fields |
+| Phase 26 | Guest Check-In and Occupancy Integration |
+| Phase 27 | Flexible Customer Package Editing and Upgrade Workflow |
+| Phase 28 | Services as Flexible Packages |
+| Phase 29 | Customer/Package/Guest Regression, Exports, Demo Data, and Client Review |
 
 ---
 
@@ -507,7 +527,7 @@ Confirmed MVP work should stay focused on:
 - Basic analytics.
 - Final testing and deployment preparation.
 
-Confirmed post-MVP Registration work must stay focused on Phase 16 through Phase 21:
+Completed post-MVP Registration work is covered by Phase 16 through Phase 21:
 
 - Registration gap audit and missing-section fixes.
 - Registration customer workspace redesign.
@@ -517,6 +537,24 @@ Confirmed post-MVP Registration work must stay focused on Phase 16 through Phase
 - Registration regression testing and client-review preparation.
 
 **Important:** Admin Settings remain admin-only. Reception view controls must not become a true system-settings editor. Any future request to let REGISTRATION edit system-wide settings requires a separate permission decision and another manual documentation update.
+
+Confirmed post-MVP expansion work must stay focused on Phase 22 through Phase 29:
+
+- Phase 22 documents and controls the approved scope only.
+- Phase 23 adds the public offer/promotion carousel.
+- Phase 24 adds guest allowance data only; it must not change occupancy or check-in behavior.
+- Phase 25 adds the confirmed customer fields and requires birth date for new customer registration.
+- Phase 26 adds operational guest check-in, allowance deduction, and customer-plus-guests occupancy.
+- Phase 27 edits existing assigned packages and logs old/new values while preserving renewal behavior.
+- Phase 28 treats services as packages and must not create a separate Services system.
+- Phase 29 performs regression, export, demo-data, privacy, and client-review checks.
+
+**Important expansion warnings:**
+
+- Guest count is operational. Never decrement guest allowance or increase occupancy from guests before Phase 26.
+- Guest occupancy changes only when staff selects the actual guest count used during check-in.
+- Services must remain `Package` and `CustomerPackage` records unless the project owner later confirms a separate Services system.
+- New customer registration must require birth date after Phase 25; legacy missing values must be handled safely without invented data.
 
 ---
 
@@ -751,7 +789,7 @@ These unclear points must not be solved by guessing inside Codex prompts. If a p
 
 1. Exact authentication method for admin and registration staff is not confirmed.
 2. Exact staff login identifier is unclear: username, email, phone, or another value.
-3. Exact customer personal information fields are not fully confirmed.
+3. Customer fields confirmed for Phase 25 are customer/member ID, first name, surname/last name, full name, required birth date for new registrations, phone, emergency phone, status, assigned coach where applicable, and gym presence; any additional personal fields remain unconfirmed.
 4. Exact customer ID/code format is not confirmed.
 5. Whether customer phone number is required or unique is unclear.
 6. Whether admin users can access the Registration Panel is unclear.
@@ -791,5 +829,5 @@ These unclear points must not be solved by guessing inside Codex prompts. If a p
 ## 18. Final Rule
 
 ```txt
-Codex and ChatGPT must follow docs/05-development-phases.md exactly. Phase 16 through Phase 21 are the only manually approved post-MVP phases. No Phase 22, unconfirmed feature, unrelated refactor, or over-engineered implementation is allowed unless the project owner manually updates the documentation again.
+Codex and ChatGPT must follow docs/05-development-phases.md exactly. Phase 16 through Phase 21 are completed post-MVP Registration phases. Phase 22 through Phase 29 are the only manually approved expansion phases. No Phase 30, unconfirmed feature, unrelated refactor, or over-engineered implementation is allowed unless the project owner manually updates the documentation again.
 ```

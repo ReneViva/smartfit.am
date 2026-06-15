@@ -21,8 +21,9 @@ export function CheckOutPanel({
         Register customer exit
       </h3>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary">
-        Check-out closes the open gym visit and decreases occupancy by one. It
-        does not deduct package sessions.
+        Check-out closes the open gym visit and decreases occupancy by the same
+        party size recorded at check-in. It does not deduct package sessions or
+        guest passes.
       </p>
       <form action={checkOutAction} className="mt-5">
         <input name="customerCode" type="hidden" value={customerCode} />
