@@ -113,23 +113,23 @@ This file is the official controlled development phase plan for Smartfit.am.
 | Phase 27 | Flexible Customer Package Editing and Upgrade Workflow | Edit assigned packages safely while logging old and new values | Phase 26 | Complete |
 | Phase 28 | Services as Flexible Packages | Manage service-style offerings through the existing package system | Phase 27 | Complete |
 | Phase 29 | Customer/Package/Guest Regression, Exports, Demo Data, and Client Review | Verify the complete expansion sequence and prepare client review | Phase 28 | Complete |
-| Phase 30 | Post-Phase 29 Scope Documentation Update | Make the newly approved analytics, package categories, customer documents, visit history, advanced freezing, Registration freeze permission, and homepage redesign phases official | Phase 29 | Planned |
-| Phase 31 | Public and Admin Analytics Expansion | Add public-safe aggregate analytics to `/our-app` and expand Admin Analytics with professional charts | Phase 30 | Planned |
-| Phase 32 | Package Category Management Foundation | Add Admin category management and prepare category data as the main package grouping system | Phase 31 | Planned |
-| Phase 33 | Package Category Assignment and Public Package Filtering | Connect packages to multiple categories and add responsive public package filters/sorting | Phase 32 | Planned |
-| Phase 34 | Customer Document Upload Storage Foundation | Add safe Admin-only customer document metadata and storage planning without guessing unsafe storage | Phase 33 | Planned |
-| Phase 35 | Admin Customer Document Upload UI | Add Admin-only customer document upload/list/download/delete UI on customer detail pages | Phase 34 | Planned |
-| Phase 36 | Customer Visit History on Admin Customer Detail | Show latest three visits and optional view-all history on Admin customer detail | Phase 35 | Planned |
-| Phase 37 | Advanced Package Freezing Data Model and Freeze Chances | Add freeze records, freeze chances, and data support for normal, retroactive, and early-reactivation freeze logic | Phase 36 | Planned |
-| Phase 38 | Advanced Admin Freeze Workflows | Implement Admin normal freeze, retroactive freeze from last checkout, early reactivation recalculation, and freeze-chance enforcement | Phase 37 | Planned |
-| Phase 39 | Registration Freeze Permission Control | Make Registration freeze/reactivation access controlled by Admin settings | Phase 38 | Planned |
-| Phase 40 | Homepage 3D Offer Carousel and Section Navigation Redesign | Fully redesign the homepage with a CSS-first 3D offer carousel, section navigation, emphasized Our App entry, and scroll-to-top behavior | Phase 39 | Planned |
-| Phase 41 | Final Regression, Exports, Demo Data, and Client Review | Verify the complete new expansion, update relevant exports/review checklist, and prepare for client review | Phase 40 | Planned |
+| Phase 30 | Post-Phase 29 Scope Documentation Update | Make the newly approved analytics, package categories, customer documents, visit history, advanced freezing, Registration freeze permission, and homepage redesign phases official | Phase 29 | Complete |
+| Phase 31 | Public and Admin Analytics Expansion | Add public-safe aggregate analytics to `/our-app` and expand Admin Analytics with professional charts | Phase 30 | Complete |
+| Phase 32 | Package Category Management Foundation | Add Admin category management and prepare category data as the main package grouping system | Phase 31 | Complete |
+| Phase 33 | Package Category Assignment and Public Package Filtering | Connect packages to multiple categories and add responsive public package filters/sorting | Phase 32 | Complete |
+| Phase 34 | Customer Document Upload Storage Foundation | Add safe Admin-only customer document metadata and storage planning without guessing unsafe storage | Phase 33 | Complete |
+| Phase 35 | Admin Customer Document Upload UI | Add Admin-only customer document upload/list/download/delete UI on customer detail pages | Phase 34 | Complete |
+| Phase 36 | Customer Visit History on Admin Customer Detail | Show latest three visits and optional view-all history on Admin customer detail | Phase 35 | Complete |
+| Phase 37 | Advanced Package Freezing Data Model and Freeze Chances | Add freeze records, freeze chances, and data support for normal, retroactive, and early-reactivation freeze logic | Phase 36 | Complete |
+| Phase 38 | Advanced Admin Freeze Workflows | Implement Admin normal freeze, retroactive freeze from last checkout, early reactivation recalculation, and freeze-chance enforcement | Phase 37 | Complete |
+| Phase 39 | Registration Freeze Permission Control | Make Registration freeze/reactivation access controlled by Admin settings | Phase 38 | Complete |
+| Phase 40 | Homepage 3D Offer Carousel and Section Navigation Redesign | Fully redesign the homepage with a CSS-first 3D offer carousel, section navigation, emphasized Our App entry, and scroll-to-top behavior | Phase 39 | Complete |
+| Phase 41 | Final Regression, Exports, Demo Data, and Client Review | Verify the complete new expansion, update relevant exports/review checklist, and prepare for client review | Phase 40 | Complete |
 
 **Original MVP phases:** Phase 0 through Phase 15, complete.
 **Completed Registration improvement phases:** Phase 16 through Phase 21.
 **Completed customer/package/guest/offer expansion phases:** Phase 22 through Phase 29.
-**Manually approved analytics/category/document/freeze/homepage expansion phases:** Phase 30 through Phase 41.
+**Completed analytics/category/document/freeze/homepage expansion phases:** Phase 30 through Phase 41.
 **Current final approved phase:** Phase 41 - Final Regression, Exports, Demo Data, and Client Review.
 
 ---
@@ -3500,7 +3500,7 @@ Specific business workflow dependencies:
 - Analytics depends on visit records and occupancy records.
 - Excel export depends on customer, package, coach, visit, public content, note, and log data.
 - Admin logs depend on server-side logging being added during earlier admin and registration actions.
-- Customer document UI depends on a production-safe private storage provider and authorized download strategy.
+- Customer document UI uses the implemented private Cloudinary storage adapter and Admin-only authorized download strategy.
 - Advanced freezing depends on transactional counter, status, date, and audit updates.
 
 ---
@@ -3586,18 +3586,18 @@ Codex should also follow these rules:
 | Phase 27 — Flexible Customer Package Editing and Upgrade Workflow | Complete |  | Completed expansion phase |
 | Phase 28 — Services as Flexible Packages | Complete |  | Completed expansion phase |
 | Phase 29 — Customer/Package/Guest Regression, Exports, Demo Data, and Client Review | Complete |  | Completed previous final review |
-| Phase 30 — Post-Phase 29 Scope Documentation Update | Planned |  | Documentation only |
-| Phase 31 — Public and Admin Analytics Expansion | Not Started |  | Next implementation phase |
-| Phase 32 — Package Category Management Foundation | Not Started |  | Category data and Admin management |
-| Phase 33 — Package Category Assignment and Public Package Filtering | Not Started |  | Public eligibility, filters, and sorting |
-| Phase 34 — Customer Document Upload Storage Foundation | Not Started |  | Blocked until production-safe storage is confirmed |
-| Phase 35 — Admin Customer Document Upload UI | Not Started |  | Depends on completed storage foundation |
-| Phase 36 — Customer Visit History on Admin Customer Detail | Not Started |  | Admin-only recent visit context |
-| Phase 37 — Advanced Package Freezing Data Model and Freeze Chances | Not Started |  | Freeze history and counters |
-| Phase 38 — Advanced Admin Freeze Workflows | Not Started |  | Admin normal/retroactive/reactivation workflow |
-| Phase 39 — Registration Freeze Permission Control | Not Started |  | Default-disabled permission |
-| Phase 40 — Homepage 3D Offer Carousel and Section Navigation Redesign | Not Started |  | Public presentation redesign |
-| Phase 41 — Final Regression, Exports, Demo Data, and Client Review | Not Started |  | Final approved phase |
+| Phase 30 — Post-Phase 29 Scope Documentation Update | Complete |  | Documentation-only expansion approval |
+| Phase 31 — Public and Admin Analytics Expansion | Complete |  | Public-safe aggregates and Admin analytics |
+| Phase 32 — Package Category Management Foundation | Complete |  | Category data and Admin management |
+| Phase 33 — Package Category Assignment and Public Package Filtering | Complete |  | Public eligibility, filters, and sorting |
+| Phase 34 — Customer Document Upload Storage Foundation | Complete |  | Private Cloudinary storage adapter and metadata |
+| Phase 35 — Admin Customer Document Upload UI | Complete |  | Admin-only upload/list/download/archive UI |
+| Phase 36 — Customer Visit History on Admin Customer Detail | Complete |  | Admin-only recent and full visit history |
+| Phase 37 — Advanced Package Freezing Data Model and Freeze Chances | Complete |  | Freeze history and counters |
+| Phase 38 — Advanced Admin Freeze Workflows | Complete |  | Admin normal/retroactive/reactivation workflow |
+| Phase 39 — Registration Freeze Permission Control | Complete |  | Default-disabled permission |
+| Phase 40 — Homepage 3D Offer Carousel and Section Navigation Redesign | Complete |  | Public presentation redesign |
+| Phase 41 — Final Regression, Exports, Demo Data, and Client Review | Complete |  | Final approved phase |
 
 ---
 
@@ -3609,10 +3609,10 @@ The following items should not be forced into implementation phases until confir
 2. Whether Gallery images are uploaded through Admin Panel or provided as external URLs.
 3. Whether reception staff can delete notes or only create/edit them.
 4. Whether note edits/deletions must create separate logs.
-5. Which production-safe private storage provider should hold customer documents.
-6. Whether customer document removal means archive, provider-object deletion, or both, including retention requirements.
-7. Which authorized private-download or signed-access strategy matches the production host.
-8. Exact timezone and date-boundary conventions for advanced freeze duration calculations.
+5. Future non-Cloudinary document storage providers, such as R2, require a new adapter and migration plan; they are not a one-URL swap.
+6. Customer document retention policy beyond the current Admin archive/delete plus provider-object deletion behavior.
+7. Production CDN/private delivery tuning beyond the current Admin-only short-lived Cloudinary download route.
+8. Future timezone edge cases beyond the implemented Phase 37-38 server date rules for advanced freeze duration calculations.
 9. Whether admin override is allowed for time-restricted packages.
 10. Whether admin override is allowed for expired packages or zero-session packages.
 11. Whether manual occupancy changes require admin password/approval.
@@ -3675,7 +3675,7 @@ The following features are not included in the current MVP phase plan because th
 
 ## 11. Final Completion Definition
 
-The Smartfit.am MVP and all approved work through Phase 29 are complete. Phase 30 through Phase 41 are the next manually approved sequence, with Phase 30 reserved for documentation and Phase 31 as the first implementation phase.
+The Smartfit.am MVP and all approved work through Phase 41 are complete. Phase 30 through Phase 41 were the manually approved analytics/category/document/freeze/homepage expansion sequence, with Phase 41 as the final approved review phase.
 
 The final MVP must satisfy these completion points:
 
@@ -3721,4 +3721,4 @@ The final MVP must satisfy these completion points:
 - Homepage redesign preserves existing public business logic and accessibility.
 - No unapproved phase beyond Phase 41 has been created.
 
-**Final rule:** Phase 0 through Phase 29 are complete. Phase 30 through Phase 41 are the manually approved next sequence. Phase 30 is documentation-only, implementation begins with Phase 31, and Phase 41 is final. No Phase 42 or later exists unless the project owner manually updates this document again.
+**Final rule:** Phase 0 through Phase 41 are complete. Phase 41 is final. No Phase 42 or later exists unless the project owner manually updates this document again.

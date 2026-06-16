@@ -43,6 +43,44 @@ const coaches = [
   },
 ];
 
+const categories = [
+  {
+    description: "General gym access memberships and visit-based passes.",
+    isPublic: true,
+    name: "Gym Access",
+    slug: "gym-access",
+    sortOrder: 10,
+  },
+  {
+    description: "Coached personal, group, and fitness trainer sessions.",
+    isPublic: true,
+    name: "Training",
+    slug: "training",
+    sortOrder: 20,
+  },
+  {
+    description: "Swimming packages and pool access offers.",
+    isPublic: true,
+    name: "Swimming",
+    slug: "swimming",
+    sortOrder: 30,
+  },
+  {
+    description: "Cardio-focused access packages.",
+    isPublic: true,
+    name: "Cardio",
+    slug: "cardio",
+    sortOrder: 40,
+  },
+  {
+    description: "Couple and member-value offers for the public packages page.",
+    isPublic: true,
+    name: "Member Offers",
+    slug: "member-offers",
+    sortOrder: 50,
+  },
+];
+
 // Duration-only memberships use demo session approximations until unlimited
 // membership behavior is separately confirmed: 30/90/180/365 sessions.
 const packages = [
@@ -394,6 +432,7 @@ const customers = [
     packages: [
       {
         name: "All-Day Access — 1 Month / 12 Visits",
+        remainingFreezeChances: 3,
         remainingSessions: 0,
         status: "ACTIVE",
       },
@@ -420,6 +459,7 @@ const customers = [
     packages: [
       {
         name: "All-Day Access — 3 Months — Individual",
+        remainingFreezeChances: 2,
         remainingSessions: 40,
         status: "FROZEN",
       },
@@ -441,6 +481,28 @@ const customers = [
       },
     ],
     phone: "+374 77 001 007",
+  },
+];
+
+const publicContents = [
+  {
+    body: "A focused seasonal offer for members who want coached training plus open gym access.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1200&q=80",
+    title: "Summer Training Pass",
+    type: "OFFER",
+  },
+  {
+    body: "Bring a training partner and ask reception about current couple package availability.",
+    imageUrl: null,
+    title: "Couple Access Packages",
+    type: "PROMOTION",
+  },
+  {
+    body: "The public app can show live occupancy, active offers, and contact details when enabled.",
+    imageUrl: null,
+    title: "Plan Your Visit",
+    type: "ANNOUNCEMENT",
   },
 ];
 
@@ -508,13 +570,83 @@ async function seedCoach(coach) {
   return prisma.coach.create({ data });
 }
 
-async function seedPackage(gymPackage, coachIdsByName) {
+async function seedCategory(category) {
+  return prisma.category.upsert({
+    create: {
+      ...category,
+      archivedAt: null,
+      isArchived: false,
+    },
+    update: {
+      ...category,
+      archivedAt: null,
+      isArchived: false,
+    },
+    where: { slug: category.slug },
+  });
+}
+
+function categorySlugsForPackage(gymPackage) {
+  const slugs = new Set();
+
+  if (gymPackage.packageType === "GYM_ACCESS") {
+    slugs.add("gym-access");
+  }
+
+  if (
+    ["PERSONAL_TRAINING", "GROUP_TRAINING", "FITNESS_TRAINER"].includes(
+      gymPackage.packageType,
+    )
+  ) {
+    slugs.add("training");
+  }
+
+  if (gymPackage.packageType === "SWIMMING") {
+    slugs.add("swimming");
+  }
+
+  if (gymPackage.packageType === "CARDIO") {
+    slugs.add("cardio");
+  }
+
+  if (gymPackage.name.includes("Couple")) {
+    slugs.add("member-offers");
+  }
+
+  return [...slugs];
+}
+
+async function linkPackageCategories(packageId, categorySlugs, categoryIdsBySlug) {
+  for (const slug of categorySlugs) {
+    const categoryId = categoryIdsBySlug.get(slug);
+    if (!categoryId) {
+      throw new Error(`Demo category was not seeded: ${slug}`);
+    }
+
+    await prisma.packageCategory.upsert({
+      create: {
+        categoryId,
+        packageId,
+      },
+      update: {},
+      where: {
+        packageId_categoryId: {
+          categoryId,
+          packageId,
+        },
+      },
+    });
+  }
+}
+
+async function seedPackage(gymPackage, coachIdsByName, categoryIdsBySlug) {
   const { assignedCoachName, durationDays, ...packageData } = gymPackage;
   const existing = await prisma.package.findFirst({
     where: { name: gymPackage.name },
   });
   const data = {
     ...packageData,
+    defaultFreezeChances: gymPackage.defaultFreezeChances ?? 3,
     defaultGuestPasses: gymPackage.name.includes("Couple") ? 2 : 0,
     assignedCoachId: assignedCoachName
       ? coachIdsByName.get(assignedCoachName)
@@ -533,7 +665,38 @@ async function seedPackage(gymPackage, coachIdsByName) {
     record = await prisma.package.create({ data });
   }
 
+  await linkPackageCategories(
+    record.id,
+    categorySlugsForPackage(gymPackage),
+    categoryIdsBySlug,
+  );
+
   return { ...record, durationDays };
+}
+
+async function seedPublicContent(content) {
+  const existing = await prisma.publicContent.findFirst({
+    where: {
+      title: content.title,
+      type: content.type,
+    },
+  });
+  const data = {
+    ...content,
+    deletedAt: null,
+    endsAt: null,
+    isActive: true,
+    startsAt: null,
+  };
+
+  if (existing) {
+    return prisma.publicContent.update({
+      data,
+      where: { id: existing.id },
+    });
+  }
+
+  return prisma.publicContent.create({ data });
 }
 
 async function seedCustomer(customer, coachIdsByName) {
@@ -597,6 +760,8 @@ async function seedCustomerPackage({
     initialSessions: packageRecord.sessionCount,
     initialGuestPasses: packageRecord.defaultGuestPasses,
     reactivatedAt: null,
+    remainingFreezeChances:
+      assignment.remainingFreezeChances ?? packageRecord.defaultFreezeChances,
     remainingSessions: assignment.remainingSessions,
     remainingGuestPasses: packageRecord.defaultGuestPasses,
     status: assignment.status,
@@ -627,9 +792,19 @@ async function main() {
     coachIdsByName.set(`${record.firstName} ${record.lastName}`, record.id);
   }
 
+  const categoryIdsBySlug = new Map();
+  for (const category of categories) {
+    const record = await seedCategory(category);
+    categoryIdsBySlug.set(record.slug, record.id);
+  }
+
   const packagesByName = new Map();
   for (const gymPackage of packages) {
-    const record = await seedPackage(gymPackage, coachIdsByName);
+    const record = await seedPackage(
+      gymPackage,
+      coachIdsByName,
+      categoryIdsBySlug,
+    );
     packagesByName.set(record.name, record);
   }
 
@@ -652,11 +827,17 @@ async function main() {
     }
   }
 
+  for (const content of publicContents) {
+    await seedPublicContent(content);
+  }
+
   console.log("Smartfit demo data seed complete.");
   console.log(`Coaches prepared: ${coaches.length}`);
+  console.log(`Categories prepared: ${categories.length}`);
   console.log(`Official packages prepared: ${packages.length}`);
   console.log(`Demo customers prepared: ${customers.length}`);
   console.log(`Demo customer-package assignments prepared: ${assignmentCount}`);
+  console.log(`Public content items prepared: ${publicContents.length}`);
   console.log("No visits, check-ins, session changes, audit logs, or occupancy changes were created.");
 }
 

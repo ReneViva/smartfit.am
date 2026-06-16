@@ -90,6 +90,7 @@ type HistoryFilter =
   | "expired"
   | "frozen"
   | "inactive";
+type OverviewMode = "all" | "current" | "history";
 
 const historyFilters: { label: string; value: HistoryFilter }[] = [
   { label: "All", value: "all" },
@@ -241,6 +242,7 @@ export function CustomerPackageOverview({
   customerCode,
   customerId,
   latestCompletedCheckoutAt,
+  mode = "all",
   packages,
   packageDefinitions,
 }: {
@@ -248,6 +250,7 @@ export function CustomerPackageOverview({
   customerCode: string;
   customerId: string;
   latestCompletedCheckoutAt: Date | null;
+  mode?: OverviewMode;
   packages: CustomerPackageValue[];
   packageDefinitions: PackageOption[];
 }) {
@@ -295,6 +298,12 @@ export function CustomerPackageOverview({
     : filteredHistory.slice(0, 10);
   const selectedPackage =
     packages.find(({ id }) => id === selectedPanel?.customerPackageId) ?? null;
+  const managePanelId =
+    mode === "history"
+      ? "manage-assigned-package-history"
+      : "manage-assigned-package";
+  const showCurrentManagement = mode !== "history";
+  const showPackageHistory = mode !== "current";
 
   function openSelectedPanel(
     customerPackageId: string,
@@ -303,7 +312,7 @@ export function CustomerPackageOverview({
     setSelectedPanel({ customerPackageId, mode });
     window.setTimeout(() => {
       document
-        .getElementById("manage-assigned-package")
+        .getElementById(managePanelId)
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 0);
   }
@@ -319,6 +328,8 @@ export function CustomerPackageOverview({
 
   return (
     <div className="space-y-8">
+      {showCurrentManagement ? (
+      <>
       <section>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -484,11 +495,13 @@ export function CustomerPackageOverview({
           </div>
         </section>
       ) : null}
+      </>
+      ) : null}
 
       {selectedPackage ? (
         <section
           className="scroll-mt-6 rounded-2xl border border-brand bg-card p-5 shadow-md sm:p-6"
-          id="manage-assigned-package"
+          id={managePanelId}
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -531,6 +544,7 @@ export function CustomerPackageOverview({
         </section>
       ) : null}
 
+      {showPackageHistory ? (
       <section>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -771,6 +785,7 @@ export function CustomerPackageOverview({
           </Button>
         ) : null}
       </section>
+      ) : null}
     </div>
   );
 }

@@ -393,22 +393,7 @@ export default async function CustomerDetailPage({
         />
       </div>
 
-      <div className="mt-6">
-        <CustomerDocumentsPanel
-          customerId={customer.id}
-          documents={documents}
-        />
-      </div>
-
-      <div className="mt-6">
-        <CustomerVisitHistory
-          description="Latest three check-in and check-out records. Open visits stay clearly marked."
-          viewAllHref={`/admin/customers/${encodeURIComponent(customer.id)}/visits`}
-          visits={recentVisits}
-        />
-      </div>
-
-      <Card className="mt-6">
+      <Card className="mt-6 scroll-mt-6" id="customer-packages">
         <CustomerPackageOverview
           coaches={coaches}
           customerCode={customer.customerCode}
@@ -416,6 +401,7 @@ export default async function CustomerDetailPage({
           latestCompletedCheckoutAt={
             latestCompletedVisit?.checkedOutAt ?? null
           }
+          mode="current"
           packageDefinitions={packageDefinitions}
           packages={customer.packages}
         />
@@ -445,6 +431,35 @@ export default async function CustomerDetailPage({
           </div>
         </details>
       </section>
+
+      <div className="mt-6">
+        <CustomerDocumentsPanel
+          customerId={customer.id}
+          documents={documents}
+        />
+      </div>
+
+      <Card className="mt-6 scroll-mt-6" id="customer-package-history">
+        <CustomerPackageOverview
+          coaches={coaches}
+          customerCode={customer.customerCode}
+          customerId={customer.id}
+          latestCompletedCheckoutAt={
+            latestCompletedVisit?.checkedOutAt ?? null
+          }
+          mode="history"
+          packageDefinitions={packageDefinitions}
+          packages={customer.packages}
+        />
+      </Card>
+
+      <div className="mt-6">
+        <CustomerVisitHistory
+          description="Latest three check-in and check-out records. Open visits stay clearly marked."
+          viewAllHref={`/admin/customers/${encodeURIComponent(customer.id)}/visits`}
+          visits={recentVisits}
+        />
+      </div>
     </>
   );
 }

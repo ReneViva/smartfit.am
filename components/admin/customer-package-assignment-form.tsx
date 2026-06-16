@@ -116,13 +116,13 @@ export function CustomerPackageAssignmentForm({
               <input
                 className={inputClass}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Package name or service type"
+                placeholder="Package name or internal type"
                 type="search"
                 value={query}
               />
             </label>
             <label className={labelClass}>
-              Service type
+              Internal type
               <select
                 className={inputClass}
                 onChange={(event) => setPackageTypeFilter(event.target.value)}
@@ -176,7 +176,7 @@ export function CustomerPackageAssignmentForm({
               ))
             ) : (
               <p className="px-3 py-5 text-center text-sm text-secondary">
-                No active packages match this search and type.
+                No active packages match this search and internal type.
               </p>
             )}
           </div>

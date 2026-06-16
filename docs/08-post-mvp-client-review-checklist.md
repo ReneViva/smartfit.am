@@ -7,15 +7,15 @@ agreed occupancy count.
 
 ## Public Website
 
-- Open the homepage with no active offers and confirm the empty message is
-  clear.
+- Open the homepage with no active offers and confirm the approved fallback
+  slides appear.
 - Review the homepage with one offer and with several offers.
 - Confirm offers rotate automatically and the arrows and dots work.
 - Confirm offer text and images look balanced with horizontal, vertical,
   logo/SVG, and no-image content.
 - Review the homepage around 390px and 1440px widths.
-- Open Public Packages and confirm package/service type and included guest
-  allowance are clear.
+- Open Public Packages and confirm package/service type, categories, filters,
+  and included guest allowance are clear.
 - Open Our App and confirm it shows current total occupancy plus only the
   enabled privacy-safe aggregate analytics.
 - Review About, Coaches, Gallery, Contact, and Our App for accurate public
@@ -92,12 +92,15 @@ agreed occupancy count.
 - As ADMIN, download Customers, Packages, Coaches, Customer Package History,
   Check-in/Check-out Logs, Promotion/Offer History, and Notes exports.
 - Confirm customer exports include birth date and emergency phone.
-- Confirm package exports include default guest passes and package/service
-  type.
-- Confirm customer package history includes initial and remaining guest
-  passes plus package/service type.
+- Confirm package exports include category names, default guest passes, default
+  freeze chances, and package/service type.
+- Confirm customer package history includes package categories, initial and
+  remaining guest passes, remaining freeze chances, status, and
+  package/service type.
 - Confirm visit exports include guest count, party size, and guest-pass
   deductions.
+- Confirm exports do not include customer document storage keys, signed URLs,
+  or file contents.
 - Confirm REGISTRATION and signed-out users cannot download Admin exports.
 
 ## Login And Access Separation
@@ -110,8 +113,8 @@ agreed occupancy count.
 
 ## Phase 31-41 Expansion Review
 
-Use this section after Phase 41. Items describe approved future behavior and
-must not be treated as implemented during the Phase 30 documentation update.
+Use this section for the Phase 41 final regression pass over the approved
+Phase 31-40 expansion.
 
 ### Analytics
 
@@ -139,8 +142,11 @@ must not be treated as implemented during the Phase 30 documentation update.
 
 ### Customer Documents
 
-- Confirm the production-safe private storage provider and required
-  environment configuration are documented before testing uploads.
+- Confirm the private Cloudinary provider is configured for authenticated or
+  private delivery before testing uploads.
+- Confirm database records contain provider metadata and private storage keys,
+  but public pages, exports, and non-Admin responses do not expose storage
+  keys, signed URLs, or file contents.
 - As Admin, upload PDF, JPG, JPEG, and PNG files up to 10 MB.
 - Reject unsupported, oversized, spoofed, or invalid files safely.
 - List, open, download, archive/delete, and refresh document records.
@@ -213,8 +219,9 @@ must not be treated as implemented during the Phase 30 documentation update.
   application.
 - Run the demo seed only against a confirmed local or disposable database,
   using the documented safety flag.
-- Complete production customer-document storage verification before Phase 35
-  or Phase 41 sign-off.
+- Complete production customer-document storage verification during Phase 41
+  sign-off, including required Cloudinary environment variables and private
+  delivery behavior.
 
 ## Cleanup And Sign-Off
 

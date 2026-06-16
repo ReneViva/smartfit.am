@@ -9,7 +9,10 @@ then remove it and restore occupancy.
 - Sign in as ADMIN and confirm `/registration` opens.
 - Sign in as REGISTRATION and confirm `/registration` opens.
 - As REGISTRATION, confirm `/admin/settings`, `/admin/customers`,
-  `/admin/logs`, `/admin/data`, and `/admin/analytics` redirect away.
+  `/admin/categories`, `/admin/packages`, `/admin/logs`, `/admin/data`,
+  `/admin/analytics`, `/admin/customers/[id]/visits`, and
+  `/admin/customers/[id]/documents/[documentId]/download` redirect away or
+  return an unauthorized response.
 - Signed out, confirm `/registration` redirects to `/login`.
 - Confirm public routes expose no customer records, package ownership,
   sessions, notes, activity, visits, logs, exports, or analytics.
@@ -99,6 +102,7 @@ Review around 390px, 768px, and 1440px widths:
 ## Release Checks
 
 ```bash
+npx prisma migrate status
 npm run typecheck
 npm run db:validate
 npm run build

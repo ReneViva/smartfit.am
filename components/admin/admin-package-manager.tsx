@@ -243,34 +243,6 @@ function PackageFormFields({
           />
         </label>
         <label className={labelClass}>
-          Package / service type
-          <select
-            className={inputClass}
-            onChange={(event) => setPackageTypeMode(event.target.value)}
-            value={packageTypeMode}
-          >
-            {PACKAGE_TYPE_PRESETS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-            <option value={CUSTOM_PACKAGE_TYPE_VALUE}>Custom type</option>
-          </select>
-          {packageTypeMode === CUSTOM_PACKAGE_TYPE_VALUE ? (
-            <input
-              className={inputClass}
-              maxLength={200}
-              name="packageType"
-              onChange={(event) => setCustomPackageType(event.target.value)}
-              placeholder="Enter a custom package or service type"
-              required
-              value={customPackageType}
-            />
-          ) : (
-            <input name="packageType" type="hidden" value={packageTypeMode} />
-          )}
-        </label>
-        <label className={labelClass}>
           Price
           <input
             className={inputClass}
@@ -406,6 +378,47 @@ function PackageFormFields({
           </p>
         ) : null}
       </fieldset>
+
+      <details
+        className="mt-4 rounded-xl border border-border bg-page p-4"
+        open={packageTypeMode === CUSTOM_PACKAGE_TYPE_VALUE || undefined}
+      >
+        <summary className="cursor-pointer list-none text-sm font-bold text-foreground">
+          Advanced / internal details
+        </summary>
+        <p className="mt-3 text-sm leading-6 text-secondary">
+          Categories control public filters. This type is kept for internal
+          compatibility.
+        </p>
+        <label className={`${labelClass} mt-4`}>
+          Internal package type
+          <select
+            className={inputClass}
+            onChange={(event) => setPackageTypeMode(event.target.value)}
+            value={packageTypeMode}
+          >
+            {PACKAGE_TYPE_PRESETS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+            <option value={CUSTOM_PACKAGE_TYPE_VALUE}>Custom type</option>
+          </select>
+          {packageTypeMode === CUSTOM_PACKAGE_TYPE_VALUE ? (
+            <input
+              className={inputClass}
+              maxLength={200}
+              name="packageType"
+              onChange={(event) => setCustomPackageType(event.target.value)}
+              placeholder="Enter a custom internal package type"
+              required
+              value={customPackageType}
+            />
+          ) : (
+            <input name="packageType" type="hidden" value={packageTypeMode} />
+          )}
+        </label>
+      </details>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="flex min-h-11 items-center gap-3 rounded-lg bg-neutral px-4 py-3 text-sm font-semibold text-foreground">
@@ -591,7 +604,7 @@ export function AdminPackageManager({
               />
             </label>
             <label className={labelClass}>
-              Service type
+              Internal type
               <select
                 className={inputClass}
                 onChange={(event) => setPackageTypeFilter(event.target.value)}
@@ -669,8 +682,8 @@ export function AdminPackageManager({
                 <summary className="cursor-pointer list-none rounded-xl p-4 transition-colors hover:bg-soft-blue sm:p-5">
                   <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(14rem,1.2fr)_minmax(8rem,0.5fr)_minmax(8rem,0.5fr)_minmax(11rem,0.8fr)_auto] lg:items-center">
                     <div className="min-w-0">
-                      <span className="inline-flex rounded-full bg-soft-blue px-3 py-1 text-xs font-bold text-primary-active">
-                        {packageTypeLabel(gymPackage.packageType)}
+                      <span className="inline-flex rounded-full bg-neutral px-3 py-1 text-xs font-bold text-secondary">
+                        Internal: {packageTypeLabel(gymPackage.packageType)}
                       </span>
                       <h4 className="mt-1 break-words text-lg font-bold text-foreground">
                         {gymPackage.name}

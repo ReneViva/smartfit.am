@@ -7,7 +7,8 @@ export const exportCategories = [
     type: "customers",
   },
   {
-    description: "Package definitions, pricing, sessions, coaches, and time rules.",
+    description:
+      "Package definitions, categories, pricing, sessions, coaches, freeze defaults, and time rules.",
     label: "Packages",
     type: "packages",
   },
@@ -17,7 +18,8 @@ export const exportCategories = [
     type: "coaches",
   },
   {
-    description: "Full customer package assignment and status history.",
+    description:
+      "Full customer package assignment, status, category, guest pass, and freeze balance history.",
     label: "Customer package history",
     type: "customer-package-history",
   },
@@ -87,6 +89,21 @@ function personName(
   return person.name ?? person.username ?? "Staff user";
 }
 
+function categoryNames(
+  categories: { category: { name: string; sortOrder: number } }[],
+) {
+  return (
+    [...categories]
+      .sort(
+        (first, second) =>
+          first.category.sortOrder - second.category.sortOrder ||
+          first.category.name.localeCompare(second.category.name),
+      )
+      .map(({ category }) => category.name)
+      .join(", ") || null
+  );
+}
+
 async function customersExport(): Promise<ExportDefinition> {
   const customers = await db.customer.findMany({
     orderBy: [{ fullName: "asc" }, { customerCode: "asc" }],
@@ -150,7 +167,13 @@ async function packagesExport(): Promise<ExportDefinition> {
       allowedEndTime: true,
       allowedStartTime: true,
       assignedCoach: { select: { firstName: true, lastName: true } },
+      categories: {
+        select: {
+          category: { select: { name: true, sortOrder: true } },
+        },
+      },
       createdAt: true,
+      defaultFreezeChances: true,
       defaultGuestPasses: true,
       deletedAt: true,
       description: true,
@@ -168,6 +191,7 @@ async function packagesExport(): Promise<ExportDefinition> {
   return {
     columns: [
       { header: "Package Name", key: "name", width: 28 },
+      { header: "Categories", key: "categories", width: 34 },
       { header: "Description", key: "description", width: 42 },
       { header: "Price", key: "price", width: 14 },
       { header: "Session Count", key: "sessionCount", width: 16 },
@@ -175,6 +199,11 @@ async function packagesExport(): Promise<ExportDefinition> {
         header: "Default Guest Passes",
         key: "defaultGuestPasses",
         width: 22,
+      },
+      {
+        header: "Default Freeze Chances",
+        key: "defaultFreezeChances",
+        width: 25,
       },
       { header: "Package Type", key: "packageType", width: 20 },
       { header: "Assigned Coach", key: "assignedCoach", width: 25 },
@@ -192,7 +221,9 @@ async function packagesExport(): Promise<ExportDefinition> {
       allowedEndTime: gymPackage.allowedEndTime,
       allowedStartTime: gymPackage.allowedStartTime,
       assignedCoach: personName(gymPackage.assignedCoach),
+      categories: categoryNames(gymPackage.categories),
       createdAt: formatDate(gymPackage.createdAt),
+      defaultFreezeChances: gymPackage.defaultFreezeChances,
       defaultGuestPasses: gymPackage.defaultGuestPasses,
       deletedAt: formatDate(gymPackage.deletedAt),
       description: gymPackage.description,
@@ -272,11 +303,17 @@ async function customerPackageHistoryExport(): Promise<ExportDefinition> {
       package: {
         select: {
           assignedCoach: { select: { firstName: true, lastName: true } },
+          categories: {
+            select: {
+              category: { select: { name: true, sortOrder: true } },
+            },
+          },
           name: true,
           packageType: true,
         },
       },
       reactivatedAt: true,
+      remainingFreezeChances: true,
       remainingSessions: true,
       remainingGuestPasses: true,
       status: true,
@@ -289,6 +326,7 @@ async function customerPackageHistoryExport(): Promise<ExportDefinition> {
       { header: "Member ID", key: "customerCode", width: 16 },
       { header: "Customer Full Name", key: "customerName", width: 28 },
       { header: "Package Name", key: "packageName", width: 28 },
+      { header: "Package Categories", key: "packageCategories", width: 34 },
       { header: "Package Type", key: "packageType", width: 20 },
       { header: "Coach", key: "coach", width: 25 },
       { header: "Activation Date", key: "activationDate", width: 24 },
@@ -304,6 +342,11 @@ async function customerPackageHistoryExport(): Promise<ExportDefinition> {
         header: "Remaining Guest Passes",
         key: "remainingGuestPasses",
         width: 25,
+      },
+      {
+        header: "Remaining Freeze Chances",
+        key: "remainingFreezeChances",
+        width: 27,
       },
       { header: "Status", key: "status", width: 16 },
       { header: "Frozen At", key: "frozenAt", width: 24 },
@@ -326,9 +369,11 @@ async function customerPackageHistoryExport(): Promise<ExportDefinition> {
       frozenAt: formatDate(customerPackage.frozenAt),
       initialSessions: customerPackage.initialSessions,
       initialGuestPasses: customerPackage.initialGuestPasses,
+      packageCategories: categoryNames(customerPackage.package.categories),
       packageName: customerPackage.package.name,
       packageType: customerPackage.package.packageType,
       reactivatedAt: formatDate(customerPackage.reactivatedAt),
+      remainingFreezeChances: customerPackage.remainingFreezeChances,
       remainingSessions: customerPackage.remainingSessions,
       remainingGuestPasses: customerPackage.remainingGuestPasses,
       status: customerPackage.status,

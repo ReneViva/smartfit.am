@@ -9,7 +9,11 @@ function applyTheme(theme: "dark" | "light") {
   document.documentElement.style.colorScheme = theme;
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({
+  variant = "default",
+}: {
+  variant?: "default" | "onHero";
+}) {
   const [theme, setTheme] = useState<"dark" | "light">("light");
   const [ready, setReady] = useState(false);
 
@@ -28,11 +32,15 @@ export function ThemeToggle() {
   }, []);
 
   const nextTheme = theme === "dark" ? "light" : "dark";
+  const buttonClassName =
+    variant === "onHero"
+      ? "inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white shadow-sm backdrop-blur transition-[background-color,border-color,color,transform] hover:-translate-y-0.5 hover:border-white/65 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      : "inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-sm transition-[background-color,border-color,color,transform] hover:-translate-y-0.5 hover:border-brand hover:bg-soft-blue hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
   return (
     <button
       aria-label={`Switch to ${nextTheme} theme`}
-      className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-sm transition-[background-color,border-color,color,transform] hover:-translate-y-0.5 hover:border-brand hover:bg-soft-blue hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      className={buttonClassName}
       onClick={() => {
         setTheme(nextTheme);
         applyTheme(nextTheme);
