@@ -1,35 +1,37 @@
-import { getServerLocalDayRange, groupCheckInsByHour } from "../analytics/basic";
+import {
+  getServerLocalWeekRange,
+  groupOccupancyEventsByDay,
+} from "../analytics/basic";
+import { getVisitAnalytics } from "../analytics/data";
 import { db } from "../db";
 
 export async function getBasicAnalytics(now = new Date()) {
-  const { end, start } = getServerLocalDayRange(now);
-  const [occupancy, visits] = await Promise.all([
+  const weekRange = getServerLocalWeekRange(now);
+  const [activity, occupancy, occupancyEvents] = await Promise.all([
+    getVisitAnalytics(now),
     db.occupancyState.findFirst({
       orderBy: { updatedAt: "desc" },
       select: { currentCount: true, updatedAt: true },
     }),
-    db.gymVisit.findMany({
-      orderBy: { checkedInAt: "asc" },
-      select: { checkedInAt: true },
+    db.occupancyEvent.findMany({
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true, newCount: true },
       where: {
-        checkedInAt: {
-          gte: start,
-          lt: end,
+        createdAt: {
+          gte: weekRange.start,
+          lt: weekRange.end,
         },
       },
     }),
   ]);
-  const peakHours = groupCheckInsByHour(
-    visits.map((visit) => visit.checkedInAt),
-  );
 
   return {
+    ...activity,
     currentOccupancy: Math.max(0, occupancy?.currentCount ?? 0),
+    occupancyTrend: groupOccupancyEventsByDay(
+      occupancyEvents,
+      weekRange.start,
+    ),
     occupancyUpdatedAt: occupancy?.updatedAt ?? null,
-    peakHours,
-    todayCheckIns: visits.length,
-    todayLabel: new Intl.DateTimeFormat("en", {
-      dateStyle: "long",
-    }).format(start),
   };
 }

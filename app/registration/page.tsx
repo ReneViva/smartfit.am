@@ -125,6 +125,12 @@ const errorMessages: Record<string, string> = {
     "Select at least one usable package before check-in.",
   "package-freeze-unavailable":
     "The package could not be frozen. Please review it and try again.",
+  "package-freeze-disabled":
+    "Package freeze access is disabled for Registration. Admin can enable it in Settings.",
+  "package-active-freeze":
+    "This package already has an active freeze.",
+  "package-no-freeze-chances":
+    "This package has no remaining freeze chances.",
   "package-not-freezable":
     "Only active, unexpired packages with remaining sessions can be frozen.",
   "package-not-frozen":
@@ -152,10 +158,15 @@ export default async function RegistrationPage({
   const compact = params.view === "compact";
   const showAllPackages = params.showAll === "1";
   const settings = await db.gymSettings.findFirst({
-    select: { hideInactiveCustomersFromRegistration: true },
+    select: {
+      allowRegistrationPackageFreeze: true,
+      hideInactiveCustomersFromRegistration: true,
+    },
   });
   const hideInactiveCustomers =
     settings?.hideInactiveCustomersFromRegistration ?? false;
+  const allowPackageFreeze =
+    settings?.allowRegistrationPackageFreeze ?? false;
   const customerVisibility = {
     deletedAt: null,
     ...(hideInactiveCustomers ? { status: "ACTIVE" as const } : {}),
@@ -292,9 +303,9 @@ export default async function RegistrationPage({
         : params.status === "package-frozen"
           ? "Package frozen. Its expiration date was extended by the selected duration."
           : params.status === "package-reactivated"
-            ? "Package reactivated. Normal package eligibility rules still apply."
+            ? "Package reactivated. Expiration was recalculated from the actual frozen days."
             : params.status === "package-reactivated-expired"
-              ? "Package reactivated as expired. Reactivation did not change its expiration date."
+              ? "Package reactivated as expired. Expiration was recalculated from the actual frozen days."
         : params.status === "correction-saved"
         ? "Remaining sessions updated and logged."
         : params.status === "occupancy-corrected"
@@ -398,6 +409,7 @@ export default async function RegistrationPage({
           >
             {selectedCustomer ? (
               <RegistrationCustomerCard
+                allowPackageFreeze={allowPackageFreeze}
                 compact={compact}
                 customer={{
                   ...selectedCustomer,

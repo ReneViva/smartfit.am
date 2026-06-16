@@ -15,6 +15,7 @@ const adminLinks = [
   { href: "/admin/gallery", label: "Gallery" },
   { href: "/admin/coaches", label: "Coaches" },
   { href: "/admin/packages", label: "Packages" },
+  { href: "/admin/categories", label: "Categories" },
   { href: "/admin/customers", label: "Customers" },
   { href: "/admin/notes", label: "Notes" },
   { href: "/admin/logs", label: "Logs" },

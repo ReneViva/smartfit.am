@@ -19,6 +19,7 @@ type CoachOption = {
 
 type PackageOption = {
   assignedCoachId: string | null;
+  defaultFreezeChances: number;
   defaultGuestPasses: number;
   id: string;
   name: string;
@@ -167,7 +168,8 @@ export function CustomerPackageAssignmentForm({
                     </span>
                     <span className="mt-1 block text-sm text-secondary">
                       {gymPackage.sessionCount} sessions ·{" "}
-                      {gymPackage.defaultGuestPasses} guest passes
+                      {gymPackage.defaultGuestPasses} guest passes,{" "}
+                      {gymPackage.defaultFreezeChances} freeze chances
                     </span>
                   </span>
                 </label>

@@ -16,7 +16,8 @@ agreed occupancy count.
 - Review the homepage around 390px and 1440px widths.
 - Open Public Packages and confirm package/service type and included guest
   allowance are clear.
-- Open Our App and confirm it shows the current total occupancy only.
+- Open Our App and confirm it shows current total occupancy plus only the
+  enabled privacy-safe aggregate analytics.
 - Review About, Coaches, Gallery, Contact, and Our App for accurate public
   information.
 - Confirm public pages do not show customer names, member IDs, contact
@@ -107,6 +108,97 @@ agreed occupancy count.
 - As REGISTRATION, confirm Admin settings, customers, logs, data, analytics,
   and exports remain unavailable.
 
+## Phase 31-41 Expansion Review
+
+Use this section after Phase 41. Items describe approved future behavior and
+must not be treated as implemented during the Phase 30 documentation update.
+
+### Analytics
+
+- Confirm Admin analytics show current occupancy, today's check-ins, hourly
+  check-ins, weekly check-in trend, weekly peak hours, and only reliable
+  historical occupancy.
+- Disable public analytics and confirm the `/our-app` analytics section and
+  its data are absent.
+- Enable public analytics and confirm only aggregate values appear.
+- Inspect public responses for customer names, IDs, visits, package ownership,
+  document data, or other private fields.
+- Review empty, sparse-data, mobile, tablet, and desktop states.
+
+### Categories And Public Packages
+
+- As Admin, create, edit, safely delete/archive, reorder, hide, and show
+  categories.
+- Assign zero, one, and multiple categories to representative packages.
+- Confirm hidden categories and affected packages remain visible to Admin.
+- Confirm a package assigned to any hidden category is absent publicly.
+- Confirm active-only behavior, category filters, minimum/maximum price, price
+  ascending/descending, and name sorting.
+- Review controls above results on mobile and in a sidebar on desktop.
+- Confirm existing package types and service-style packages still work.
+
+### Customer Documents
+
+- Confirm the production-safe private storage provider and required
+  environment configuration are documented before testing uploads.
+- As Admin, upload PDF, JPG, JPEG, and PNG files up to 10 MB.
+- Reject unsupported, oversized, spoofed, or invalid files safely.
+- List, open, download, archive/delete, and refresh document records.
+- Confirm document actions create the required logs.
+- As REGISTRATION and signed out, attempt customer-detail and direct file
+  access and confirm metadata, storage keys, URLs, and file contents are denied.
+- Test missing provider objects and provider failures without leaking internal
+  details.
+
+### Customer Visit History
+
+- Confirm the latest three visits are ordered correctly on Admin customer
+  detail.
+- Review check-in, check-out, duration, stored guest count, and supported
+  package usage.
+- Test no visits, fewer than three visits, more than three visits, and an open
+  visit.
+- Confirm any "View all" experience remains Admin-only.
+- Confirm no visit-history export was added.
+
+### Advanced Freezing
+
+- Confirm new package assignments copy the package default of three freeze
+  chances unless Admin configured another non-negative value.
+- Confirm each successful freeze decrements chances exactly once and zero
+  chances block the action.
+- Confirm chances do not reset automatically and only Admin can edit an
+  assignment's counter.
+- Test normal and retroactive freezes, including latest-checkout resolution.
+- Test early reactivation and verify resulting expiration equals original
+  expiration plus actual frozen days.
+- Test repeated submit, stale form, invalid dates, and concurrent attempts.
+- Review freeze records and audit logs for actor, mode, dates, and before/after
+  values.
+
+### Registration Freeze Permission
+
+- With the setting disabled, confirm Registration controls are hidden and
+  direct mutations fail server-side.
+- Confirm Admin can freeze/reactivate while the setting is disabled.
+- Enable the setting and confirm Registration uses the same validated workflow.
+- Disable it again and confirm stale Registration requests are rejected.
+- Confirm Registration cannot edit freeze chances or Admin settings.
+
+### Homepage Redesign
+
+- Review zero, one, and multiple offers with horizontal, vertical, SVG, and
+  missing images.
+- Confirm zero active offers produce the approved default fallback slides.
+- Confirm automatic rotation, manual controls, keyboard focus, and reduced
+  motion behavior.
+- Confirm rectangular cards stay visible and uncropped across mobile and
+  desktop widths.
+- Verify large section-navigation buttons, stronger Our App emphasis, section
+  previews/links, smooth navigation, and scroll-to-top.
+- Confirm navbar, authentication, public privacy, and business logic did not
+  change.
+
 ## Known Remaining Manual Tests
 
 - Let the homepage carousel run for several rotations in the client's primary
@@ -121,6 +213,8 @@ agreed occupancy count.
   application.
 - Run the demo seed only against a confirmed local or disposable database,
   using the documented safety flag.
+- Complete production customer-document storage verification before Phase 35
+  or Phase 41 sign-off.
 
 ## Cleanup And Sign-Off
 

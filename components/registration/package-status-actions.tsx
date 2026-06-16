@@ -12,7 +12,7 @@ import { Button } from "../ui/button";
 function confirmReactivation(event: FormEvent<HTMLFormElement>) {
   if (
     !window.confirm(
-      "Reactivate this package? Expiration and sessions will not change, and normal package eligibility rules will still apply.",
+      "Reactivate this package? Expiration will be recalculated from the actual frozen days, and normal package eligibility rules will still apply.",
     )
   ) {
     event.preventDefault();
@@ -20,6 +20,7 @@ function confirmReactivation(event: FormEvent<HTMLFormElement>) {
 }
 
 export function PackageStatusActions({
+  allowPackageFreeze,
   canFreeze,
   compact,
   customerCode,
@@ -30,6 +31,7 @@ export function PackageStatusActions({
   returnPath,
   showAllPackages,
 }: {
+  allowPackageFreeze: boolean;
   canFreeze: boolean;
   compact: boolean;
   customerCode: string;
@@ -41,6 +43,10 @@ export function PackageStatusActions({
   showAllPackages: boolean;
 }) {
   const [showFreezeForm, setShowFreezeForm] = useState(false);
+
+  if (!allowPackageFreeze) {
+    return null;
+  }
 
   if (!canFreeze && !isFrozen) {
     return null;
@@ -120,7 +126,8 @@ export function PackageStatusActions({
             />
           </label>
           <p className="mt-2 text-xs leading-5 text-secondary">
-            Expiration will be extended by this many days.
+            Expiration is planned from this duration and recalculated if the
+            package is reactivated early.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button type="submit" variant="warning">

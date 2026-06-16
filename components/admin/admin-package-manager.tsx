@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 
 import { savePackageAction } from "../../app/admin/packages/actions";
 import {
@@ -22,6 +23,14 @@ export type AdminPackageCoach = {
   lastName: string;
 };
 
+export type AdminPackageCategory = {
+  id: string;
+  isArchived?: boolean;
+  isPublic: boolean;
+  name: string;
+  slug: string;
+};
+
 export type AdminPackageValue = {
   allowedEndTime: string | null;
   allowedStartTime: string | null;
@@ -30,7 +39,9 @@ export type AdminPackageValue = {
     lastName: string;
   } | null;
   assignedCoachId: string | null;
+  categories: AdminPackageCategory[];
   createdAt: string;
+  defaultFreezeChances: number;
   defaultGuestPasses: number;
   description: string | null;
   hasTimeRestriction: boolean;
@@ -81,9 +92,11 @@ function packageText(gymPackage: AdminPackageValue) {
     gymPackage.name,
     gymPackage.packageType,
     gymPackage.description,
+    ...gymPackage.categories.map((category) => category.name),
     gymPackage.defaultGuestPasses > 0
       ? `${gymPackage.defaultGuestPasses} guest passes`
       : "no guest passes",
+    `${gymPackage.defaultFreezeChances} freeze chances`,
     gymPackage.timeRestrictionLabel,
     gymPackage.assignedCoach
       ? `${gymPackage.assignedCoach.firstName} ${gymPackage.assignedCoach.lastName}`
@@ -184,9 +197,13 @@ function displayPrice(value: string) {
 }
 
 function PackageFormFields({
+  categories,
+  categoryError = false,
   coaches,
   gymPackage,
 }: {
+  categories: AdminPackageCategory[];
+  categoryError?: boolean;
   coaches: AdminPackageCoach[];
   gymPackage?: AdminPackageValue;
 }) {
@@ -203,6 +220,13 @@ function PackageFormFields({
   const [customPackageType, setCustomPackageType] = useState(
     existingPreset ? "" : (gymPackage?.packageType ?? ""),
   );
+  const assignedCategoryIds = new Set(
+    gymPackage?.categories
+      .filter((category) => !category.isArchived)
+      .map((category) => category.id) ?? [],
+  );
+  const archivedCategories =
+    gymPackage?.categories.filter((category) => category.isArchived) ?? [];
 
   return (
     <>
@@ -283,6 +307,18 @@ function PackageFormFields({
           />
         </label>
         <label className={labelClass}>
+          Default freeze chances
+          <input
+            className={inputClass}
+            defaultValue={gymPackage?.defaultFreezeChances ?? 3}
+            min={0}
+            name="defaultFreezeChances"
+            required
+            step={1}
+            type="number"
+          />
+        </label>
+        <label className={labelClass}>
           Assigned coach
           <select
             className={inputClass}
@@ -308,6 +344,68 @@ function PackageFormFields({
           />
         </label>
       </div>
+
+      <fieldset className="mt-4 rounded-xl border border-border bg-page p-4">
+        <legend className="px-2 text-sm font-bold text-foreground">
+          Package categories
+        </legend>
+        {categories.length ? (
+          <>
+            <p className="text-sm text-secondary">
+              Select one or more categories. Hidden categories remain available
+              to Admin but hide assigned packages from the public page.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {categories.map((category) => (
+                <label
+                  className="flex min-h-11 items-center gap-3 rounded-lg bg-card px-4 py-3 text-sm font-semibold text-foreground"
+                  key={category.id}
+                >
+                  <input
+                    defaultChecked={assignedCategoryIds.has(category.id)}
+                    name="categoryIds"
+                    type="checkbox"
+                    value={category.id}
+                  />
+                  <span>
+                    {category.name}
+                    {!category.isPublic ? (
+                      <span className="ml-2 text-xs text-secondary">
+                        Hidden publicly
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm font-semibold text-secondary">
+            No active categories exist yet. Package saves remain available for
+            compatibility, but create categories before enabling public
+            category filtering.{" "}
+            <Link
+              className="text-brand hover:text-primary-hover"
+              href="/admin/categories"
+            >
+              Manage categories
+            </Link>
+          </p>
+        )}
+        {categoryError ? (
+          <p className="mt-3 text-sm font-semibold text-button-danger" role="alert">
+            Select at least one available category before saving.
+          </p>
+        ) : null}
+        {archivedCategories.length ? (
+          <p className="mt-3 text-sm font-semibold text-secondary">
+            Archived assignment
+            {archivedCategories.length === 1 ? "" : "s"}:{" "}
+            {archivedCategories.map((category) => category.name).join(", ")}.
+            Select active replacements before saving.
+          </p>
+        ) : null}
+      </fieldset>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="flex min-h-11 items-center gap-3 rounded-lg bg-neutral px-4 py-3 text-sm font-semibold text-foreground">
@@ -375,11 +473,17 @@ function PackageFormFields({
 }
 
 export function AdminPackageManager({
+  categories,
+  categoryError = false,
   coaches,
   packages,
+  selectedPackageId,
 }: {
+  categories: AdminPackageCategory[];
+  categoryError?: boolean;
   coaches: AdminPackageCoach[];
   packages: AdminPackageValue[];
+  selectedPackageId?: string;
 }) {
   const [filter, setFilter] = useState<PackageFilter>("all");
   const [packageTypeFilter, setPackageTypeFilter] = useState("all");
@@ -451,7 +555,11 @@ export function AdminPackageManager({
           action={savePackageAction}
           className="animate-panel-in border-t border-border p-5 sm:p-6"
         >
-          <PackageFormFields coaches={coaches} />
+          <PackageFormFields
+            categories={categories}
+            categoryError={categoryError && !selectedPackageId}
+            coaches={coaches}
+          />
           <Button className="mt-5 w-full sm:w-auto" type="submit">
             Create package
           </Button>
@@ -554,7 +662,9 @@ export function AdminPackageManager({
             {visiblePackages.map((gymPackage) => (
               <details
                 className="smooth-panel rounded-xl border border-border bg-card shadow-sm open:border-brand"
+                id={`package-${gymPackage.id}`}
                 key={gymPackage.id}
+                open={selectedPackageId === gymPackage.id ? true : undefined}
               >
                 <summary className="cursor-pointer list-none rounded-xl p-4 transition-colors hover:bg-soft-blue sm:p-5">
                   <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(14rem,1.2fr)_minmax(8rem,0.5fr)_minmax(8rem,0.5fr)_minmax(11rem,0.8fr)_auto] lg:items-center">
@@ -603,6 +713,29 @@ export function AdminPackageManager({
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                    {gymPackage.categories.length ? (
+                      gymPackage.categories.map((category) => (
+                        <span
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                            category.isArchived || !category.isPublic
+                              ? "border-border bg-neutral text-secondary"
+                              : "border-brand bg-soft-blue text-primary-active"
+                          }`}
+                          key={category.id}
+                        >
+                          {category.name}
+                          {category.isArchived
+                            ? " (archived)"
+                            : !category.isPublic
+                              ? " (hidden)"
+                              : ""}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
+                        No categories assigned
+                      </span>
+                    )}
                     {packageBadges(gymPackage).map((badge) => (
                       <span
                         className="rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary"
@@ -615,6 +748,12 @@ export function AdminPackageManager({
                       {gymPackage.defaultGuestPasses > 0
                         ? `Includes ${gymPackage.defaultGuestPasses} guest ${gymPackage.defaultGuestPasses === 1 ? "pass" : "passes"}`
                         : "No guest passes"}
+                    </span>
+                    <span className="rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
+                      {gymPackage.defaultFreezeChances} default freeze{" "}
+                      {gymPackage.defaultFreezeChances === 1
+                        ? "chance"
+                        : "chances"}
                     </span>
                     {gymPackage.hasTimeRestriction &&
                     gymPackage.timeRestrictionLabel ? (
@@ -632,6 +771,10 @@ export function AdminPackageManager({
                   className="animate-panel-in border-t border-border p-4 sm:p-5"
                 >
                   <PackageFormFields
+                    categories={categories}
+                    categoryError={
+                      categoryError && selectedPackageId === gymPackage.id
+                    }
                     coaches={coaches}
                     gymPackage={gymPackage}
                   />

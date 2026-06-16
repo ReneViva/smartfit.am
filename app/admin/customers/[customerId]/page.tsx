@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CustomerDocumentsPanel } from "../../../../components/admin/customer-documents-panel";
 import { CustomerForm } from "../../../../components/admin/customer-form";
 import { CustomerNotesPanel } from "../../../../components/admin/customer-notes-panel";
 import { CustomerPackageAssignmentForm } from "../../../../components/admin/customer-package-assignment-form";
 import { CustomerPackageOverview } from "../../../../components/admin/customer-package-overview";
+import { CustomerVisitHistory } from "../../../../components/admin/customer-visit-history";
 import { CustomerWorkspaceActions } from "../../../../components/admin/customer-workspace-actions";
 import { Card } from "../../../../components/ui/card";
 import { StatusBadge } from "../../../../components/ui/status-badge";
+import { getCustomerVisitHistoryForAdmin } from "../../../../lib/admin/customer-visit-history";
+import { listCustomerDocumentsForAdmin } from "../../../../lib/customer-documents/actions";
 import { db } from "../../../../lib/db";
 
 type CustomerDetailPageProps = {
@@ -29,12 +33,16 @@ const errorMessages: Record<string, string> = {
   "invalid-date-order": "Expiration date cannot be before activation date.",
   "invalid-freeze-days":
     "Freeze duration must be a positive whole number of days.",
+  "invalid-retroactive-freeze":
+    "Retroactive freeze days could not be calculated from the latest checkout.",
   "invalid-package": "Choose an available package definition.",
   "invalid-package-action": "The package status action is not available.",
   "invalid-package-balance":
     "Remaining sessions and guest passes cannot exceed their initial values.",
   "invalid-package-edit":
-    "Enter valid assigned package dates, sessions, guest passes, coach, and status.",
+    "Enter valid assigned package dates, sessions, guest passes, freeze chances, coach, and status.",
+  "document-download-unavailable":
+    "The private document download could not be prepared. Please try again.",
   "package-edit-frozen-status":
     "Use the dedicated freeze/reactivate control to change frozen status.",
   "package-edit-open-visit":
@@ -45,11 +53,19 @@ const errorMessages: Record<string, string> = {
     "The assigned package could not be updated. Please review it and try again.",
   "package-freeze-unavailable":
     "The package could not be frozen. Please try again.",
+  "package-active-freeze":
+    "This package already has an active freeze record.",
+  "package-no-checkout":
+    "No completed checkout was found for a retroactive freeze.",
+  "package-no-freeze-chances":
+    "This assignment has no remaining freeze chances. Edit the counter before freezing.",
   "package-not-freezable":
     "Only an active, unexpired package with remaining sessions can be frozen.",
   "package-not-frozen": "This package is no longer frozen.",
   "package-reactivation-unavailable":
     "The package could not be reactivated. Please try again.",
+  "retroactive-freeze-unavailable":
+    "The retroactive freeze could not be saved. Please try again.",
   "package-status-stale":
     "The package status changed before the action completed. Review it and try again.",
 };
@@ -59,11 +75,13 @@ const statusMessages: Record<string, string> = {
   "package-assigned":
     "Package assigned. A new package history record was created.",
   "package-frozen":
-    "Package frozen. Its expiration date was extended by the selected duration.",
+    "Package frozen. A freeze record was created and the chance counter was updated.",
   "package-reactivated":
-    "Package reactivated. Normal eligibility rules continue to apply.",
+    "Package reactivated. Expiration was recalculated from actual frozen days.",
   "package-reactivated-expired":
     "Package reactivated as expired because its expiration date has passed.",
+  "package-retroactive-frozen":
+    "Retroactive freeze saved. The package was not left frozen.",
   "package-updated":
     "Assigned package updated. Previous and new values were logged.",
 };
@@ -89,7 +107,15 @@ export default async function CustomerDetailPage({
   searchParams,
 }: CustomerDetailPageProps) {
   const [{ customerId }, query] = await Promise.all([params, searchParams]);
-  const [customer, coaches, activePackages, packageDefinitions] =
+  const [
+    customer,
+    coaches,
+    activePackages,
+    packageDefinitions,
+    customerDocuments,
+    recentVisits,
+    latestCompletedVisit,
+  ] =
     await Promise.all([
       db.customer.findFirst({
         include: {
@@ -138,6 +164,25 @@ export default async function CustomerDetailPage({
                   timeRestrictionLabel: true,
                 },
               },
+              freezes: {
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: {
+                  actualDays: true,
+                  actualEndDate: true,
+                  createdAt: true,
+                  id: true,
+                  mode: true,
+                  notes: true,
+                  originalExpirationDate: true,
+                  plannedDays: true,
+                  plannedEndDate: true,
+                  resultingExpirationDate: true,
+                  startDate: true,
+                  status: true,
+                },
+                take: 1,
+                where: { status: "ACTIVE" },
+              },
             },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             where: { deletedAt: null },
@@ -159,6 +204,7 @@ export default async function CustomerDetailPage({
         orderBy: { name: "asc" },
         select: {
           assignedCoachId: true,
+          defaultFreezeChances: true,
           defaultGuestPasses: true,
           id: true,
           name: true,
@@ -177,6 +223,16 @@ export default async function CustomerDetailPage({
         },
         where: { deletedAt: null },
       }),
+      listCustomerDocumentsForAdmin(customerId),
+      getCustomerVisitHistoryForAdmin(customerId, { take: 3 }),
+      db.gymVisit.findFirst({
+        orderBy: [{ checkedOutAt: "desc" }, { id: "desc" }],
+        select: { checkedOutAt: true },
+        where: {
+          checkedOutAt: { not: null },
+          customerId,
+        },
+      }),
     ]);
 
   if (!customer) {
@@ -192,6 +248,11 @@ export default async function CustomerDetailPage({
     id: note.id,
     updatedAt: note.updatedAt.toISOString(),
     updatedByName: note.updatedBy ? staffName(note.updatedBy) : null,
+  }));
+  const documents = customerDocuments.map((document) => ({
+    ...document,
+    createdAt: document.createdAt.toISOString(),
+    updatedAt: document.updatedAt.toISOString(),
   }));
 
   return (
@@ -332,11 +393,29 @@ export default async function CustomerDetailPage({
         />
       </div>
 
+      <div className="mt-6">
+        <CustomerDocumentsPanel
+          customerId={customer.id}
+          documents={documents}
+        />
+      </div>
+
+      <div className="mt-6">
+        <CustomerVisitHistory
+          description="Latest three check-in and check-out records. Open visits stay clearly marked."
+          viewAllHref={`/admin/customers/${encodeURIComponent(customer.id)}/visits`}
+          visits={recentVisits}
+        />
+      </div>
+
       <Card className="mt-6">
         <CustomerPackageOverview
           coaches={coaches}
           customerCode={customer.customerCode}
           customerId={customer.id}
+          latestCompletedCheckoutAt={
+            latestCompletedVisit?.checkedOutAt ?? null
+          }
           packageDefinitions={packageDefinitions}
           packages={customer.packages}
         />

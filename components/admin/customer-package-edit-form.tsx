@@ -34,6 +34,7 @@ type AssignedPackageValue = {
   initialGuestPasses: number;
   initialSessions: number;
   packageId: string;
+  remainingFreezeChances: number;
   remainingGuestPasses: number;
   remainingSessions: number;
   status: CustomerPackageStatus;
@@ -57,6 +58,7 @@ export function CustomerPackageEditForm({
   const initialValues = {
     initialGuestPasses: customerPackage.initialGuestPasses.toString(),
     initialSessions: customerPackage.initialSessions.toString(),
+    remainingFreezeChances: customerPackage.remainingFreezeChances.toString(),
     remainingGuestPasses: customerPackage.remainingGuestPasses.toString(),
     remainingSessions: customerPackage.remainingSessions.toString(),
   };
@@ -72,6 +74,9 @@ export function CustomerPackageEditForm({
   const [remainingGuestPasses, setRemainingGuestPasses] = useState(
     initialValues.remainingGuestPasses,
   );
+  const [remainingFreezeChances, setRemainingFreezeChances] = useState(
+    initialValues.remainingFreezeChances,
+  );
 
   return (
     <form
@@ -81,6 +86,7 @@ export function CustomerPackageEditForm({
         setRemainingSessions(initialValues.remainingSessions);
         setInitialGuestPasses(initialValues.initialGuestPasses);
         setRemainingGuestPasses(initialValues.remainingGuestPasses);
+        setRemainingFreezeChances(initialValues.remainingFreezeChances);
       }}
     >
       <input name="customerId" type="hidden" value={customerPackage.customerId} />
@@ -238,12 +244,26 @@ export function CustomerPackageEditForm({
             ))}
           </select>
         </label>
+        <label className={labelClass}>
+          Remaining freeze chances
+          <input
+            className={inputClass}
+            min={0}
+            name="remainingFreezeChances"
+            onChange={(event) => setRemainingFreezeChances(event.target.value)}
+            required
+            step={1}
+            type="number"
+            value={remainingFreezeChances}
+          />
+        </label>
       </div>
       <p className="mt-4 text-sm leading-6 text-secondary">
         Editing changes this assigned package record. Changing the package
         definition keeps the current dates, sessions, guest passes, and coach
-        unless you adjust them here. Renewal or an additional package can still
-        be added separately.
+        unless you adjust them here. Remaining freeze chances belong to this
+        assignment only and do not reset automatically. Renewal or an
+        additional package can still be added separately.
       </p>
       <div className="mt-5 flex flex-wrap gap-3">
         <Button type="submit">Save package changes</Button>

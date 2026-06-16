@@ -244,6 +244,8 @@ The Admin Settings section must allow the admin to manage gym name, logo, contac
 | showMotivationalTextInPublicApp | Boolean | Yes | Controls motivational text visibility. | Confirmed |
 | motivationalText | String | No | Public app motivational message. | Confirmed |
 | hideInactiveCustomersFromRegistration | Boolean | Yes | Controls registration view filtering. | Confirmed |
+| showPublicAnalyticsOnOurApp | Boolean | Yes | Controls the privacy-safe aggregate analytics section on `/our-app`. Default false. | Manually approved for Phase 31 |
+| allowRegistrationPackageFreeze | Boolean | Yes | Controls Registration freeze access. Default false. | Manually approved for Phase 39 |
 | createdAt | DateTime | Yes | Record creation time. | Recommended technical field |
 | updatedAt | DateTime | Yes | Last update time. | Recommended technical field |
 
@@ -409,6 +411,7 @@ The admin can create, view, update, renew/reactivate, and delete gym packages. P
 | packageType | String | Yes | Type such as general gym, coach session, pool access, or group training. | Confirmed concept; exact allowed values unclear |
 | assignedCoachId | String | No | Coach required for coach-specific package if applicable. | Confirmed if required |
 | isActive | Boolean | Yes | Active/inactive status. | Confirmed |
+| defaultFreezeChances | Int | Yes | Freeze chances copied to a new customer-package assignment. Default 3. | Manually approved for Phase 37 |
 | hasTimeRestriction | Boolean | Yes | Whether usage is restricted by time. | Confirmed |
 | allowedStartTime | String / Time | No | Start time if time range is supported. | Unclear |
 | allowedEndTime | String / Time | No | End time; supports “before 3:00 PM” style rule. | Confirmed concept; exact structure unclear |
@@ -423,6 +426,7 @@ The admin can create, view, update, renew/reactivate, and delete gym packages. P
 |---|---|---|---|
 | Coach | many-to-one | Package may be connected to a coach if required. | Confirmed if applicable |
 | CustomerPackage | one-to-many | Package definition can be assigned to many customer packages. | Recommended technical relationship |
+| PackageCategory | one-to-many | Join rows connect this package to zero or more categories. | Manually approved for Phase 32 |
 | PublicContent | none / indirect | Packages may be shown publicly, but not necessarily linked to content records. | Unclear |
 | AuditLog | one-to-many / target reference | Package edits should be loggable. | Confirmed concept |
 
@@ -457,6 +461,7 @@ The system must support customers with no active package, one package, or multip
 | status | CustomerPackageStatus | Yes | Active, inactive, expired, or frozen. | Confirmed |
 | frozenAt | DateTime | No | When package was frozen. | Confirmed concept; exact rules unclear |
 | reactivatedAt | DateTime | No | When package was reactivated. | Confirmed concept |
+| remainingFreezeChances | Int | Yes | Assignment-specific remaining freeze count copied from the package default. | Manually approved for Phase 37 |
 | deletedAt | DateTime | No | Soft delete timestamp if used. | Recommended technical field |
 | createdAt | DateTime | Yes | Record creation time. | Recommended technical field |
 | updatedAt | DateTime | Yes | Last update time. | Recommended technical field |
@@ -470,12 +475,13 @@ The system must support customers with no active package, one package, or multip
 | Coach | many-to-one | Customer package may be assigned to a coach. | Confirmed if applicable |
 | PackageSessionChange | one-to-many | Session deductions/corrections are linked to this package. | Confirmed concept |
 | VisitPackageUsage | one-to-many | Package may be selected during check-in visits. | Confirmed concept |
+| PackageFreeze | one-to-many | Preserves the full history of advanced freezes and reactivations. | Manually approved for Phase 37 |
 | AuditLog | one-to-many / target reference | Freezing, renewal, reactivation, and edits should be loggable. | Confirmed |
 
 ### Notes
 
 This model is central to the check-in workflow. Session counts should not go below zero unless the client confirms admin override behavior.
-Freezing and reactivation are confirmed for the MVP. A frozen customer package cannot be used during check-in or session deduction. Both admin/manager users and registration/reception users can freeze and reactivate customer packages. Every freeze and reactivation action must create an admin-visible log entry. Freezing does not automatically extend the expiration date in the MVP unless later confirmed.
+Freezing and reactivation are confirmed for the MVP. The manually approved Phase 37-39 model supersedes the MVP-only history, permission, and expiration assumptions by introducing explicit freeze records, remaining chances, advanced date calculation, and setting-controlled Registration access.
 
 
 ---
@@ -1092,10 +1098,10 @@ Whether rules can include weekdays, holidays, only-after times, or multiple time
 A frozen package should not be treated as active for session usage.
 
 **Database Impact:**  
-Store `CustomerPackage.status = FROZEN` and optional `frozenAt` / `reactivatedAt` timestamps.
+For the MVP, store `CustomerPackage.status = FROZEN` and optional `frozenAt` / `reactivatedAt` timestamps. For Phases 37-39, also store a separate `PackageFreeze` history record and update the assignment's remaining freeze chances transactionally.
 
 **Unclear Points:**  
-Whether freezing extends expiration date and who can freeze/reactivate.
+The advanced workflow defines expiration recalculation and role access. Exact date-boundary and timezone handling still requires implementation verification.
 
 ---
 
@@ -1144,7 +1150,7 @@ Whether occupancy should update instantly, by polling, or only on page refresh.
 The public User Panel must show only general gym information and live occupancy count, not private customer data.
 
 **Database Impact:**  
-Public queries should read only `GymSettings`, public content, public package/coach/gallery data, and `OccupancyState.currentCount`. They should not expose `Customer`, `CustomerPackage`, `GymVisit`, `Note`, or `AuditLog` data.
+Public queries should read only `GymSettings`, public content, publicly eligible package/category/coach/gallery data, `OccupancyState.currentCount`, and approved aggregate analytics. They must not expose raw `Customer`, `CustomerPackage`, `GymVisit`, `Note`, `CustomerDocument`, or `AuditLog` records.
 
 **Unclear Points:**  
 None for the privacy rule itself.
@@ -1675,7 +1681,7 @@ No implementation commands are included here because this document is still data
 27. Should package time restrictions support weekdays?
 28. Should package time restrictions support multiple rules per package?
 29. Should package freezing extend the expiration date?
-30. Who can freeze/reactivate packages?
+30. What exact timezone and date-boundary convention should freeze duration calculations use?
 31. Should freeze/reactivation be stored as separate history records beyond `AuditLog`?
 32. Should manual session corrections require a reason?
 33. Should manual occupancy corrections require a reason?
@@ -1707,6 +1713,202 @@ No implementation commands are included here because this document is still data
 
 ---
 
+## 14A. Approved Post-Phase 29 Schema Planning
+
+This section documents manually approved schema direction for Phases 31-39. It does not modify the current Prisma schema and must not be treated as a completed migration.
+
+### Existing Model Additions
+
+#### `GymSettings`
+
+| Field | Type | Required? | Default | Purpose |
+|---|---|---|---|---|
+| `showPublicAnalyticsOnOurApp` | Boolean | Yes | `false` | Controls whether aggregate analytics appear publicly on `/our-app`. |
+| `allowRegistrationPackageFreeze` | Boolean | Yes | `false` | Controls Registration access to freeze mutations and UI. |
+
+Both fields require admin-only mutation, safe defaults for existing rows, and audit logging when changed.
+
+#### `Package`
+
+| Field | Type | Required? | Default | Purpose |
+|---|---|---|---|---|
+| `defaultFreezeChances` | Int | Yes | `3` | Value copied to a new customer-package assignment. |
+
+The existing package `type` field must remain available until category migration and compatibility are verified. Services remain packages.
+
+#### `CustomerPackage`
+
+| Field | Type | Required? | Default | Purpose |
+|---|---|---|---|---|
+| `remainingFreezeChances` | Int | Yes | Copied from package | Assignment-specific freeze chances. |
+
+The value must not reset automatically. Admin may explicitly edit it through an audited action. Existing assignments need a documented backfill strategy before a migration is applied.
+
+### Planned Model: `Category`
+
+Represents an admin-managed package grouping used as the primary public filter.
+
+| Field | Type | Required? | Description |
+|---|---|---|---|
+| `id` | String / UUID / CUID | Yes | Internal identifier. |
+| `name` | String | Yes | Admin and public category name. |
+| `slug` | String | Yes | Stable public/query identifier. |
+| `description` | String | No | Optional admin/public description. |
+| `sortOrder` | Int | Yes | Admin-controlled display order. |
+| `isPublic` | Boolean | Yes | Whether the category and its packages may be shown publicly. |
+| `isArchived` | Boolean | Yes | Whether the category is retired from active management flows. |
+| `createdAt` | DateTime | Yes | Creation timestamp. |
+| `updatedAt` | DateTime | Yes | Last update timestamp. |
+| `archivedAt` | DateTime | No | Archive timestamp when applicable. |
+
+Recommended constraints:
+
+- Unique normalized name or unique slug.
+- Indexed `sortOrder`, `isPublic`, and `isArchived`.
+- Archive instead of destructive deletion when package assignments exist.
+
+### Planned Model: `PackageCategory`
+
+Many-to-many join between `Package` and `Category`.
+
+| Field | Type | Required? | Description |
+|---|---|---|---|
+| `packageId` | String | Yes | Package definition. |
+| `categoryId` | String | Yes | Assigned category. |
+| `createdAt` | DateTime | Yes | Assignment timestamp. |
+
+Recommended constraints:
+
+- Composite unique key on `packageId` and `categoryId`.
+- Index both foreign keys.
+- A package assigned to any category where `isPublic = false` is not publicly eligible.
+- Admin queries may still return hidden categories and affected packages.
+
+### Planned Model: `CustomerDocument`
+
+Stores private document metadata. File bytes should live in a production-safe private storage service rather than the relational database unless infrastructure review explicitly approves another approach.
+
+| Field | Type | Required? | Description |
+|---|---|---|---|
+| `id` | String / UUID / CUID | Yes | Internal identifier. |
+| `customerId` | String | Yes | Customer who owns the document. |
+| `originalFileName` | String | Yes | Sanitized display filename. |
+| `storageKey` | String | Yes | Private provider/object identifier; never a public URL. |
+| `mimeType` | String | Yes | Validated PDF, JPG, JPEG, or PNG MIME type. |
+| `sizeBytes` | Int / BigInt | Yes | Validated size, maximum 10 MB. |
+| `status` | Enum | Yes | `ACTIVE` or `ARCHIVED`; deletion semantics require implementation confirmation. |
+| `uploadedById` | String | Yes | Admin who uploaded the file. |
+| `archivedById` | String | No | Admin who archived/deleted it. |
+| `createdAt` | DateTime | Yes | Upload timestamp. |
+| `archivedAt` | DateTime | No | Archive timestamp. |
+
+Security and storage rules:
+
+- No Registration or public relationship may expose this model.
+- Download/open access must be authorized before resolving a private object.
+- Validate extension, MIME type, and size server-side.
+- Audit upload, archive/delete, and other material document actions.
+- Storage provider, private download strategy, retention, and physical deletion behavior are unresolved blockers.
+
+### Planned Model: `PackageFreeze`
+
+Preserves every confirmed freeze and reactivation independently from current customer-package status.
+
+| Field | Type | Required? | Description |
+|---|---|---|---|
+| `id` | String / UUID / CUID | Yes | Internal identifier. |
+| `customerPackageId` | String | Yes | Frozen customer-package assignment. |
+| `mode` | Enum | Yes | `NORMAL` or `RETROACTIVE`. |
+| `status` | Enum | Yes | At minimum `ACTIVE`, `REACTIVATED`, or `CANCELLED` if cancellation is later required. |
+| `plannedDays` | Int | Yes | Requested or planned freeze duration. |
+| `actualDays` | Int | No | Actual frozen duration, finalized on reactivation. |
+| `startDate` | DateTime | Yes | Confirmed effective freeze start. |
+| `plannedEndDate` | DateTime | No | Intended freeze end. |
+| `actualEndDate` | DateTime | No | Actual reactivation/end date. |
+| `originalExpirationDate` | DateTime | Yes | Expiration before this freeze. |
+| `resultingExpirationDate` | DateTime | No | Recalculated expiration after reactivation. |
+| `createdById` | String | Yes | Authorized staff user who confirmed the freeze. |
+| `reactivatedById` | String | No | Authorized staff user who reactivated it. |
+| `notes` | String | No | Optional administrative context. |
+| `createdAt` | DateTime | Yes | Creation timestamp. |
+| `updatedAt` | DateTime | Yes | Last update timestamp. |
+
+Recommended constraints and indexes:
+
+- Index `customerPackageId`, `status`, `startDate`, and `actualEndDate`.
+- Prevent more than one active freeze for the same customer package.
+- Prevent a confirmed freeze when `remainingFreezeChances <= 0`.
+- Ensure end dates do not precede the effective start date.
+- Store enough date context to calculate actual frozen days deterministically.
+
+Transaction boundary for freeze confirmation:
+
+1. Lock or otherwise protect the customer-package assignment.
+2. Revalidate status, eligibility, and remaining chances.
+3. Resolve normal or retroactive start date.
+4. Create `PackageFreeze`.
+5. Decrement `remainingFreezeChances`.
+6. Set customer-package status to frozen.
+7. Create the audit log.
+8. Commit all changes together.
+
+Transaction boundary for reactivation:
+
+1. Load and validate the active freeze.
+2. Resolve the actual end date.
+3. Calculate actual frozen days.
+4. Set resulting expiration to original expiration plus actual frozen days.
+5. Update the customer package and freeze status.
+6. Create the audit log.
+7. Commit all changes together.
+
+### Visit History Query Planning
+
+No new visit model is automatically required. The admin customer detail should first query existing `GymVisit` and `VisitPackageUsage` data for the latest three visits.
+
+Return only fields backed by current data:
+
+- Check-in timestamp.
+- Check-out timestamp.
+- Derived duration.
+- Stored guest count, if such a field already exists.
+- Packages used through existing usage records.
+
+Visit-history export remains postponed.
+
+### Analytics Data Planning
+
+Prefer deriving approved aggregate metrics from existing visits, occupancy events, and occupancy state. Do not add a snapshot or aggregate table until Phase 31 proves that existing records cannot produce reliable historical occupancy.
+
+Any future aggregate model must:
+
+- Contain no unnecessary customer identifiers.
+- Define timezone and bucket boundaries.
+- Be safe for the public query contract.
+- Have a documented backfill and retention policy.
+
+### Public Package Filtering and Sorting Implications
+
+The public package query should use package-definition and category data only.
+
+- Filter to active package definitions.
+- Enforce category public visibility before applying user-selected filters.
+- Support category, minimum price, and maximum price filters.
+- Support price ascending, price descending, and normalized name sorting.
+- Consider indexes on package active state, price, name, and join foreign keys after checking the real query plan.
+- Never join or expose `CustomerPackage` data for public filtering.
+
+### Migration Order
+
+1. Add settings fields with safe defaults.
+2. Add categories and join records while retaining package `type`.
+3. Backfill categories only after mapping rules are confirmed.
+4. Add document metadata only after storage infrastructure is approved.
+5. Add freeze fields and records with an explicit existing-assignment backfill.
+6. Apply unique constraints and indexes after validating existing data.
+
+---
+
 ## 15. Do Not Include Yet
 
 Do not include the following database areas until they are confirmed by the client or later project documents:
@@ -1734,7 +1936,7 @@ Do not include the following database areas until they are confirmed by the clie
 - Marketing campaign tables.
 - Advanced revenue analytics tables.
 - Predictive analytics tables.
-- Any database model not directly supporting the confirmed public website, public occupancy page, Admin Panel, Registration Panel, customer/package/coach management, check-in/check-out, session tracking, occupancy tracking, notes, logs, exports, settings, or basic analytics.
+- Any database model not directly supporting the confirmed system or the manually approved Phase 31-39 category, document, analytics, visit-history, and advanced-freeze scope.
 
 ---
 

@@ -1,5 +1,9 @@
+import { Prisma } from "@prisma/client";
+
 import { db } from "./db";
 import { normalizeMapEmbedUrl } from "./map-embed";
+
+const PRICE_FILTER_PATTERN = /^\d{1,8}(?:\.\d{1,2})?$/;
 
 function safePublicUrl(value: string | null) {
   if (!value) {
@@ -74,6 +78,7 @@ export async function getPublicAppData() {
           showLocationInPublicApp: true,
           showMotivationalTextInPublicApp: true,
           showPhoneInPublicApp: true,
+          showPublicAnalyticsOnOurApp: true,
           showWhatsappInPublicApp: true,
           whatsappLink: true,
         },
@@ -128,6 +133,7 @@ export async function getPublicAppData() {
       ? settings.motivationalText
       : null,
     settingsAvailable: Boolean(settings),
+    showPublicAnalytics: settings?.showPublicAnalyticsOnOurApp ?? false,
     location: settings?.showLocationInPublicApp
       ? {
           address: settings.address,
@@ -258,13 +264,122 @@ export async function getActiveCoaches(limit?: number) {
   }
 }
 
-export async function getActivePackages(limit?: number) {
-  try {
-    const packages = await db.package.findMany({
-      where: {
-        deletedAt: null,
-        isActive: true,
+export type PublicPackageSearchParams = {
+  category?: string | string[];
+  maxPrice?: string | string[];
+  minPrice?: string | string[];
+  sort?: string | string[];
+};
+
+export type PublicPackageSort = "name" | "price-asc" | "price-desc";
+
+const publicPackageSorts = new Set<PublicPackageSort>([
+  "name",
+  "price-asc",
+  "price-desc",
+]);
+
+function publicEligiblePackageWhere(): Prisma.PackageWhereInput {
+  return {
+    categories: {
+      none: {
+        category: {
+          OR: [{ isArchived: true }, { isPublic: false }],
+        },
       },
+    },
+    deletedAt: null,
+    isActive: true,
+  };
+}
+
+function queryValue(value: string | string[] | undefined) {
+  return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
+}
+
+function priceFilter(value: string) {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return { value: null, valid: true };
+  }
+
+  return {
+    value: PRICE_FILTER_PATTERN.test(normalized) ? normalized : null,
+    valid: PRICE_FILTER_PATTERN.test(normalized),
+  };
+}
+
+export async function getPublicPackageCatalog(
+  searchParams: PublicPackageSearchParams,
+) {
+  try {
+    const categories = await db.category.findMany({
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: {
+        name: true,
+        slug: true,
+      },
+      where: {
+        isArchived: false,
+        isPublic: true,
+        packages: {
+          some: {
+            package: publicEligiblePackageWhere(),
+          },
+        },
+      },
+    });
+    const requestedCategory = queryValue(searchParams.category);
+    const requestedMinPrice = queryValue(searchParams.minPrice);
+    const requestedMaxPrice = queryValue(searchParams.maxPrice);
+    const rawSort = queryValue(searchParams.sort);
+    const category = categories.some(
+      (option) => option.slug === requestedCategory,
+    )
+      ? requestedCategory
+      : null;
+    const minPrice = priceFilter(requestedMinPrice);
+    const maxPrice = priceFilter(requestedMaxPrice);
+    const requestedSort = rawSort as PublicPackageSort;
+    const sort = requestedSort && publicPackageSorts.has(requestedSort)
+      ? requestedSort
+      : "name";
+    const rangeIsValid =
+      minPrice.value === null ||
+      maxPrice.value === null ||
+      Number(minPrice.value) <= Number(maxPrice.value);
+    const filterErrors = [
+      requestedCategory && !category
+        ? "The selected category is not publicly available."
+        : null,
+      !minPrice.valid || !maxPrice.valid
+        ? "Prices must be non-negative numbers with no more than two decimal places."
+        : null,
+      !rangeIsValid
+        ? "Minimum price cannot be greater than maximum price."
+        : null,
+      rawSort && !publicPackageSorts.has(requestedSort)
+        ? "The selected sort option is not available."
+        : null,
+    ].filter((message): message is string => Boolean(message));
+    const priceWhere =
+      minPrice.valid && maxPrice.valid && rangeIsValid
+        ? {
+            price: {
+              gte: minPrice.value ?? undefined,
+              lte: maxPrice.value ?? undefined,
+            },
+          }
+        : {};
+    const orderBy: Prisma.PackageOrderByWithRelationInput[] =
+      sort === "price-asc"
+        ? [{ price: "asc" }, { name: "asc" }]
+        : sort === "price-desc"
+          ? [{ price: "desc" }, { name: "asc" }]
+          : [{ name: "asc" }];
+    const packages = await db.package.findMany({
+      orderBy,
       select: {
         assignedCoach: {
           select: {
@@ -272,6 +387,21 @@ export async function getActivePackages(limit?: number) {
             firstName: true,
             isActive: true,
             lastName: true,
+          },
+        },
+        categories: {
+          orderBy: {
+            category: {
+              sortOrder: "asc",
+            },
+          },
+          select: {
+            category: {
+              select: {
+                name: true,
+                slug: true,
+              },
+            },
           },
         },
         description: true,
@@ -283,31 +413,76 @@ export async function getActivePackages(limit?: number) {
         sessionCount: true,
         timeRestrictionLabel: true,
       },
-      orderBy: { name: "asc" },
-      take: limit,
+      where: {
+        AND: [
+          publicEligiblePackageWhere(),
+          category
+            ? {
+                categories: {
+                  some: {
+                    category: {
+                      isArchived: false,
+                      isPublic: true,
+                      slug: category,
+                    },
+                  },
+                },
+              }
+            : {},
+          priceWhere,
+        ],
+      },
     });
 
-    return packages.map((gymPackage) => ({
-      description: gymPackage.description,
-      defaultGuestPasses: gymPackage.defaultGuestPasses,
-      id: gymPackage.id,
-      name: gymPackage.name,
-      packageType: gymPackage.packageType,
-      price: gymPackage.price.toString(),
-      sessionCount: gymPackage.sessionCount,
-      timeRestrictionLabel: gymPackage.timeRestrictionLabel,
-      assignedCoach:
-        gymPackage.assignedCoach?.isActive &&
-        !gymPackage.assignedCoach.deletedAt
-          ? {
-              firstName: gymPackage.assignedCoach.firstName,
-              lastName: gymPackage.assignedCoach.lastName,
-            }
-          : null,
-    }));
+    return {
+      available: true,
+      categories,
+      filterErrors,
+      filters: {
+        category: category ?? "",
+        maxPrice: requestedMaxPrice,
+        minPrice: requestedMinPrice,
+        sort,
+      },
+      packages: packages.map((gymPackage) => ({
+        assignedCoach:
+          gymPackage.assignedCoach?.isActive &&
+          !gymPackage.assignedCoach.deletedAt
+            ? {
+                firstName: gymPackage.assignedCoach.firstName,
+                lastName: gymPackage.assignedCoach.lastName,
+              }
+            : null,
+        categories: gymPackage.categories.map(({ category: option }) => option),
+        description: gymPackage.description,
+        defaultGuestPasses: gymPackage.defaultGuestPasses,
+        id: gymPackage.id,
+        name: gymPackage.name,
+        packageType: gymPackage.packageType,
+        price: gymPackage.price.toString(),
+        sessionCount: gymPackage.sessionCount,
+        timeRestrictionLabel: gymPackage.timeRestrictionLabel,
+      })),
+    };
   } catch {
-    return [];
+    return {
+      available: false,
+      categories: [],
+      filterErrors: [],
+      filters: {
+        category: "",
+        maxPrice: queryValue(searchParams.maxPrice),
+        minPrice: queryValue(searchParams.minPrice),
+        sort: "name" as const,
+      },
+      packages: [],
+    };
   }
+}
+
+export async function getActivePackages(limit?: number) {
+  const catalog = await getPublicPackageCatalog({});
+  return limit ? catalog.packages.slice(0, limit) : catalog.packages;
 }
 
 export async function getActiveGalleryImages(limit?: number) {

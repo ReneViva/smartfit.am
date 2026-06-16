@@ -14,7 +14,7 @@ type SettingsPageProps = {
 const inputClass =
   "mt-2 min-h-11 w-full rounded-lg border border-input-border bg-card px-3 py-2 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue";
 const labelClass = "block text-sm font-semibold text-foreground";
-const toggleFields = [
+const publicAppToggleFields = [
   {
     defaultChecked: true,
     label: "Show phone",
@@ -42,8 +42,21 @@ const toggleFields = [
   },
   {
     defaultChecked: false,
+    label: "Show aggregate analytics on Our App",
+    name: "showPublicAnalyticsOnOurApp",
+  },
+] as const;
+
+const registrationToggleFields = [
+  {
+    defaultChecked: false,
     label: "Hide inactive customers from registration",
     name: "hideInactiveCustomersFromRegistration",
+  },
+  {
+    defaultChecked: false,
+    label: "Allow Registration to freeze/reactivate packages",
+    name: "allowRegistrationPackageFreeze",
   },
 ] as const;
 
@@ -247,7 +260,9 @@ export default async function SettingsPage({
           </h3>
           <p className="mt-2 text-sm leading-6 text-secondary">
             Set separate Our App wordmarks for light and dark themes. The
-            bundled Smartfit logos are used when a field is empty.
+            bundled Smartfit logos are used when a field is empty. Public
+            analytics contain aggregate check-in counts only and are hidden by
+            default.
           </p>
           <div className="mt-5 grid gap-5 md:grid-cols-2">
             <ImageInput
@@ -264,7 +279,7 @@ export default async function SettingsPage({
             />
           </div>
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {toggleFields.map(({ defaultChecked, label, name }) => (
+            {publicAppToggleFields.map(({ defaultChecked, label, name }) => (
               <label
                 className="flex items-center gap-3 rounded-lg bg-neutral px-4 py-3 text-sm font-semibold text-foreground"
                 key={name}
@@ -289,6 +304,34 @@ export default async function SettingsPage({
               name="motivationalText"
             />
           </label>
+        </Card>
+
+        <Card>
+          <h3 className="text-xl font-bold text-foreground">
+            Registration workspace
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            Control daily Registration visibility and package freeze access.
+            When freeze access is disabled, only Admin can freeze or reactivate
+            customer packages.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {registrationToggleFields.map(({ defaultChecked, label, name }) => (
+              <label
+                className="flex items-center gap-3 rounded-lg bg-neutral px-4 py-3 text-sm font-semibold text-foreground"
+                key={name}
+              >
+                <input
+                  defaultChecked={
+                    settings ? Boolean(settings[name]) : defaultChecked
+                  }
+                  name={name}
+                  type="checkbox"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
         </Card>
 
         <Button type="submit">Save settings</Button>

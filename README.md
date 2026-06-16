@@ -55,6 +55,11 @@ Open [http://localhost:3000](http://localhost:3000).
 | `CLOUDINARY_API_KEY` | For file uploads | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | For file uploads | Cloudinary API secret; server-only |
 | `CLOUDINARY_UPLOAD_FOLDER` | No | Cloudinary folder, defaults to `smartfit-am` |
+| `CUSTOMER_DOCUMENT_STORAGE_PROVIDER` | For customer documents | Private customer document provider, currently `cloudinary` |
+| `CUSTOMER_DOCUMENT_MAX_FILE_SIZE_MB` | No | Customer document upload limit, capped at 10 MB |
+| `CUSTOMER_DOCUMENT_ALLOWED_MIME_TYPES` | No | Customer document MIME allowlist; safe values are PDF, JPEG, and PNG |
+| `CUSTOMER_DOCUMENT_CLOUDINARY_FOLDER` | No | Cloudinary folder for private customer documents |
+| `CUSTOMER_DOCUMENT_CLOUDINARY_DELIVERY_TYPE` | No | Cloudinary delivery type for customer documents; use `authenticated` or `private` |
 
 ## Routes and Access
 
@@ -107,6 +112,14 @@ Do not add `ALLOW_DEMO_SEED` permanently to a production environment.
 Admin image fields accept a public `http` or `https` URL. With Cloudinary configured, they also accept a local image file and store only the resulting public URL.
 
 `CLOUDINARY_API_SECRET` is used only by server-side upload actions. Pasted image URLs continue to work when Cloudinary is not configured.
+
+## Customer Document Storage
+
+Customer documents use a separate private storage foundation from public image uploads. The current provider is Cloudinary with authenticated/private delivery; the database stores provider metadata and private object keys, not public `secure_url` values or file bytes.
+
+Document access must go through Admin-only server logic that validates the staff role before creating a short-lived private download URL. Archive keeps metadata and the provider object for retention; physical deletion is limited to internal cleanup for failed metadata writes until deletion policy is confirmed.
+
+Cloudflare/R2 can be added later by implementing a new customer-document storage adapter and switching `CUSTOMER_DOCUMENT_STORAGE_PROVIDER`; it is not a one-URL swap.
 
 ## Verification
 

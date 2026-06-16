@@ -1,13 +1,32 @@
 "use client";
 
-import type { CustomerPackageStatus } from "@prisma/client";
+import type {
+  CustomerPackageStatus,
+  PackageFreezeMode,
+  PackageFreezeStatus,
+} from "@prisma/client";
 import { useMemo, useState } from "react";
 
 import { packageTypeLabel } from "../../lib/package-types";
-import { PackageStatusActions } from "../registration/package-status-actions";
 import { Button } from "../ui/button";
 import { StatusBadge } from "../ui/status-badge";
+import { CustomerPackageFreezeControls } from "./customer-package-freeze-controls";
 import { CustomerPackageEditForm } from "./customer-package-edit-form";
+
+type ActiveFreezeValue = {
+  actualDays: number | null;
+  actualEndDate: Date | null;
+  createdAt: Date;
+  id: string;
+  mode: PackageFreezeMode;
+  notes: string | null;
+  originalExpirationDate: Date;
+  plannedDays: number;
+  plannedEndDate: Date | null;
+  resultingExpirationDate: Date | null;
+  startDate: Date;
+  status: PackageFreezeStatus;
+};
 
 type CustomerPackageValue = {
   activationDate: Date;
@@ -36,7 +55,9 @@ type CustomerPackageValue = {
     packageType: string;
     timeRestrictionLabel: string | null;
   };
+  freezes: ActiveFreezeValue[];
   packageId: string;
+  remainingFreezeChances: number;
   remainingGuestPasses: number;
   remainingSessions: number;
   status: CustomerPackageStatus;
@@ -55,6 +76,11 @@ type PackageOption = {
   isActive: boolean;
   name: string;
   packageType: string;
+};
+
+type SelectedPanel = {
+  customerPackageId: string;
+  mode: "edit" | "freeze";
 };
 
 type HistoryFilter =
@@ -214,20 +240,20 @@ export function CustomerPackageOverview({
   coaches,
   customerCode,
   customerId,
+  latestCompletedCheckoutAt,
   packages,
   packageDefinitions,
 }: {
   coaches: CoachOption[];
   customerCode: string;
   customerId: string;
+  latestCompletedCheckoutAt: Date | null;
   packages: CustomerPackageValue[];
   packageDefinitions: PackageOption[];
 }) {
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
   const [showAllHistory, setShowAllHistory] = useState(false);
-  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(
-    null,
-  );
+  const [selectedPanel, setSelectedPanel] = useState<SelectedPanel | null>(null);
   const today = useMemo(() => {
     const value = new Date();
     value.setUTCHours(0, 0, 0, 0);
@@ -268,11 +294,13 @@ export function CustomerPackageOverview({
     ? filteredHistory
     : filteredHistory.slice(0, 10);
   const selectedPackage =
-    packages.find(({ id }) => id === selectedPackageId) ?? null;
-  const returnPath = `/admin/customers/${customerId}`;
+    packages.find(({ id }) => id === selectedPanel?.customerPackageId) ?? null;
 
-  function openManager(customerPackageId: string) {
-    setSelectedPackageId(customerPackageId);
+  function openSelectedPanel(
+    customerPackageId: string,
+    mode: "edit" | "freeze",
+  ) {
+    setSelectedPanel({ customerPackageId, mode });
     window.setTimeout(() => {
       document
         .getElementById("manage-assigned-package")
@@ -314,12 +342,7 @@ export function CustomerPackageOverview({
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
             {currentPackages.map((customerPackage) => {
               const state = packageState(customerPackage, today);
-              const canFreeze =
-                customerPackage.status === "ACTIVE" &&
-                customerPackage.expirationDate >= today &&
-                customerPackage.remainingSessions > 0 &&
-                !customerPackage.package.deletedAt &&
-                customerPackage.package.isActive;
+              const hasActiveFreeze = customerPackage.freezes.length > 0;
 
               return (
                 <article
@@ -342,7 +365,7 @@ export function CustomerPackageOverview({
                     </StatusBadge>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4">
+                  <div className="mt-5 grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-3">
                     <div>
                       <p className="text-3xl font-bold text-foreground">
                         {customerPackage.remainingSessions}
@@ -357,6 +380,14 @@ export function CustomerPackageOverview({
                       </p>
                       <p className="mt-1 text-xs font-semibold text-secondary">
                         guest passes remaining
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-3xl font-bold text-foreground">
+                        {customerPackage.remainingFreezeChances}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-secondary">
+                        freeze chances
                       </p>
                     </div>
                   </div>
@@ -374,22 +405,21 @@ export function CustomerPackageOverview({
 
                   <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
                     <Button
-                      onClick={() => openManager(customerPackage.id)}
+                      onClick={() =>
+                        openSelectedPanel(customerPackage.id, "edit")
+                      }
                       variant="neutral"
                     >
                       Manage
                     </Button>
-                    <PackageStatusActions
-                      canFreeze={canFreeze}
-                      compact={false}
-                      customerCode={customerCode}
-                      customerId={customerId}
-                      customerPackageId={customerPackage.id}
-                      inline
-                      isFrozen={customerPackage.status === "FROZEN"}
-                      returnPath={returnPath}
-                      showAllPackages
-                    />
+                    <Button
+                      onClick={() =>
+                        openSelectedPanel(customerPackage.id, "freeze")
+                      }
+                      variant={hasActiveFreeze ? "primary" : "warning"}
+                    >
+                      {hasActiveFreeze ? "Reactivate" : "Freeze options"}
+                    </Button>
                   </div>
                 </article>
               );
@@ -424,7 +454,7 @@ export function CustomerPackageOverview({
               {packageState(latestAttentionPackage, today).label}
             </StatusBadge>
           </div>
-          <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+          <div className="mt-4 grid gap-3 text-sm sm:grid-cols-4">
             <p className="rounded-lg bg-card px-3 py-2 text-secondary">
               Ended / ends{" "}
               <strong className="text-foreground">
@@ -445,6 +475,12 @@ export function CustomerPackageOverview({
                 {latestAttentionPackage.initialGuestPasses}
               </strong>
             </p>
+            <p className="rounded-lg bg-card px-3 py-2 text-secondary">
+              Freeze chances{" "}
+              <strong className="text-foreground">
+                {latestAttentionPackage.remainingFreezeChances}
+              </strong>
+            </p>
           </div>
         </section>
       ) : null}
@@ -463,23 +499,34 @@ export function CustomerPackageOverview({
                 {selectedPackage.package.name}
               </h3>
               <p className="mt-1 text-sm text-secondary">
-                Only this package edit form is open.
+                Only this package{" "}
+                {selectedPanel?.mode === "freeze" ? "freeze panel" : "edit form"}{" "}
+                is open.
               </p>
             </div>
             <Button
-              onClick={() => setSelectedPackageId(null)}
+              onClick={() => setSelectedPanel(null)}
               variant="neutral"
             >
               Close
             </Button>
           </div>
           <div className="mt-5 border-t border-border pt-5">
-            <CustomerPackageEditForm
-              coaches={coaches}
-              customerPackage={selectedPackage}
-              packages={packageDefinitions}
-              returnToDetail
-            />
+            {selectedPanel?.mode === "freeze" ? (
+              <CustomerPackageFreezeControls
+                customerCode={customerCode}
+                customerId={customerId}
+                customerPackage={selectedPackage}
+                latestCompletedCheckoutAt={latestCompletedCheckoutAt}
+              />
+            ) : (
+              <CustomerPackageEditForm
+                coaches={coaches}
+                customerPackage={selectedPackage}
+                packages={packageDefinitions}
+                returnToDetail
+              />
+            )}
           </div>
         </section>
       ) : null}
@@ -581,13 +628,36 @@ export function CustomerPackageOverview({
                           {customerPackage.initialGuestPasses}
                         </dd>
                       </div>
+                      <div>
+                        <dt className="font-semibold text-secondary">
+                          Freeze chances
+                        </dt>
+                        <dd className="mt-1 text-foreground">
+                          {customerPackage.remainingFreezeChances}
+                        </dd>
+                      </div>
                     </dl>
                     <Button
                       className="mt-4 w-full"
-                      onClick={() => openManager(customerPackage.id)}
+                      onClick={() =>
+                        openSelectedPanel(customerPackage.id, "edit")
+                      }
                       variant="neutral"
                     >
                       Manage
+                    </Button>
+                    <Button
+                      className="mt-2 w-full"
+                      onClick={() =>
+                        openSelectedPanel(customerPackage.id, "freeze")
+                      }
+                      variant={
+                        customerPackage.freezes.length ? "primary" : "warning"
+                      }
+                    >
+                      {customerPackage.freezes.length
+                        ? "Reactivate"
+                        : "Freeze options"}
                     </Button>
                   </article>
                 );
@@ -595,13 +665,14 @@ export function CustomerPackageOverview({
             </div>
 
             <div className="mt-5 hidden overflow-x-auto rounded-xl border border-border md:block">
-              <table className="w-full min-w-[70rem] border-collapse text-left text-sm">
+              <table className="w-full min-w-[76rem] border-collapse text-left text-sm">
                 <thead className="bg-page text-xs uppercase tracking-wide text-secondary">
                   <tr>
                     <th className="px-4 py-3">Package / service</th>
                     <th className="px-4 py-3">Dates</th>
                     <th className="px-4 py-3">Sessions</th>
                     <th className="px-4 py-3">Guest passes</th>
+                    <th className="px-4 py-3">Freeze chances</th>
                     <th className="px-4 py-3">Coach</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Action</th>
@@ -639,6 +710,9 @@ export function CustomerPackageOverview({
                           {customerPackage.remainingGuestPasses} /{" "}
                           {customerPackage.initialGuestPasses}
                         </td>
+                        <td className="px-4 py-4 text-foreground">
+                          {customerPackage.remainingFreezeChances}
+                        </td>
                         <td className="px-4 py-4 text-secondary">
                           {packageCoach(customerPackage)}
                         </td>
@@ -649,10 +723,27 @@ export function CustomerPackageOverview({
                         </td>
                         <td className="px-4 py-4">
                           <Button
-                            onClick={() => openManager(customerPackage.id)}
+                            onClick={() =>
+                              openSelectedPanel(customerPackage.id, "edit")
+                            }
                             variant="neutral"
                           >
                             Manage
+                          </Button>
+                          <Button
+                            className="mt-2"
+                            onClick={() =>
+                              openSelectedPanel(customerPackage.id, "freeze")
+                            }
+                            variant={
+                              customerPackage.freezes.length
+                                ? "primary"
+                                : "warning"
+                            }
+                          >
+                            {customerPackage.freezes.length
+                              ? "Reactivate"
+                              : "Freeze"}
                           </Button>
                         </td>
                       </tr>

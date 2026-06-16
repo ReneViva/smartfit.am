@@ -49,10 +49,18 @@ then remove it and restore occupancy.
 - Check out an IN_GYM customer and confirm sessions do not decrease,
   occupancy decreases, and the visit closes.
 - Confirm checkout while NOT_IN_GYM is blocked.
-- Freeze and reactivate an eligible package.
-- Confirm expiration and remaining sessions do not change and logs are
-  created.
-- Confirm an expired frozen package does not become usable after reactivation.
+- With `allowRegistrationPackageFreeze` disabled, confirm freeze/reactivation
+  controls are hidden and direct Registration requests are rejected.
+- Confirm Admin freeze access remains available while the Registration setting
+  is disabled.
+- Enable the setting as Admin, then freeze and reactivate an eligible package
+  from Registration.
+- Confirm a confirmed freeze decrements remaining freeze chances exactly once,
+  zero chances block freezing, and Registration cannot edit the counter.
+- Confirm early reactivation uses actual frozen days to recalculate expiration
+  and creates the required logs.
+- Confirm an expired frozen package does not become usable unless the approved
+  advanced date rules produce an eligible expiration.
 
 ## Notes And Activity
 

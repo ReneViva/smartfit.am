@@ -117,6 +117,8 @@ export async function saveSettingsAction(formData: FormData) {
 
   const data = {
     address: optionalText(formData, "address"),
+    allowRegistrationPackageFreeze:
+      formData.get("allowRegistrationPackageFreeze") === "on",
     contactNumber: optionalText(formData, "contactNumber", 120),
     gymName,
     hideInactiveCustomersFromRegistration:
@@ -139,6 +141,8 @@ export async function saveSettingsAction(formData: FormData) {
     showMotivationalTextInPublicApp:
       formData.get("showMotivationalTextInPublicApp") === "on",
     showPhoneInPublicApp: formData.get("showPhoneInPublicApp") === "on",
+    showPublicAnalyticsOnOurApp:
+      formData.get("showPublicAnalyticsOnOurApp") === "on",
     showWhatsappInPublicApp:
       formData.get("showWhatsappInPublicApp") === "on",
     whatsappLink: urls.whatsappLink,
@@ -179,6 +183,8 @@ export async function saveSettingsAction(formData: FormData) {
   revalidatePath("/contact");
   revalidatePath("/our-app");
   revalidatePath("/admin");
+  revalidatePath("/registration");
+  revalidatePath("/registration/rules");
   revalidatePath(SETTINGS_PATH);
   redirect(`${SETTINGS_PATH}?status=saved`);
 }

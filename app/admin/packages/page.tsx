@@ -4,6 +4,7 @@ import { db } from "../../../lib/db";
 type PackagesPageProps = {
   searchParams: Promise<{
     error?: string;
+    package?: string;
     status?: string;
   }>;
 };
@@ -12,6 +13,10 @@ const errorMessages: Record<string, string> = {
   "incomplete-restriction":
     "A restricted package needs an end time or a useful restriction label.",
   "invalid-coach": "The selected coach is not available.",
+  "invalid-categories":
+    "Select at least one available category. Archived or unknown categories cannot be assigned.",
+  "invalid-freeze-chances":
+    "Default freeze chances must be a non-negative whole number.",
   "invalid-guest-passes":
     "Default guest passes must be a non-negative whole number.",
   "invalid-price":
@@ -24,7 +29,7 @@ const errorMessages: Record<string, string> = {
 };
 
 export default async function PackagesPage({ searchParams }: PackagesPageProps) {
-  const [packages, coaches, params] = await Promise.all([
+  const [packages, coaches, categories, params] = await Promise.all([
     db.package.findMany({
       orderBy: { name: "asc" },
       select: {
@@ -37,7 +42,21 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
           },
         },
         assignedCoachId: true,
+        categories: {
+          select: {
+            category: {
+              select: {
+                id: true,
+                isArchived: true,
+                isPublic: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        },
         createdAt: true,
+        defaultFreezeChances: true,
         defaultGuestPasses: true,
         description: true,
         hasTimeRestriction: true,
@@ -61,11 +80,22 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
       },
       where: { deletedAt: null },
     }),
+    db.category.findMany({
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: {
+        id: true,
+        isPublic: true,
+        name: true,
+        slug: true,
+      },
+      where: { isArchived: false },
+    }),
     searchParams,
   ]);
   const errorMessage = params.error ? errorMessages[params.error] : null;
   const packageValues = packages.map((gymPackage) => ({
     ...gymPackage,
+    categories: gymPackage.categories.map(({ category }) => category),
     createdAt: gymPackage.createdAt.toISOString(),
     price: gymPackage.price.toString(),
   }));
@@ -99,7 +129,13 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
         </p>
       ) : null}
 
-      <AdminPackageManager coaches={coaches} packages={packageValues} />
+      <AdminPackageManager
+        categories={categories}
+        categoryError={params.error === "invalid-categories"}
+        coaches={coaches}
+        packages={packageValues}
+        selectedPackageId={params.package}
+      />
     </>
   );
 }

@@ -1,8 +1,10 @@
 import { PublicLayout } from "../../components/layout/public-layout";
 import { SmartfitLogo } from "../../components/brand/smartfit-logo";
 import { JsonLd } from "../../components/public/json-ld";
+import { PublicAnalytics } from "../../components/public/public-analytics";
 import { Card } from "../../components/ui/card";
 import { StatusBadge } from "../../components/ui/status-badge";
+import { getPublicVisitAnalytics } from "../../lib/analytics/data";
 import {
   getPublicAppData,
   type PublicCrowdStatus,
@@ -85,6 +87,9 @@ function LocationIcon() {
 
 export default async function OurAppPage() {
   const appData = await getPublicAppData();
+  const publicAnalytics = appData.showPublicAnalytics
+    ? await getPublicVisitAnalytics()
+    : null;
   const { occupancy } = appData;
   const hasPublicLinks = Object.values(appData.links).some(Boolean);
   const occupancyClasses = occupancy.crowdStatus
@@ -146,6 +151,10 @@ export default async function OurAppPage() {
             </p>
           ) : null}
         </Card>
+
+        {appData.showPublicAnalytics ? (
+          <PublicAnalytics analytics={publicAnalytics} />
+        ) : null}
 
         {appData.motivationalText ? (
           <Card className="mt-6 bg-soft-blue text-center">

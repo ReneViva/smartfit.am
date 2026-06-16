@@ -52,7 +52,7 @@ No additional technical specification, database schema, API documentation, hosti
 - The uploaded Word document includes a responsive customer-card visual example for desktop, tablet, and mobile reception views, with customer status, package cards, plus/minus controls, and save action.
 * Gallery is confirmed as an MVP public website page at `/gallery`.
 * Package freezing and reactivation are confirmed for the MVP.
-* Both admin/manager users and registration/reception users can freeze and reactivate customer packages.
+* Admin/manager users can freeze and reactivate customer packages; Registration access is controlled by an Admin setting that defaults to disabled.
 * Manual session corrections and manual occupancy corrections do not require admin approval or a reason in the MVP, but they must be logged.
 
 
@@ -176,7 +176,7 @@ Receptionist / registration staff.
 - Check-in, check-out, manual session correction, package freezing/reactivation, note changes, and manual occupancy correction should be handled server-side.
 - All important actions must write logs visible to admin.
 - The customer-card UI should be responsive; the source specification includes a desktop/tablet/mobile visual example for this operational card layout.
-- Package freezing and reactivation are confirmed for registration staff in the MVP. Registration staff can freeze and reactivate customer packages, but every freeze/reactivation action must be handled server-side and logged.
+- Package freezing and reactivation are confirmed for registration staff in the MVP. In the approved post-Phase 29 workflow, registration freeze access is controlled by `allowRegistrationPackageFreeze`, defaults to disabled, and must be enforced both in the UI and server-side. Every permitted freeze/reactivation action must be handled server-side and logged.
 
 **Status:** Confirmed by requirements. Exact login method and some permissions are unclear.
 
@@ -956,7 +956,7 @@ Authentication and permissions are required, but not fully specified in the curr
 - Exact role names.
 - Whether admin and registration staff use one login page or separate login pages.
 - Whether registration staff can delete notes.
-- Whether registration staff can freeze/reactivate packages without admin approval.
+- Registration freeze/reactivation is governed by `allowRegistrationPackageFreeze`; broader approval or override behavior remains unapproved.
 - Whether manual occupancy changes require only receptionist permission or admin confirmation.
 - Whether admin overrides are allowed for package time restrictions or zero-session/expired packages.
 
@@ -1111,8 +1111,10 @@ The uploaded requirements confirm the following configurable items:
 | Gym working hours | Public website, settings | Confirmed |
 | Occupancy green/yellow/red thresholds | Public live occupancy display | Confirmed |
 | Public app display toggles | Public User Panel / Mobile App Experience | Confirmed |
+| Public aggregate analytics visibility | Public `/our-app` analytics section | Approved for Phase 31 |
 | Motivational text visibility/content | Public User Panel / Mobile App Experience | Confirmed |
 | Whether registration staff can hide inactive customers | Registration Panel | Confirmed |
+| Whether Registration can freeze customer packages | Registration Panel and server authorization | Approved for Phase 39; default disabled |
 | Package time restriction | Package management and check-in validation | Confirmed |
 
 ### Unclear Settings
@@ -1148,6 +1150,8 @@ The recommended MVP specifically includes:
 - Daily check-ins.
 - Current occupancy.
 - Peak hours.
+
+The manually approved Phase 31 expansion adds responsive aggregate views for current occupancy, today's check-ins, hourly check-ins, weekly check-in trend, weekly peak hours, and historical occupancy when a reliable source exists. The public `/our-app` version must be setting-controlled and must contain aggregate data only. The admin version remains private.
 
 ### Confirmed Reporting / Export
 
@@ -1215,6 +1219,7 @@ Do not build external notification infrastructure in the MVP unless the client c
 - Gallery images.
 - Possible public content images if the homepage, offers, or announcements require visuals.
 - Excel export files generated from admin data.
+- Admin-only customer documents in PDF, JPG, JPEG, or PNG format, limited to 10 MB per file.
 
 ### Recommended Technical Approach
 
@@ -1222,6 +1227,10 @@ Do not build external notification infrastructure in the MVP unless the client c
 - Store actual image files using a file storage method appropriate for the deployment environment.
 - Keep image upload/edit access restricted to admin users.
 - Generate Excel export files server-side and restrict downloads to admin users.
+- Keep customer document metadata, file access, and document actions admin-only.
+- Validate document type and size server-side.
+- Log customer document upload, download/open when required by the audit design, archive/delete, and administrative recovery actions.
+- Confirm a production-safe storage provider or existing storage pattern before implementing document uploads.
 
 ### Unclear
 
@@ -1231,6 +1240,7 @@ Do not build external notification infrastructure in the MVP unless the client c
 - Whether old images should be deleted, archived, or kept.
 - Whether banners are separate from offers/announcements.
 - Whether export files should be stored permanently or generated on demand.
+- Which production-safe storage provider and private-download strategy should be used for customer documents.
 
 ---
 
@@ -1362,6 +1372,82 @@ The following questions cannot be safely answered from the uploaded documents an
 
 ---
 
+## 16A. Approved Post-Phase 29 Technical Expansion
+
+This section records manually approved technical direction for Phases 31-41. It is planning guidance only and does not mean the features are implemented.
+
+### Analytics Architecture
+
+- Build aggregate queries on the server.
+- Keep public and admin data contracts separate even when they share calculation helpers.
+- Public responses must contain no customer identifiers or customer-level records.
+- Gate the public `/our-app` analytics section with a persisted admin setting.
+- Prefer existing responsive card and simple bar-chart patterns.
+- Do not add a charting dependency unless the existing stack cannot reasonably produce the approved presentation.
+- Derive historical occupancy only after confirming a reliable event or snapshot source.
+
+### Package Categories and Public Filters
+
+- Add a first-class category entity and a many-to-many package-category relation.
+- Preserve existing package `type` behavior until migration compatibility is verified.
+- Treat category visibility as a public eligibility rule: assignment to any hidden category hides the package publicly.
+- Keep hidden categories and packages visible to authorized admin users.
+- Provide admin create, edit, safe delete/archive, reorder, and visibility operations under `/admin/categories`.
+- Resolve category, price-range, active-state, and sort filters server-side or through a validated shared query contract.
+- Keep services represented by the package model.
+
+### Customer Documents
+
+- Store document metadata separately from customer records.
+- Restrict upload, list, open, download, archive/delete, and recovery operations to Admin.
+- Reject Registration and public access server-side regardless of client rendering.
+- Allow PDF, JPG, JPEG, and PNG only, with a 10 MB maximum.
+- Use private object access or an equivalent production-safe download mechanism.
+- Audit material document actions.
+- Treat the storage provider and private URL strategy as a blocking deployment decision. Do not ship a local-filesystem-only production implementation. A clearly labeled local/demo adapter is acceptable only when isolated from production assumptions and safe for the current deployment setup.
+
+### Customer Visit History
+
+- Extend the admin customer detail query with the latest three visits.
+- Include check-in, check-out, derived duration, stored guest count, and package usage only when backed by existing relations.
+- Add a "View all" route or panel only if it remains simple and uses the same admin authorization boundary.
+- Do not add visit-history export in this expansion.
+
+### Advanced Freeze Architecture
+
+- Add a separate freeze record instead of encoding freeze history only in the customer-package status.
+- Add a package default freeze-chance count of three.
+- Copy that value to each newly assigned customer package as its own remaining counter.
+- Decrement the counter once per confirmed freeze and block new freezes at zero.
+- Allow only Admin to edit the assignment counter directly.
+- Do not reset counters automatically.
+- Support normal and retroactive modes; retroactive start uses the latest valid checkout when available.
+- On early reactivation, calculate the new expiration from the original expiration plus actual frozen days.
+- Save freeze creation, counter mutation, status mutation, and expiration changes in one transaction.
+- Audit creation, reactivation, administrative counter edits, and overrides.
+
+### Registration Freeze Permission
+
+- Add `allowRegistrationPackageFreeze` to persisted settings with a default of `false`.
+- Admin freeze access remains available.
+- Hide Registration freeze controls and reject Registration freeze mutations while disabled.
+- When enabled, Registration uses the same validated server workflow without receiving unrelated admin permissions.
+
+### Homepage Interaction Architecture
+
+- Implement the offer carousel with CSS and existing React/browser primitives first.
+- Support automatic rotation, manual navigation, responsive rectangular cards, package images, and a stable no-image fallback.
+- Replace the current homepage hero and provide default fallback slides when no active offers exist.
+- Add large section-navigation controls, stronger Our App emphasis, concise section previews, section links, smooth scrolling where appropriate, and scroll-to-top.
+- Preserve accessibility, reduced-motion behavior, keyboard operation, and existing public privacy rules.
+- Do not add a carousel or animation package without project-owner approval.
+
+### Final Regression and Review
+
+Phase 41 must verify all approved public, admin, registration, export, demo-data, privacy, authorization, responsive, and production-readiness behavior. It must not introduce a new Phase 42 or silently expand product scope.
+
+---
+
 ## 17. Do Not Build Yet
 
 Do not technically plan or build the following until the client confirms them in later requirements:
@@ -1388,11 +1474,9 @@ Do not technically plan or build the following until the client confirms them in
 - Revenue analytics.
 - Marketing campaign analytics.
 - Real-time WebSocket infrastructure, unless live update behavior is confirmed.
-- Detailed Prisma schema.
-- Detailed API route list.
-- Development phases.
-- Codex prompts.
-- Detailed folder structure.
+- Schema or route implementation beyond the explicitly approved phase plan.
+- Unapproved API surface or infrastructure.
+- Development work outside Phases 31-41.
 
 ---
 

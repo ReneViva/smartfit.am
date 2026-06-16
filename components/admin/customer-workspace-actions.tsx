@@ -25,6 +25,18 @@ export function CustomerWorkspaceActions() {
         Add customer note
       </Button>
       <Button
+        onClick={() => openPanel("customer-documents")}
+        variant="neutral"
+      >
+        Documents
+      </Button>
+      <Button
+        onClick={() => openPanel("customer-visits")}
+        variant="neutral"
+      >
+        Recent visits
+      </Button>
+      <Button
         onClick={() => openPanel("assign-customer-package")}
         variant="success"
       >

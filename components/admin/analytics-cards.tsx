@@ -3,14 +3,14 @@ import { Card } from "../ui/card";
 
 export function AnalyticsCards({
   currentOccupancy,
-  peakHours,
+  todayHourlyCheckIns,
   todayCheckIns,
 }: {
   currentOccupancy: number;
-  peakHours: HourlyCheckIns[];
+  todayHourlyCheckIns: HourlyCheckIns[];
   todayCheckIns: number;
 }) {
-  const topHours = peakHours.filter((hour) => hour.isPeak);
+  const topHours = todayHourlyCheckIns.filter((hour) => hour.isPeak);
   const peakValue = topHours[0]?.count ?? 0;
   const peakLabel = topHours.length
     ? topHours.map((hour) => hour.label).join(", ")

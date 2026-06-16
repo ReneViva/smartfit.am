@@ -3,17 +3,20 @@ import type { ReactNode } from "react";
 type AdminExpandableCardProps = {
   children: ReactNode;
   className?: string;
+  defaultOpen?: boolean;
   summary: ReactNode;
 };
 
 export function AdminExpandableCard({
   children,
   className = "",
+  defaultOpen = false,
   summary,
 }: AdminExpandableCardProps) {
   return (
     <details
       className={`group min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-[border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:border-brand hover:shadow-lg open:translate-y-0 open:border-brand open:shadow-lg motion-reduce:transform-none ${className}`}
+      open={defaultOpen}
     >
       <summary className="cursor-pointer list-none focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand [&::-webkit-details-marker]:hidden">
         {summary}

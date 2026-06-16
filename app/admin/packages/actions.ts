@@ -11,6 +11,22 @@ const PACKAGES_PATH = "/admin/packages";
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const PRICE_PATTERN = /^\d{1,8}(?:\.\d{1,2})?$/;
 
+function packagePath(errorOrStatus: string, id: string | null, isError = true) {
+  const params = new URLSearchParams({
+    [isError ? "error" : "status"]: errorOrStatus,
+  });
+
+  if (id) {
+    params.set("package", id);
+  }
+
+  return `${PACKAGES_PATH}?${params.toString()}${id ? `#package-${encodeURIComponent(id)}` : ""}`;
+}
+
+function redirectPackageError(error: string, id: string | null): never {
+  redirect(packagePath(error, id));
+}
+
 function optionalText(formData: FormData, name: string, maxLength: number) {
   const value = formData.get(name);
 
@@ -39,6 +55,21 @@ function nonNegativeIntegerOrZero(formData: FormData, name: string) {
   return Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+function nonNegativeIntegerOrDefault(
+  formData: FormData,
+  name: string,
+  defaultValue: number,
+) {
+  const rawValue = optionalText(formData, name, 20);
+
+  if (rawValue === null) {
+    return defaultValue;
+  }
+
+  const value = Number(rawValue);
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
 function timeLabel(startTime: string | null, endTime: string | null) {
   if (startTime && endTime) {
     return `Available ${startTime} - ${endTime}`;
@@ -58,6 +89,11 @@ export async function savePackageAction(formData: FormData) {
     formData,
     "defaultGuestPasses",
   );
+  const defaultFreezeChances = nonNegativeIntegerOrDefault(
+    formData,
+    "defaultFreezeChances",
+    3,
+  );
   const assignedCoachId = optionalText(formData, "assignedCoachId", 100);
   const hasTimeRestriction = formData.get("hasTimeRestriction") === "on";
   const rawStartTime = optionalText(formData, "allowedStartTime", 5);
@@ -67,21 +103,35 @@ export async function savePackageAction(formData: FormData) {
     "timeRestrictionLabel",
     500,
   );
+  const categoryIds = Array.from(
+    new Set(
+      formData
+        .getAll("categoryIds")
+        .filter(
+          (value): value is string =>
+            typeof value === "string" && value.length > 0 && value.length <= 100,
+        ),
+    ),
+  );
 
   if (!name || !packageType || !price) {
-    redirect(`${PACKAGES_PATH}?error=invalid-required`);
+    redirectPackageError("invalid-required", id);
   }
 
   if (!PRICE_PATTERN.test(price)) {
-    redirect(`${PACKAGES_PATH}?error=invalid-price`);
+    redirectPackageError("invalid-price", id);
   }
 
   if (sessionCount === null) {
-    redirect(`${PACKAGES_PATH}?error=invalid-sessions`);
+    redirectPackageError("invalid-sessions", id);
   }
 
   if (defaultGuestPasses === null) {
-    redirect(`${PACKAGES_PATH}?error=invalid-guest-passes`);
+    redirectPackageError("invalid-guest-passes", id);
+  }
+
+  if (defaultFreezeChances === null) {
+    redirectPackageError("invalid-freeze-chances", id);
   }
 
   if (
@@ -89,7 +139,7 @@ export async function savePackageAction(formData: FormData) {
     ((rawStartTime && !TIME_PATTERN.test(rawStartTime)) ||
       (rawEndTime && !TIME_PATTERN.test(rawEndTime)))
   ) {
-    redirect(`${PACKAGES_PATH}?error=invalid-time`);
+    redirectPackageError("invalid-time", id);
   }
 
   if (
@@ -98,25 +148,41 @@ export async function savePackageAction(formData: FormData) {
     rawEndTime &&
     rawStartTime >= rawEndTime
   ) {
-    redirect(`${PACKAGES_PATH}?error=invalid-time-order`);
+    redirectPackageError("invalid-time-order", id);
   }
 
   if (hasTimeRestriction && !rawEndTime && !rawRestrictionLabel) {
-    redirect(`${PACKAGES_PATH}?error=incomplete-restriction`);
+    redirectPackageError("incomplete-restriction", id);
   }
 
-  if (assignedCoachId) {
-    const assignedCoach = await db.coach.findFirst({
+  const [assignedCoach, assignableCategories] = await Promise.all([
+    assignedCoachId
+      ? db.coach.findFirst({
+          select: { id: true },
+          where: {
+            deletedAt: null,
+            id: assignedCoachId,
+          },
+        })
+      : null,
+    db.category.findMany({
       select: { id: true },
-      where: {
-        deletedAt: null,
-        id: assignedCoachId,
-      },
-    });
+      where: { isArchived: false },
+    }),
+  ]);
 
-    if (!assignedCoach) {
-      redirect(`${PACKAGES_PATH}?error=invalid-coach`);
-    }
+  if (assignedCoachId && !assignedCoach) {
+    redirectPackageError("invalid-coach", id);
+  }
+
+  const assignableCategoryIds = new Set(
+    assignableCategories.map((category) => category.id),
+  );
+  if (
+    (assignableCategories.length > 0 && categoryIds.length === 0) ||
+    categoryIds.some((categoryId) => !assignableCategoryIds.has(categoryId))
+  ) {
+    redirectPackageError("invalid-categories", id);
   }
 
   const allowedStartTime = hasTimeRestriction ? rawStartTime : null;
@@ -128,6 +194,7 @@ export async function savePackageAction(formData: FormData) {
     allowedEndTime,
     allowedStartTime,
     assignedCoachId,
+    defaultFreezeChances,
     defaultGuestPasses,
     description: optionalText(formData, "description", 2000),
     hasTimeRestriction,
@@ -139,10 +206,19 @@ export async function savePackageAction(formData: FormData) {
     timeRestrictionLabel: restrictionLabel,
   };
 
+  let savedPackageId: string;
+
   try {
-    await db.$transaction(async (transaction) => {
+    savedPackageId = await db.$transaction(async (transaction) => {
       if (id) {
         const existing = await transaction.package.findFirst({
+          include: {
+            categories: {
+              include: {
+                category: true,
+              },
+            },
+          },
           where: {
             deletedAt: null,
             id,
@@ -153,8 +229,29 @@ export async function savePackageAction(formData: FormData) {
           throw new Error("Package not found.");
         }
 
-        const saved = await transaction.package.update({
+        await transaction.package.update({
           data,
+          where: { id },
+        });
+        await transaction.packageCategory.deleteMany({
+          where: { packageId: id },
+        });
+        if (categoryIds.length) {
+          await transaction.packageCategory.createMany({
+            data: categoryIds.map((categoryId) => ({
+              categoryId,
+              packageId: id,
+            })),
+          });
+        }
+        const saved = await transaction.package.findUniqueOrThrow({
+          include: {
+            categories: {
+              include: {
+                category: true,
+              },
+            },
+          },
           where: { id },
         });
 
@@ -167,10 +264,24 @@ export async function savePackageAction(formData: FormData) {
           targetId: saved.id,
           targetType: "Package",
         });
-        return;
+        return saved.id;
       }
 
-      const saved = await transaction.package.create({ data });
+      const saved = await transaction.package.create({
+        data: {
+          ...data,
+          categories: {
+            create: categoryIds.map((categoryId) => ({ categoryId })),
+          },
+        },
+        include: {
+          categories: {
+            include: {
+              category: true,
+            },
+          },
+        },
+      });
 
       await writeAuditLog(transaction, {
         actionType: "PACKAGE_EDIT",
@@ -180,13 +291,15 @@ export async function savePackageAction(formData: FormData) {
         targetId: saved.id,
         targetType: "Package",
       });
+      return saved.id;
     });
   } catch {
-    redirect(`${PACKAGES_PATH}?error=unavailable`);
+    redirectPackageError("unavailable", id);
   }
 
   revalidatePath("/");
   revalidatePath("/packages");
   revalidatePath(PACKAGES_PATH);
-  redirect(`${PACKAGES_PATH}?status=saved`);
+  revalidatePath("/admin/categories");
+  redirect(packagePath("saved", savedPackageId, false));
 }

@@ -817,7 +817,7 @@ The interface should remain usable on desktop, tablet, and mobile-sized screens,
 ### Freezing and Reactivating Packages
 
 **Description:**  
-Reception staff and admin/manager users should be able to freeze and reactivate customer packages in the MVP. A frozen package cannot be used during check-in and must not be treated as active for session deduction. Every freeze and reactivation action must create an admin-visible log entry. For the MVP, freezing does not automatically extend the expiration date unless this is confirmed later.
+Admin/manager users can freeze and reactivate customer packages. Registration users can do so only when the Admin setting allows it. A frozen package cannot be used during check-in or session deduction. Every freeze and reactivation action must create an admin-visible log entry. The approved advanced workflow tracks planned and actual frozen days and recalculates expiration accordingly.
 
 **Primary Users:**  
 Receptionist/registration staff, gym admin/manager.
@@ -842,7 +842,7 @@ Receptionist/registration staff, gym admin/manager.
 **Priority:** MVP.
 
 **Notes / Assumptions:**
-Package freezing and reactivation are confirmed for the MVP. Both admin/manager users and registration/reception users can freeze and reactivate customer packages. A frozen package cannot be used during check-in and must not be treated as active for session deduction. Every freeze and reactivation action must create an admin-visible log entry. For the MVP, freezing does not automatically extend the expiration date unless this is confirmed later.
+The manually approved post-Phase 29 scope supersedes the earlier MVP-only permission and expiration assumptions during Phases 37-39. Registration freeze access becomes setting-controlled, and advanced freezes use explicit records, remaining chances, and expiration recalculation.
 
 
 ---
@@ -1109,6 +1109,125 @@ Do not include external notification sending in the MVP unless the client confir
 
 ---
 
+## 4A. Manually Approved Post-Phase 29 Expansion Requirements
+
+The project owner manually approved the following scope for documentation and future implementation. Phase 30 is documentation-only. Implementation starts in Phase 31 and proceeds sequentially through Phase 41.
+
+### 4A.1 Public and Admin Analytics Expansion
+
+The public `/our-app` page may show privacy-safe aggregate analytics below the existing occupancy experience when an admin-controlled visibility setting is enabled.
+
+Approved aggregate metrics:
+
+- Current occupancy.
+- Today's check-in count.
+- Hourly check-ins.
+- Weekly check-in trend.
+- Weekly peak hours.
+- Historical occupancy only when the source data can be derived safely and consistently.
+
+Public analytics must not expose customer names, identifiers, package assignments, individual visits, or any other personal data. The presentation must be responsive, should prefer simple bar-chart or existing chart patterns, and must be hidden when the dedicated public-analytics setting is disabled.
+
+The admin analytics experience may expose the same operational metrics without the public visibility restriction. Historical metrics must not be presented unless the implementation has a reliable data source and clearly defined aggregation rules.
+
+### 4A.2 Package Category Management
+
+Package categories become the primary public grouping and filtering system. Existing package `type` data must be preserved or migrated carefully until compatibility is confirmed.
+
+Approved category capabilities:
+
+- Many-to-many relationship between packages and categories.
+- Admin create, edit, delete/archive, reorder, and public-visibility controls.
+- Dedicated `/admin/categories` management page.
+- Hidden categories do not appear publicly.
+- A package assigned to any hidden category is hidden from public package listings.
+- Hidden categories and affected packages remain visible to authorized admin users.
+- Services continue to use the existing package model.
+
+### 4A.3 Public Package Filtering and Sorting
+
+The public packages page must show active, publicly eligible packages only.
+
+Approved controls:
+
+- Category filter.
+- Minimum and maximum price filters.
+- Price ascending and descending sorts.
+- Name sort.
+
+Controls appear above the list on mobile and in a sidebar on desktop. The page must not expose customer package data or admin-only package metadata.
+
+### 4A.4 Admin Customer Documents
+
+Authorized admin users may upload, list, open, download, delete, or archive documents on a customer record. Accepted file types are PDF, JPG, JPEG, and PNG, with a maximum size of 10 MB per file. Material document actions require audit logs.
+
+Customer documents are strictly admin-only. Registration users and public visitors must not receive document metadata, URLs, file contents, or storage access.
+
+Production-safe document storage is not yet confirmed. Before implementation, Codex must inspect existing storage patterns and configuration. If no production-safe storage approach exists, implementation must stop at the storage boundary and report the blocker instead of inventing a local-only production solution. Local/demo storage is allowed only when clearly labeled, isolated from production assumptions, and safe for the current deployment setup.
+
+### 4A.5 Customer Visit History
+
+The admin customer detail page may show:
+
+- Latest three visits.
+- Check-in and check-out timestamps.
+- Visit duration when derivable.
+- Guest count when already stored.
+- Packages used when existing data supports the relationship.
+- A "View all" path when it can be added without unnecessary complexity.
+
+Visit-history export is postponed and is not part of this approved expansion.
+
+### 4A.6 Advanced Package Freezing
+
+Advanced freezing requires a separate `PackageFreeze` record for every confirmed freeze.
+
+Business rules:
+
+- Packages default to three freeze chances.
+- Each customer package receives its own remaining freeze-chance value when assigned.
+- Each confirmed freeze decrements the assignment's remaining chances.
+- Freezing is blocked at zero remaining chances unless an admin explicitly edits the assignment.
+- Freeze chances do not reset automatically.
+- A normal freeze starts from the current eligible date.
+- A normal freeze accepts requested/planned days and calculates the planned adjusted expiration.
+- A retroactive freeze starts from the latest valid checkout when available, calculates the elapsed days through today, and uses those days for the confirmed extension.
+- Early reactivation recalculates expiration as the original expiration plus actual frozen days.
+- Freeze creation, counter updates, status changes, and expiration recalculation must be transaction-safe.
+- Material freeze actions and administrative overrides require audit logs.
+
+Planned freeze data includes the customer package, requested/planned days, actual frozen days, start date, planned end date, reactivated/actual end date, mode, status, original expiration, adjusted expiration, creator, reactivating user, timestamps, and optional administrative notes.
+
+### 4A.7 Registration Freeze Permission
+
+`allowRegistrationPackageFreeze` is an admin-controlled setting that defaults to `false`.
+
+- Admin users retain freeze access.
+- Registration users see no freeze action while disabled.
+- Server-side authorization must reject registration freeze attempts while disabled.
+- A read-only explanation may be shown when useful.
+- Enabling the setting allows Registration users to use the approved freeze workflow under the same package validation rules.
+
+### 4A.8 Homepage Redesign
+
+The homepage expansion includes:
+
+- A CSS-first 3D offer carousel.
+- Replacement of the current homepage hero with that offer carousel.
+- Automatic rotation and manual controls.
+- Responsive rectangular cards.
+- Active-offer images when available and a stable fallback when absent.
+- Default fallback slides when there are no active offers.
+- Large section-navigation buttons.
+- Stronger emphasis on the Our App section.
+- Brief section previews and links.
+- Smooth section scrolling where appropriate.
+- A scroll-to-top control.
+
+No new carousel or animation dependency may be added without project-owner approval.
+
+---
+
 ## 5. MVP Scope
 
 The MVP should focus on the first realistic working version for the client. It should include the core public website, core admin management, core reception workflow, live occupancy, basic logs, basic exports, and basic analytics.
@@ -1269,7 +1388,9 @@ The following ideas should remain separate from confirmed MVP requirements. They
 - The public user panel must not show customer names.
 - The public user panel must not show customer IDs.
 - The public user panel must not show package details of individual members.
-- The public user panel must not show internal notes, logs, or analytics.
+- The public user panel must not show internal notes, logs, private analytics, or customer-level analytics.
+- Public pages must not expose customer documents, individual visit rows, export data, analytics source rows, or staff account data.
+- Privacy-safe aggregate analytics may appear only when the dedicated admin visibility setting is enabled.
 
 ### 8.11 Package Freezing Rules
 
@@ -1439,24 +1560,29 @@ The following items should not be built in the first version unless the client e
 
 - Customer login accounts.
 - Customer self-service dashboard.
+- Customer self-service document access.
 - Online payments.
 - Ecommerce checkout for buying packages.
+- Subscription billing.
 - Native iOS or Android mobile app.
 - QR code check-in.
 - Physical membership card system.
 - Multi-branch support.
+- Multi-tenant/SaaS support.
 - Coach login/dashboard.
+- Separate Services model or subsystem.
 - Full group class registration system.
+- Group class scheduling and capacity management.
 - Waiting lists for group classes.
 - External SMS/WhatsApp/email/push notifications.
 - Loyalty or rewards system.
-- Advanced analytics beyond daily check-ins, current occupancy, and peak hours.
+- Predictive, revenue, marketing, or customer-level analytics beyond the explicitly approved aggregate operational metrics.
 - Advanced export scheduling or automated reports.
 - Public archive of old offers/promotions.
 - Complex admin override workflows.
 - Detailed permission matrix beyond admin and registration roles.
 - Automated long-stay detection unless confirmed.
-- Any feature not directly connected to the public website, live occupancy, reception workflow, package/session tracking, admin management, logs, exports, settings, or basic analytics.
+- Any feature outside the confirmed system and the manually approved Phase 31-41 expansion.
 
 ---
 

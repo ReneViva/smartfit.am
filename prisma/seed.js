@@ -79,6 +79,7 @@ async function main() {
     update: {},
     create: {
       id: "default",
+      allowRegistrationPackageFreeze: false,
       gymName: "Smartfit.am",
       occupancyGreenMax: 20,
       occupancyYellowMax: 40,

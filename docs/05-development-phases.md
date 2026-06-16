@@ -45,9 +45,10 @@ This file is the official controlled development phase plan for Smartfit.am.
 - If a feature does not fit into the approved phases, it must be placed under **Blocked / Unclear Items** instead of creating a new phase.
 - Phase 0 through Phase 15 are the completed original MVP phases.
 - Phase 16 through Phase 21 were manually added after MVP completion for confirmed Registration Panel improvements and are complete.
-- Phase 22 through Phase 29 were manually added by the project owner after Phase 21 for confirmed customer, package, guest, service, and public-offer expansion work.
+- Phase 22 through Phase 29 were manually added by the project owner after Phase 21 and are complete.
+- Phase 30 through Phase 41 were manually approved after Phase 29 for analytics, package categories and filters, customer documents and visit history, advanced freezing, Registration freeze permission, homepage redesign, and final review.
 
-**This plan now contains Phase 0 through Phase 29. Phase 22 through Phase 29 are official only because the project owner manually approved this documentation update. Codex must follow them one at a time. Do not create Phase 30 or any later phase unless this document is manually updated again.**
+**This plan now contains Phase 0 through Phase 41. Phase 30 is documentation-only. Implementation resumes with Phase 31 only after Phase 30 is completed and reviewed, then proceeds one phase at a time through the final approved Phase 41. Do not create Phase 42 or any later phase unless this document is manually updated again.**
 
 ---
 
@@ -71,9 +72,10 @@ This file is the official controlled development phase plan for Smartfit.am.
 16. Public routes must never expose private customer, package ownership, notes, logs, or staff data.
 17. Admin and Registration/Reception access must stay separated according to the uploaded requirements.
 18. Phase 15 remains the final original MVP phase.
-19. Post-MVP work must stay inside the manually approved phases, Phase 16 through Phase 29.
-20. Phases 22 through 29 must be implemented one at a time, beginning with Phase 23 after this documentation-only Phase 22.
-21. Do not create Phase 30 or any later phase without another manual documentation update.
+19. Post-MVP work must stay inside the manually approved phases, Phase 16 through Phase 41.
+20. Phase 30 is documentation-only; do not implement Phase 31 work during Phase 30.
+21. Phases 31 through 41 must be implemented one at a time.
+22. Do not create Phase 42 or any later phase without another manual documentation update.
 
 ---
 
@@ -104,18 +106,31 @@ This file is the official controlled development phase plan for Smartfit.am.
 | Phase 20 | Reception Workspace Controls and Operational Rules Display | Add reception-side view controls and read-only operational rules | Phase 19 | Complete |
 | Phase 21 | Post-MVP Registration Regression and Client Review Preparation | Verify and prepare the improved Registration Panel for client review | Phase 20 | Complete |
 | Phase 22 | Post-MVP Scope Documentation Update | Make the confirmed customer, package, guest, service, and offer expansion phases official | Phase 21 | Complete |
-| Phase 23 | Public Content Carousel for Offers and Promotions | Show multiple active homepage offers in a responsive accessible carousel | Phase 22 | Planned |
-| Phase 24 | Package Guest Allowance Data Support | Store and manage default and remaining guest allowance data | Phase 23 | Planned |
-| Phase 25 | Expanded Customer Profile Fields | Add required birth date and emergency phone to real customer registration fields | Phase 24 | Planned |
-| Phase 26 | Guest Check-In and Occupancy Integration | Record guest usage, decrement allowance, and increase occupancy by customer plus guests | Phase 25 | Planned |
-| Phase 27 | Flexible Customer Package Editing and Upgrade Workflow | Edit assigned packages safely while logging old and new values | Phase 26 | Planned |
-| Phase 28 | Services as Flexible Packages | Manage service-style offerings through the existing package system | Phase 27 | Planned |
-| Phase 29 | Customer/Package/Guest Regression, Exports, Demo Data, and Client Review | Verify the complete expansion sequence and prepare client review | Phase 28 | Planned |
+| Phase 23 | Public Content Carousel for Offers and Promotions | Show multiple active homepage offers in a responsive accessible carousel | Phase 22 | Complete |
+| Phase 24 | Package Guest Allowance Data Support | Store and manage default and remaining guest allowance data | Phase 23 | Complete |
+| Phase 25 | Expanded Customer Profile Fields | Add required birth date and emergency phone to real customer registration fields | Phase 24 | Complete |
+| Phase 26 | Guest Check-In and Occupancy Integration | Record guest usage, decrement allowance, and increase occupancy by customer plus guests | Phase 25 | Complete |
+| Phase 27 | Flexible Customer Package Editing and Upgrade Workflow | Edit assigned packages safely while logging old and new values | Phase 26 | Complete |
+| Phase 28 | Services as Flexible Packages | Manage service-style offerings through the existing package system | Phase 27 | Complete |
+| Phase 29 | Customer/Package/Guest Regression, Exports, Demo Data, and Client Review | Verify the complete expansion sequence and prepare client review | Phase 28 | Complete |
+| Phase 30 | Post-Phase 29 Scope Documentation Update | Make the newly approved analytics, package categories, customer documents, visit history, advanced freezing, Registration freeze permission, and homepage redesign phases official | Phase 29 | Planned |
+| Phase 31 | Public and Admin Analytics Expansion | Add public-safe aggregate analytics to `/our-app` and expand Admin Analytics with professional charts | Phase 30 | Planned |
+| Phase 32 | Package Category Management Foundation | Add Admin category management and prepare category data as the main package grouping system | Phase 31 | Planned |
+| Phase 33 | Package Category Assignment and Public Package Filtering | Connect packages to multiple categories and add responsive public package filters/sorting | Phase 32 | Planned |
+| Phase 34 | Customer Document Upload Storage Foundation | Add safe Admin-only customer document metadata and storage planning without guessing unsafe storage | Phase 33 | Planned |
+| Phase 35 | Admin Customer Document Upload UI | Add Admin-only customer document upload/list/download/delete UI on customer detail pages | Phase 34 | Planned |
+| Phase 36 | Customer Visit History on Admin Customer Detail | Show latest three visits and optional view-all history on Admin customer detail | Phase 35 | Planned |
+| Phase 37 | Advanced Package Freezing Data Model and Freeze Chances | Add freeze records, freeze chances, and data support for normal, retroactive, and early-reactivation freeze logic | Phase 36 | Planned |
+| Phase 38 | Advanced Admin Freeze Workflows | Implement Admin normal freeze, retroactive freeze from last checkout, early reactivation recalculation, and freeze-chance enforcement | Phase 37 | Planned |
+| Phase 39 | Registration Freeze Permission Control | Make Registration freeze/reactivation access controlled by Admin settings | Phase 38 | Planned |
+| Phase 40 | Homepage 3D Offer Carousel and Section Navigation Redesign | Fully redesign the homepage with a CSS-first 3D offer carousel, section navigation, emphasized Our App entry, and scroll-to-top behavior | Phase 39 | Planned |
+| Phase 41 | Final Regression, Exports, Demo Data, and Client Review | Verify the complete new expansion, update relevant exports/review checklist, and prepare for client review | Phase 40 | Planned |
 
 **Original MVP phases:** Phase 0 through Phase 15, complete.
 **Completed Registration improvement phases:** Phase 16 through Phase 21.
-**Manually approved customer/package/guest/offer expansion phases:** Phase 22 through Phase 29.
-**Current final approved phase:** Phase 29 — Customer/Package/Guest Regression, Exports, Demo Data, and Client Review.
+**Completed customer/package/guest/offer expansion phases:** Phase 22 through Phase 29.
+**Manually approved analytics/category/document/freeze/homepage expansion phases:** Phase 30 through Phase 41.
+**Current final approved phase:** Phase 41 - Final Regression, Exports, Demo Data, and Client Review.
 
 ---
 
@@ -1089,7 +1104,7 @@ Uses `Customer`, `CustomerPackage`, `Package`, `Coach`, `GymSettings`, `PackageS
 - Registration user can search by customer ID/code.
 - Customer card shows name, customer ID, status badge, and packages.
 - Package cards show remaining sessions, expiry date, status, and time rule.
-- Registration can freeze and reactivate customer packages.
+- Registration can freeze and reactivate customer packages under the then-current MVP rule; Phase 39 later makes this access setting-controlled.
 - Frozen packages are clearly shown on the registration customer card.
 - Manual session corrections require Save, create logs, and do not require approval/reason.
 - Sessions cannot go below zero.
@@ -1714,7 +1729,7 @@ Small bug fixes only. No new workflows.
 - Registration routes are protected.
 - Admin can manage settings, content, coaches, packages, customers, and customer packages.
 - Admin can freeze and reactivate customer packages.
-- Registration can freeze and reactivate customer packages.
+- Registration can freeze and reactivate customer packages under the then-current MVP rule; Phase 39 later makes this access setting-controlled.
 - Registration can search customers.
 - Registration customer card displays correctly.
 - Frozen packages cannot be selected or used for check-in.
@@ -2121,7 +2136,7 @@ Phase 22 — Post-MVP Scope Documentation Update.
 
 # Post-MVP Customer, Package, Guest, and Offer Expansion Phases
 
-These phases were manually added by the project owner after Phase 21. They are now official only because this documentation update is being made.
+These phases were manually added by the project owner after Phase 21 and are now complete. The controls below describe their original approved sequence.
 
 - Codex must follow Phase 22 through Phase 29 one at a time.
 - Phase 22 is documentation-only. Implementation begins in Phase 23.
@@ -2129,7 +2144,7 @@ These phases were manually added by the project owner after Phase 21. They are n
 - Package upgrades edit the existing assigned customer package and log old/new values.
 - Swimming, cardio, trainer, group-training, and similar services remain packages for now.
 - Birth date is required for new customer registration when Phase 25 is implemented.
-- No Phase 30 or later exists unless the project owner manually updates this document again.
+- At the time of Phase 22, the sequence ended at Phase 29; the later Phase 30 documentation update now supersedes that former limit.
 - Do not implement any of these phases during the Phase 22 documentation task.
 
 ---
@@ -2161,7 +2176,7 @@ Update the official project documentation so the new post-MVP customer, package,
 - Do not change database schema.
 - Do not create migrations.
 - Do not implement UI.
-- Do not create Phase 30.
+- Do not extend the then-approved sequence beyond Phase 29 during the Phase 22 task.
 
 ## Acceptance Criteria
 
@@ -2487,7 +2502,6 @@ Verify the complete customer, package, guest, service, and offer expansion and p
 ## What Codex Must Not Build
 
 - Do not add new product features.
-- Do not create Phase 30.
 - Do not add payments, customer login, QR code, or a separate services system.
 
 ## Acceptance Criteria
@@ -2500,7 +2514,937 @@ Verify the complete customer, package, guest, service, and offer expansion and p
 
 ## Next Phase
 
-None. No Phase 30 or later exists unless the project owner manually updates this document again.
+Phase 30 - Post-Phase 29 Scope Documentation Update.
+
+---
+
+# Phase 30 - Post-Phase 29 Scope Documentation Update
+
+## Goal
+
+Make the manually approved Phase 31 through Phase 41 expansion official in project documentation.
+
+## Why This Phase Exists
+
+Phase 29 completed the previous approved sequence. The new analytics, category, document, visit-history, freezing, permission, homepage, and final-review work must be documented before implementation starts.
+
+## Source Requirements Covered
+
+- Manual project-owner approval for Phases 30-41.
+- Documentation-only scope for Phase 30.
+- Sequential implementation beginning with Phase 31.
+- Phase 41 as the final approved phase.
+
+## What Codex Should Build
+
+- Update the product, technical, schema-planning, route, phase, prompt, and review-checklist documentation.
+- Record privacy, authorization, transaction, migration, storage, and dependency constraints.
+- Mark Phase 0 through Phase 29 complete.
+- Add no application behavior.
+
+## What Codex Must Not Build
+
+- Do not edit application code, Prisma schema, migrations, seed data, package metadata, or runtime configuration.
+- Do not start Phase 31.
+- Do not create Phase 42.
+
+## Suggested Files / Folders Likely Affected
+
+- `docs/01-product-requirements.md`
+- `docs/02-technical-blueprint.md`
+- `docs/03-database-schema.md`
+- `docs/04-routes-and-api.md`
+- `docs/05-development-phases.md`
+- `docs/06-codex-prompt-guide.md`
+- `docs/08-post-mvp-client-review-checklist.md`
+- `docs/07-registration-client-review-checklist.md` only if a confirmed permission rule needs clarification
+
+## Data / Database Impact
+
+Documentation only. No schema, migration, or seed change.
+
+## UI Impact
+
+None.
+
+## Backend / Logic Impact
+
+None.
+
+## Acceptance Criteria
+
+- Official documentation contains Phases 0-41.
+- Phase 30 is explicitly documentation-only.
+- Phase 31 is the next implementation phase.
+- Phase 41 is the final approved phase.
+- No code or database files changed.
+
+## Manual Verification Checklist
+
+- Review the docs-only git diff.
+- Search for obsolete statements that Phase 29 is final or that Phase 30 does not exist.
+- Confirm no Phase 42 was introduced.
+
+## Completion Definition
+
+Phase 30 is complete when the official documents consistently define Phase 30-41, the diff is documentation-only, and unresolved blockers are recorded.
+
+## Next Phase
+
+Phase 31 - Public and Admin Analytics Expansion.
+
+---
+
+# Phase 31 - Public and Admin Analytics Expansion
+
+## Goal
+
+Add responsive operational analytics for Admin and privacy-safe aggregate analytics to `/our-app`.
+
+## Why This Phase Exists
+
+The existing analytics are basic. The owner approved broader operational trends while preserving strict public privacy.
+
+## Source Requirements Covered
+
+- Current occupancy and today's check-ins.
+- Hourly check-ins, weekly check-in trend, and weekly peak hours.
+- Historical occupancy only when safely derivable.
+- Admin-controlled public analytics visibility.
+
+## What Codex Should Build
+
+- Add `showPublicAnalyticsOnOurApp`, defaulting to disabled.
+- Expand `/admin/analytics`.
+- Add the enabled public aggregate section below occupancy on `/our-app`.
+- Reuse existing cards/charts or implement simple responsive bars.
+- Define and test aggregate query boundaries.
+
+## What Codex Must Not Build
+
+- Do not expose customer-level records or identifiers publicly.
+- Do not invent historical data when the source is unreliable.
+- Do not add predictive, revenue, or marketing analytics.
+- Do not add a chart dependency without owner approval.
+
+## Suggested Files / Folders Likely Affected
+
+- Existing admin analytics route/components.
+- Existing `/our-app` route/components.
+- Settings model/form/action.
+- Shared aggregate analytics helpers and focused tests.
+
+## Data / Database Impact
+
+Add the public visibility setting through a reviewed migration. Reuse existing visit and occupancy data unless reliable historical analytics require a separately approved storage decision.
+
+## UI Impact
+
+Responsive admin analytics and an optional public section below occupancy.
+
+## Backend / Logic Impact
+
+Server-side aggregate calculations, date buckets, timezone handling, and separate public/private result contracts.
+
+## Acceptance Criteria
+
+- Approved metrics render correctly in Admin.
+- Public analytics are hidden by default and visible only when enabled.
+- Public responses contain no private data.
+- Empty and insufficient-data states are safe.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Toggle public visibility off and on.
+- Compare aggregate values with known visit data.
+- Inspect public network/rendered data for identifiers.
+- Test mobile and desktop layouts.
+
+## Completion Definition
+
+Phase 31 is complete when approved Admin/public analytics work, privacy checks, formulas, settings, tests, typecheck, and build are verified.
+
+## Next Phase
+
+Phase 32 - Package Category Management Foundation.
+
+---
+
+# Phase 32 - Package Category Management Foundation
+
+## Goal
+
+Add first-class package categories and Admin category management without breaking existing package-type behavior.
+
+## Why This Phase Exists
+
+Categories are the approved primary public grouping, but current package types and service-style packages must remain compatible during migration.
+
+## Source Requirements Covered
+
+- Many-to-many package categories.
+- Admin create, edit, archive, reorder, and visibility controls.
+- Hidden categories remain visible to Admin.
+- Services remain packages.
+
+## What Codex Should Build
+
+- Add category and package-category assignment data structures.
+- Add `/admin/categories`.
+- Add category create, edit, safe delete/archive, reorder, and visibility actions.
+- Add audit logging.
+- Preserve the existing package `type` field until compatibility is proven.
+
+## What Codex Must Not Build
+
+- Do not remove or destructively reinterpret existing package types.
+- Do not create a separate Service model.
+- Do not expose category management to Registration or public users.
+- Do not implement public filtering before Phase 33.
+
+## Suggested Files / Folders Likely Affected
+
+- Prisma schema and migration.
+- Admin categories route/components/actions.
+- Package data access and validation helpers.
+- Audit log integration and tests.
+
+## Data / Database Impact
+
+Add category and join models, indexes, ordering, visibility, and archive fields. Any backfill from package type requires an explicit compatibility strategy.
+
+## UI Impact
+
+New Admin-only category management page and package assignment preparation.
+
+## Backend / Logic Impact
+
+Admin authorization, unique naming/slug validation, stable ordering, archive safeguards, and logging.
+
+## Acceptance Criteria
+
+- Admin can create, edit, safely delete/archive, reorder, and toggle category visibility.
+- Packages can support many categories.
+- Existing packages and services continue to work.
+- Registration and public routes cannot mutate categories.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Exercise every category action.
+- Verify duplicate and invalid input handling.
+- Verify archived and hidden categories remain available to Admin.
+- Regression-test existing package management.
+
+## Completion Definition
+
+Phase 32 is complete when category management, many-to-many data, compatibility, logging, migration/backfill, typecheck, and build are verified.
+
+## Next Phase
+
+Phase 33 - Package Category Assignment and Public Package Filtering.
+
+---
+
+# Phase 33 - Package Category Assignment and Public Package Filtering
+
+## Goal
+
+Assign categories to packages and add approved public package filtering, sorting, and visibility behavior.
+
+## Why This Phase Exists
+
+Visitors need practical package discovery, and category visibility must consistently control public eligibility.
+
+## Source Requirements Covered
+
+- Category, minimum price, and maximum price filters.
+- Price ascending, price descending, and name sorts.
+- Mobile top controls and desktop sidebar.
+- Active packages only.
+- Any hidden assigned category hides the package publicly.
+
+## What Codex Should Build
+
+- Add category assignment controls to Admin package management.
+- Add validated filters and sorts to `/packages`.
+- Enforce active and category visibility rules in the public query.
+- Preserve clean empty states and shareable query parameters where practical.
+
+## What Codex Must Not Build
+
+- Do not expose customer package data.
+- Do not show hidden categories or affected packages publicly.
+- Do not change service data into a separate system.
+- Do not remove legacy type support prematurely.
+
+## Suggested Files / Folders Likely Affected
+
+- Public packages route/components.
+- Admin package forms/actions.
+- Package query and category eligibility helpers.
+- Responsive styles and tests.
+
+## Data / Database Impact
+
+Use Phase 32 models. Add only indexes proven necessary by the final query.
+
+## UI Impact
+
+Desktop sidebar filters and mobile top controls; Admin category assignment UI.
+
+## Backend / Logic Impact
+
+Validated price/category/sort input and one shared public eligibility rule.
+
+## Acceptance Criteria
+
+- Filters and sorts produce correct active package results.
+- A package assigned to any hidden category is absent publicly.
+- Admin still sees hidden categories and affected packages.
+- Mobile and desktop controls work.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Test every sort and price boundary.
+- Test packages with zero, one, multiple, hidden, archived, and visible categories.
+- Test query reloads and empty results.
+- Confirm no private package ownership data is present.
+
+## Completion Definition
+
+Phase 33 is complete when assignment, filtering, sorting, hidden-category eligibility, responsive behavior, privacy, typecheck, and build are verified.
+
+## Next Phase
+
+Phase 34 - Customer Document Upload Storage Foundation.
+
+---
+
+# Phase 34 - Customer Document Upload Storage Foundation
+
+## Goal
+
+Establish a production-safe, private storage and metadata foundation for Admin customer documents.
+
+## Why This Phase Exists
+
+Document UI cannot be built safely until storage, authorization, download, retention, and deployment behavior are confirmed.
+
+## Source Requirements Covered
+
+- Admin-only PDF, JPG, JPEG, and PNG files.
+- Maximum 10 MB per file.
+- Upload, list, open, download, archive/delete, and logs.
+- No Registration or public access.
+
+## What Codex Should Build
+
+- Inspect existing storage code, environment configuration, hosting assumptions, and private-file patterns first.
+- If a production-safe approach exists, add document metadata, provider integration, validation, authorization, and audit foundations.
+- Use private object keys and authorized download handling.
+- Document retention and archive/delete behavior.
+- Allow a clearly labeled local/demo adapter only when isolated from production assumptions and safe for the current deployment setup.
+
+## What Codex Must Not Build
+
+- Do not use a local development filesystem as an assumed production solution.
+- Do not create public object URLs.
+- Do not expose metadata or storage access to Registration.
+- Do not continue to Phase 35 if storage is unresolved.
+
+## Suggested Files / Folders Likely Affected
+
+- Existing storage/provider adapters.
+- Prisma schema and migration.
+- Admin-only document service/actions.
+- Environment example only when a confirmed provider requires it.
+- Focused authorization and validation tests.
+
+## Data / Database Impact
+
+Add document metadata only after storage design approval. Include customer, private storage key, filename, MIME type, size, status, actor, and timestamps.
+
+## UI Impact
+
+No full upload UI; only minimal infrastructure test surfaces if required.
+
+## Backend / Logic Impact
+
+Private upload/download authorization, file validation, provider failure handling, and audit logging.
+
+## Acceptance Criteria
+
+- A production-safe private storage path is confirmed and documented, or the phase stops with a clear blocker.
+- Allowed types and 10 MB limit are enforced server-side.
+- Registration and public access are rejected.
+- Metadata and storage operations fail safely.
+- Typecheck and build pass when implementation proceeds.
+
+## Manual Verification Checklist
+
+- Test valid and invalid files.
+- Test size limits and spoofed MIME/extension combinations.
+- Test Admin, Registration, unauthenticated, and public access.
+- Test provider failure and orphan-cleanup behavior.
+
+## Completion Definition
+
+Phase 34 is complete only when a production-safe private storage foundation, metadata, authorization, validation, logs, deployment requirements, typecheck, and build are verified. If storage is unresolved, report the phase as blocked.
+
+## Next Phase
+
+Phase 35 - Admin Customer Document Upload UI, only after Phase 34 is safely complete.
+
+---
+
+# Phase 35 - Admin Customer Document Upload UI
+
+## Goal
+
+Add the Admin-only customer document management experience using the Phase 34 storage foundation.
+
+## Why This Phase Exists
+
+Admins need a practical customer-detail workflow for private documents after the storage boundary is safe.
+
+## Source Requirements Covered
+
+- Upload and list documents.
+- Open and download documents.
+- Delete or archive documents.
+- Admin-only access and logs.
+
+## What Codex Should Build
+
+- Add a documents section to the Admin customer detail.
+- Add upload progress/error states where supported.
+- List filename, type, size, status, date, and relevant actor.
+- Add authorized open/download and confirmed archive/delete actions.
+- Keep destructive actions explicit.
+
+## What Codex Must Not Build
+
+- Do not expose document UI or data to Registration.
+- Do not add customer self-service.
+- Do not bypass the Phase 34 provider/service.
+- Do not invent physical deletion if archive/retention is the confirmed behavior.
+
+## Suggested Files / Folders Likely Affected
+
+- Admin customer detail route/components.
+- Document forms/actions/download handler.
+- Existing admin UI primitives.
+- Authorization and interaction tests.
+
+## Data / Database Impact
+
+Use the Phase 34 model. Add no unrelated customer fields.
+
+## UI Impact
+
+Admin-only document panel with responsive list and clear file actions.
+
+## Backend / Logic Impact
+
+All actions reauthorize Admin access and resolve private files server-side.
+
+## Acceptance Criteria
+
+- Admin can complete every approved document action.
+- Invalid files show safe errors.
+- Registration and public access are denied.
+- Actions are logged.
+- Mobile and desktop layouts work.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Upload each allowed type and reject disallowed/oversized files.
+- Open, download, archive/delete, and refresh.
+- Attempt direct URLs with non-admin sessions.
+- Test missing provider object and metadata mismatch states.
+
+## Completion Definition
+
+Phase 35 is complete when all approved Admin document UI actions, access separation, retention behavior, provider integration, logs, typecheck, and build are verified.
+
+## Next Phase
+
+Phase 36 - Customer Visit History on Admin Customer Detail.
+
+---
+
+# Phase 36 - Customer Visit History on Admin Customer Detail
+
+## Goal
+
+Show useful recent visit context on the Admin customer detail page.
+
+## Why This Phase Exists
+
+Admins need quick operational history without opening raw logs or adding a broad reporting system.
+
+## Source Requirements Covered
+
+- Latest three visits.
+- Check-in, check-out, and duration.
+- Guest count if stored.
+- Packages used when supported.
+- Simple "View all" option.
+
+## What Codex Should Build
+
+- Query and display the latest three visits.
+- Derive duration safely.
+- Include guest count and package usage only when existing data supports them.
+- Add a simple Admin-only full-history view when it fits current routing patterns.
+
+## What Codex Must Not Build
+
+- Do not expose visit history to public or Registration routes.
+- Do not add visit-history export.
+- Do not invent package usage or guest data that was not stored.
+- Do not create a new reporting subsystem.
+
+## Suggested Files / Folders Likely Affected
+
+- Admin customer detail query/components.
+- Optional nested history route or simple panel.
+- Date/duration formatting helpers and tests.
+
+## Data / Database Impact
+
+Prefer existing `GymVisit` and usage relations. Add no model unless a proven missing relation blocks an approved field.
+
+## UI Impact
+
+Responsive recent-visits section with clear empty and open-visit states.
+
+## Backend / Logic Impact
+
+Admin-only query, stable ordering, duration calculation, and bounded result size.
+
+## Acceptance Criteria
+
+- Latest three visits are correct.
+- Open visits and missing optional data render safely.
+- Full history, if added, remains Admin-only and simple.
+- No export is added.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Test no visits, one visit, more than three visits, and an open visit.
+- Compare duration and package usage with source records.
+- Verify role protection.
+- Test mobile and desktop.
+
+## Completion Definition
+
+Phase 36 is complete when recent visit history and supported optional fields are correct, Admin-only, responsive, tested, and pass typecheck/build.
+
+## Next Phase
+
+Phase 37 - Advanced Package Freezing Data Model and Freeze Chances.
+
+---
+
+# Phase 37 - Advanced Package Freezing Data Model and Freeze Chances
+
+## Goal
+
+Add explicit freeze history and assignment-level freeze chances without changing the operational workflow yet.
+
+## Why This Phase Exists
+
+The current status-only freeze handling cannot reliably support retroactive dates, early reactivation, counters, or audit history.
+
+## Source Requirements Covered
+
+- Separate `PackageFreeze` records.
+- Package default of three chances.
+- Customer-package remaining chances.
+- Planned/requested days and actual frozen days.
+- Decrement per confirmed freeze.
+- No automatic reset.
+- Admin-editable assignment counter.
+
+## What Codex Should Build
+
+- Add package default and customer-package remaining fields.
+- Add the freeze model, enums, relations, indexes, and constraints.
+- Define safe backfills for existing packages and assignments.
+- Add Admin-only counter editing with audit logs.
+- Preserve existing freeze behavior until Phase 38 switches the workflow.
+
+## What Codex Must Not Build
+
+- Do not reset chances automatically.
+- Do not allow negative counters.
+- Do not expose direct counter edits to Registration.
+- Do not partially switch production freeze behavior before Phase 38.
+
+## Suggested Files / Folders Likely Affected
+
+- Prisma schema and migration.
+- Package/customer-package admin forms/actions.
+- Freeze domain helpers and tests.
+- Audit log integration.
+
+## Data / Database Impact
+
+Add `defaultFreezeChances`, `remainingFreezeChances`, `PackageFreeze`, enums, indexes, and a documented backfill.
+
+## UI Impact
+
+Admin package default and assignment counter fields only; no advanced workflow UI yet.
+
+## Backend / Logic Impact
+
+Non-negative validation, safe defaults, existing-row backfill, and audited Admin edits.
+
+## Acceptance Criteria
+
+- Existing data migrates safely.
+- New assignments copy the package default.
+- Admin can edit assignment chances with a log.
+- Registration cannot edit chances.
+- Existing check-in/freeze behavior does not regress.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Migrate representative existing data.
+- Create packages and assignments with default and custom values.
+- Test zero and invalid counters.
+- Review audit logs and rollback behavior.
+
+## Completion Definition
+
+Phase 37 is complete when models, fields, constraints, backfills, Admin counter edits, logs, compatibility, typecheck, and build are verified.
+
+## Next Phase
+
+Phase 38 - Advanced Admin Freeze Workflows.
+
+---
+
+# Phase 38 - Advanced Admin Freeze Workflows
+
+## Goal
+
+Implement transaction-safe normal, retroactive, and early-reactivation workflows for Admin.
+
+## Why This Phase Exists
+
+The approved date and chance rules must be proven in an Admin-only workflow before Registration access can be considered.
+
+## Source Requirements Covered
+
+- Normal freeze.
+- Retroactive start from latest checkout.
+- Planned and actual end dates.
+- Early reactivation.
+- Original expiration plus actual frozen days.
+- Transactional updates and logs.
+
+## What Codex Should Build
+
+- Add Admin freeze and reactivation UI.
+- Validate eligibility and remaining chances.
+- Accept requested/planned days for a normal freeze and calculate its planned extension.
+- Resolve retroactive start from the latest valid checkout and calculate elapsed days through today.
+- Create freeze record, decrement chances, change status, and log atomically.
+- Reactivate using actual frozen days and update resulting expiration atomically.
+- Handle stale/concurrent requests safely.
+
+## What Codex Must Not Build
+
+- Do not grant Registration access yet.
+- Do not freeze when chances are zero.
+- Do not reset chances on renewal/reactivation.
+- Do not guess a retroactive start when no valid checkout exists; show a safe validation path.
+
+## Suggested Files / Folders Likely Affected
+
+- Admin customer package components/actions.
+- Freeze transaction/domain service.
+- Date calculation helpers.
+- Concurrency and workflow tests.
+
+## Data / Database Impact
+
+Use Phase 37 models. Store every confirmed freeze and reactivation result.
+
+## UI Impact
+
+Admin dialogs/forms for mode, dates, chance visibility, notes, and reactivation.
+
+## Backend / Logic Impact
+
+Transactional state changes, date arithmetic, authorization, idempotency/concurrency protection, and audit logs.
+
+## Acceptance Criteria
+
+- Normal and retroactive freezes work.
+- Each confirmed freeze decrements once.
+- Zero chances block the action.
+- Early reactivation calculates expiration from actual frozen days.
+- Duplicate active freezes are prevented.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Test normal, retroactive, planned-end, early, and on-time reactivation.
+- Test no latest checkout, zero chances, stale forms, and repeated submits.
+- Verify exact database and log results.
+- Regression-test check-in blocking for frozen packages.
+
+## Completion Definition
+
+Phase 38 is complete when normal, retroactive, and early-reactivation Admin workflows are transaction-safe, logged, edge-tested, and pass typecheck/build.
+
+## Next Phase
+
+Phase 39 - Registration Freeze Permission Control.
+
+---
+
+# Phase 39 - Registration Freeze Permission Control
+
+## Goal
+
+Allow Admin to control whether Registration can use the advanced freeze workflow.
+
+## Why This Phase Exists
+
+Registration freeze access is operationally sensitive and must be disabled by default with server-side enforcement.
+
+## Source Requirements Covered
+
+- `allowRegistrationPackageFreeze`, default false.
+- Admin freeze access always remains.
+- Hidden Registration UI and blocked server action while disabled.
+- Optional read-only explanation.
+
+## What Codex Should Build
+
+- Add the setting to Admin settings.
+- Hide Registration freeze/reactivation controls while disabled.
+- Reject Registration freeze/reactivation mutations server-side while disabled.
+- Reuse the Phase 38 workflow when enabled.
+- Optionally show a concise read-only explanation.
+
+## What Codex Must Not Build
+
+- Do not rely only on hidden buttons.
+- Do not grant Registration direct chance-edit permissions.
+- Do not weaken Admin access.
+- Do not expose unrelated Admin settings to Registration.
+
+## Suggested Files / Folders Likely Affected
+
+- Admin settings form/action.
+- Registration customer workspace.
+- Shared freeze authorization helper.
+- Permission and integration tests.
+
+## Data / Database Impact
+
+Add or use the approved `allowRegistrationPackageFreeze` settings field with default false and migration-safe existing-row behavior.
+
+## UI Impact
+
+Admin toggle and conditional Registration controls/explanation.
+
+## Backend / Logic Impact
+
+Role plus current-setting checks on every Registration freeze and reactivation request.
+
+## Acceptance Criteria
+
+- Default is disabled.
+- Disabled Registration UI is absent and direct requests fail.
+- Enabled Registration workflow works under the same validation rules.
+- Admin workflow works in both setting states.
+- Setting changes are logged.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Test Admin and Registration with setting off and on.
+- Attempt direct/stale requests after disabling.
+- Verify chance counts, dates, and logs.
+- Confirm Registration cannot edit counters.
+
+## Completion Definition
+
+Phase 39 is complete when disabled and enabled Registration behavior, server authorization, Admin continuity, logs, typecheck, and build are verified.
+
+## Next Phase
+
+Phase 40 - Homepage 3D Offer Carousel and Section Navigation Redesign.
+
+---
+
+# Phase 40 - Homepage 3D Offer Carousel and Section Navigation Redesign
+
+## Goal
+
+Improve homepage offer presentation and section navigation without changing public business logic.
+
+## Why This Phase Exists
+
+The owner approved a more visible, interactive public homepage after the operational work is stable.
+
+## Source Requirements Covered
+
+- CSS-first 3D offer carousel.
+- Automatic and manual controls.
+- Responsive rectangular cards.
+- Image and no-image fallback.
+- Large section buttons, stronger Our App emphasis, section previews/links, and scroll-to-top.
+
+## What Codex Should Build
+
+- Redesign the existing offer carousel with CSS and current primitives.
+- Replace the current homepage hero and provide default fallback slides when no active offers exist.
+- Preserve content ordering and active/public rules.
+- Add automatic rotation, manual navigation, keyboard support, and reduced-motion behavior.
+- Add large section navigation and scroll-to-top.
+- Keep concise previews and useful links.
+
+## What Codex Must Not Build
+
+- Do not add a dependency without owner approval.
+- Do not change navbar, authentication, package, analytics, or content business rules.
+- Do not expose private data.
+- Do not make essential content inaccessible without animation.
+
+## Suggested Files / Folders Likely Affected
+
+- Homepage route/components.
+- Existing public content carousel.
+- Global/component styles.
+- Accessibility and responsive tests.
+
+## Data / Database Impact
+
+None unless the existing package/content image relation already supports the approved visuals. Do not add speculative media fields.
+
+## UI Impact
+
+Homepage-only responsive carousel, navigation buttons, previews, Our App emphasis, and scroll-to-top.
+
+## Backend / Logic Impact
+
+Minimal client interaction state; reuse existing public content queries and visibility rules.
+
+## Acceptance Criteria
+
+- Carousel works automatically and manually.
+- Cards remain visible and uncropped with image fallbacks.
+- Keyboard and reduced-motion behavior are acceptable.
+- Section navigation and scroll-to-top work.
+- Mobile and desktop layouts work.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Test zero, one, and many offers with and without images.
+- Test autoplay, controls, keyboard, focus, reduced motion, and resize.
+- Test all section links and scroll-to-top.
+- Regression-test public privacy and existing navigation.
+
+## Completion Definition
+
+Phase 40 is complete when carousel, fallbacks, navigation, accessibility, responsive behavior, privacy regression, typecheck, and build are verified.
+
+## Next Phase
+
+Phase 41 - Final Regression, Exports, Demo Data, and Client Review.
+
+---
+
+# Phase 41 - Final Regression, Exports, Demo Data, and Client Review
+
+## Goal
+
+Verify the complete Phase 31-40 expansion and prepare a reliable client-review build.
+
+## Why This Phase Exists
+
+Cross-feature privacy, authorization, migration, export, demo-data, responsive, and deployment behavior must be reviewed together before handoff.
+
+## Source Requirements Covered
+
+- Final regression.
+- Export updates for implemented fields where approved.
+- Demo data updates.
+- Client review preparation.
+- Phase 41 as the final approved phase.
+
+## What Codex Should Build
+
+- Fix defects found while testing approved Phase 31-40 behavior.
+- Update relevant exports and demo data for implemented fields.
+- Update review documentation.
+- Verify storage/deployment requirements.
+- Run focused tests, typecheck, and production build.
+
+## What Codex Must Not Build
+
+- Do not add new product features.
+- Do not add postponed visit-history export.
+- Do not invent unresolved storage infrastructure.
+- Do not create Phase 42.
+
+## Suggested Files / Folders Likely Affected
+
+- Existing tests and affected feature files only.
+- Export builders.
+- Demo seed/data.
+- README and client review checklists where needed.
+
+## Data / Database Impact
+
+No new model by default. Apply only fixes required for the approved phases and verify migrations/backfills on representative data.
+
+## UI Impact
+
+Regression fixes only across public, Admin, and Registration areas.
+
+## Backend / Logic Impact
+
+Regression fixes only, with special review of privacy, authorization, transactions, exports, and storage.
+
+## Acceptance Criteria
+
+- Phase 31-40 acceptance criteria pass.
+- Public routes expose no private/customer document data.
+- Registration freeze permission is enforced server-side.
+- Category visibility and filters are consistent.
+- Freeze counters and date calculations are correct.
+- Exports and demo data match implemented scope.
+- Typecheck and build pass.
+
+## Manual Verification Checklist
+
+- Complete the post-MVP client review checklist.
+- Test representative Admin, Registration, public, responsive, and failure-state flows.
+- Inspect exports and seeded/demo records.
+- Verify production environment requirements, especially private document storage.
+
+## Completion Definition
+
+Phase 41 is complete when the full approved expansion, exports, demo data, review checklist, production requirements, typecheck, build, and client-review readiness are verified.
+
+## Next Phase
+
+None. Phase 41 is the final approved phase. No Phase 42 exists.
 
 ---
 
@@ -2535,6 +3479,18 @@ None. No Phase 30 or later exists unless the project owner manually updates this
 - Phase 27 depends on Phase 26 because flexible assigned-package editing must preserve the final guest-allowance behavior.
 - Phase 28 depends on Phase 27 because service-style package assignment should reuse the flexible package editing workflow.
 - Phase 29 depends on Phases 23 through 28 because it verifies the complete expansion sequence.
+- Phase 30 depends on completed Phase 29 because the next scope must be documented before implementation.
+- Phase 31 depends on Phase 30 because analytics privacy, settings, and data-source rules must be official first.
+- Phase 32 depends on Phase 31 and introduces category data before public package behavior changes.
+- Phase 33 depends on Phase 32 because filtering and visibility require category management and assignments.
+- Phase 34 depends on Phase 33 and must confirm production-safe private storage before document UI work.
+- Phase 35 depends on a safely completed Phase 34 storage foundation.
+- Phase 36 depends on Phase 35 because it expands the same Admin customer detail surface after document work is stable.
+- Phase 37 depends on Phase 36 and introduces advanced freeze data before workflow changes.
+- Phase 38 depends on Phase 37 because advanced Admin workflows require freeze records and counters.
+- Phase 39 depends on Phase 38 because Registration may reuse the workflow only after Admin behavior is proven.
+- Phase 40 depends on Phase 39 and keeps the public redesign separate from operational permission work.
+- Phase 41 depends on Phases 31 through 40 because it verifies the full approved expansion.
 
 Specific business workflow dependencies:
 
@@ -2544,6 +3500,8 @@ Specific business workflow dependencies:
 - Analytics depends on visit records and occupancy records.
 - Excel export depends on customer, package, coach, visit, public content, note, and log data.
 - Admin logs depend on server-side logging being added during earlier admin and registration actions.
+- Customer document UI depends on a production-safe private storage provider and authorized download strategy.
+- Advanced freezing depends on transactional counter, status, date, and audit updates.
 
 ---
 
@@ -2621,13 +3579,25 @@ Codex should also follow these rules:
 | Phase 20 — Reception Workspace Controls and Operational Rules Display | Complete |  | Completed post-MVP Registration phase |
 | Phase 21 — Post-MVP Registration Regression and Client Review Preparation | Complete |  | Completed Registration improvement phase |
 | Phase 22 — Post-MVP Scope Documentation Update | Complete |  | Documentation-only expansion approval |
-| Phase 23 — Public Content Carousel for Offers and Promotions | Not Started |  | First implementation phase in expansion sequence |
-| Phase 24 — Package Guest Allowance Data Support | Not Started |  | Data support only; no occupancy changes |
-| Phase 25 — Expanded Customer Profile Fields | Not Started |  | Birth date required for new registrations |
-| Phase 26 — Guest Check-In and Occupancy Integration | Not Started |  | Operational guest usage and occupancy |
-| Phase 27 — Flexible Customer Package Editing and Upgrade Workflow | Not Started |  | Existing assignment edits with old/new logs |
-| Phase 28 — Services as Flexible Packages | Not Started |  | Reuse Package and CustomerPackage |
-| Phase 29 — Customer/Package/Guest Regression, Exports, Demo Data, and Client Review | Not Started |  | Current final approved phase |
+| Phase 23 — Public Content Carousel for Offers and Promotions | Complete |  | Completed expansion phase |
+| Phase 24 — Package Guest Allowance Data Support | Complete |  | Completed expansion phase |
+| Phase 25 — Expanded Customer Profile Fields | Complete |  | Completed expansion phase |
+| Phase 26 — Guest Check-In and Occupancy Integration | Complete |  | Completed expansion phase |
+| Phase 27 — Flexible Customer Package Editing and Upgrade Workflow | Complete |  | Completed expansion phase |
+| Phase 28 — Services as Flexible Packages | Complete |  | Completed expansion phase |
+| Phase 29 — Customer/Package/Guest Regression, Exports, Demo Data, and Client Review | Complete |  | Completed previous final review |
+| Phase 30 — Post-Phase 29 Scope Documentation Update | Planned |  | Documentation only |
+| Phase 31 — Public and Admin Analytics Expansion | Not Started |  | Next implementation phase |
+| Phase 32 — Package Category Management Foundation | Not Started |  | Category data and Admin management |
+| Phase 33 — Package Category Assignment and Public Package Filtering | Not Started |  | Public eligibility, filters, and sorting |
+| Phase 34 — Customer Document Upload Storage Foundation | Not Started |  | Blocked until production-safe storage is confirmed |
+| Phase 35 — Admin Customer Document Upload UI | Not Started |  | Depends on completed storage foundation |
+| Phase 36 — Customer Visit History on Admin Customer Detail | Not Started |  | Admin-only recent visit context |
+| Phase 37 — Advanced Package Freezing Data Model and Freeze Chances | Not Started |  | Freeze history and counters |
+| Phase 38 — Advanced Admin Freeze Workflows | Not Started |  | Admin normal/retroactive/reactivation workflow |
+| Phase 39 — Registration Freeze Permission Control | Not Started |  | Default-disabled permission |
+| Phase 40 — Homepage 3D Offer Carousel and Section Navigation Redesign | Not Started |  | Public presentation redesign |
+| Phase 41 — Final Regression, Exports, Demo Data, and Client Review | Not Started |  | Final approved phase |
 
 ---
 
@@ -2639,10 +3609,10 @@ The following items should not be forced into implementation phases until confir
 2. Whether Gallery images are uploaded through Admin Panel or provided as external URLs.
 3. Whether reception staff can delete notes or only create/edit them.
 4. Whether note edits/deletions must create separate logs.
-5. Whether REGISTRATION staff are permitted to freeze/reactivate packages in Phase 19.
-6. Whether package freezing extends expiration date.
-7. Who can freeze/reactivate packages: admin, reception, or both.
-8. Whether package reactivation and renewal are the same workflow or separate workflows.
+5. Which production-safe private storage provider should hold customer documents.
+6. Whether customer document removal means archive, provider-object deletion, or both, including retention requirements.
+7. Which authorized private-download or signed-access strategy matches the production host.
+8. Exact timezone and date-boundary conventions for advanced freeze duration calculations.
 9. Whether admin override is allowed for time-restricted packages.
 10. Whether admin override is allowed for expired packages or zero-session packages.
 11. Whether manual occupancy changes require admin password/approval.
@@ -2657,12 +3627,12 @@ The following items should not be forced into implementation phases until confir
 20. Whether media upload endpoint should exist.
 21. Exact export filters and file naming rules.
 22. Whether export history should be stored.
-23. Exact analytics formulas beyond current occupancy, daily check-ins, and peak hours.
+23. Exact analytics bucket formulas and whether reliable historical occupancy can be derived from existing records.
 24. Whether admin can access `/registration` as a receptionist.
 25. Whether public coach contact information should be shown or kept admin-only.
-26. Whether reception staff should ever be allowed to edit true system settings; this requires a separate permission decision and is not part of any approved phase.
+26. Whether reception staff should ever be allowed to edit true system settings; Phase 39 grants no settings-edit access.
 
-These unclear items must not create additional phases beyond the manually approved Phase 16 through Phase 29 sequence. Any Phase 30 or later requires another manual update to this document.
+These unclear items must be resolved inside their approved phase or reported as blockers. They must not create additional phases beyond Phase 41. Any Phase 42 or later requires another manual update to this document.
 
 ---
 
@@ -2699,13 +3669,13 @@ The following features are not included in the current MVP phase plan because th
 - Marketing campaign analytics.
 - Complex admin override workflows.
 - Real-time WebSocket infrastructure unless live update behavior is confirmed.
-- Any route, API, model, dashboard, or workflow not directly connected to the confirmed public website, Our App/live occupancy page, Admin Panel, Registration Panel, customer/package/coach management, check-in/check-out, session tracking, occupancy tracking, notes, logs, exports, settings, and basic analytics.
+- Any route, API, model, dashboard, or workflow outside the confirmed system and manually approved Phase 31-41 scope.
 
 ---
 
 ## 11. Final Completion Definition
 
-The Smartfit.am MVP is complete because all original fixed phases from Phase 0 through Phase 15 have been completed and verified. Phase 16 through Phase 21 are completed post-MVP Registration Panel improvements. Phase 22 through Phase 29 are the official manually approved expansion sequence.
+The Smartfit.am MVP and all approved work through Phase 29 are complete. Phase 30 through Phase 41 are the next manually approved sequence, with Phase 30 reserved for documentation and Phase 31 as the first implementation phase.
 
 The final MVP must satisfy these completion points:
 
@@ -2742,6 +3712,13 @@ The final MVP must satisfy these completion points:
 - The project builds successfully.
 - Deployment preparation is complete.
 - No unconfirmed feature has been accidentally added.
-- No unapproved phase beyond Phase 29 has been created.
+- Public aggregate analytics remain setting-controlled and privacy-safe.
+- Package category visibility consistently controls public package eligibility.
+- Customer documents remain Admin-only and use production-safe private storage.
+- Customer visit history remains Admin-only and uses stored data only.
+- Advanced freeze chances, transactions, dates, and logs follow the approved rules.
+- Registration freeze access defaults to disabled and is enforced server-side.
+- Homepage redesign preserves existing public business logic and accessibility.
+- No unapproved phase beyond Phase 41 has been created.
 
-**Final rule:** Phase 0 through Phase 15 remain the completed original MVP. Phase 16 through Phase 21 are completed post-MVP Registration improvement phases. Phase 22 through Phase 29 are the manually approved customer/package/guest/offer expansion sequence. No Phase 30 or later exists unless the project owner manually updates this document again.
+**Final rule:** Phase 0 through Phase 29 are complete. Phase 30 through Phase 41 are the manually approved next sequence. Phase 30 is documentation-only, implementation begins with Phase 31, and Phase 41 is final. No Phase 42 or later exists unless the project owner manually updates this document again.

@@ -856,7 +856,7 @@ Registration / Reception staff. Admin may also access if the client wants admin 
 
 ### Confirmed / Unclear
 
-Confirmed. Registration staff can freeze and reactivate customer packages in the MVP. Note deletion permissions and advanced freeze expiration-extension rules remain unclear.
+Confirmed for the MVP. In Phases 37-39, advanced freeze rules apply and Registration freeze access is controlled by an admin setting that defaults to disabled.
 
 ---
 
@@ -1683,13 +1683,17 @@ Freeze a customer package so it is not treated as active for session usage.
 
 ### Permission Requirement
 
-Admin users and Registration / Reception staff.
+Admin users always. Registration / Reception staff only when `allowRegistrationPackageFreeze` is enabled.
 
 ### Validation Rules
 
 - Customer package must exist.
-- Package must be eligible to freeze based on final client rule.
+- Package must be eligible under the advanced freeze rules.
+- Remaining freeze chances must be greater than zero.
+- Registration requests must be rejected when the permission setting is disabled.
 - Frozen packages should not be treated as active.
+- Normal or retroactive effective dates must be validated.
+- Freeze record creation, chance decrement, status change, expiration context, and audit logging must be transactional.
 
 ### Log Requirement
 
@@ -1697,7 +1701,7 @@ Yes. Freeze actions must be logged.
 
 ### Confirmed / Unclear
 
-Confirmed for MVP. Both admin/manager users and registration/reception users can freeze customer packages. Frozen packages cannot be used for check-in or session deduction. Expiration-date extension is not included unless later confirmed.
+Confirmed for MVP and expanded for Phases 37-39. Advanced freezing uses explicit freeze history, remaining chances, normal or retroactive dates, transactional updates, and setting-controlled Registration access.
 
 ---
 
@@ -1726,12 +1730,15 @@ Reactivate or renew a frozen/inactive/expired customer package where allowed.
 
 ### Permission Requirement
 
-Admin users and Registration / Reception staff.
+Admin users always. Registration / Reception staff only when `allowRegistrationPackageFreeze` is enabled.
 
 ### Validation Rules
 
 - Customer package must exist.
-- Reactivation/renewal behavior must follow final client rule.
+- An active freeze record must exist for advanced reactivation.
+- Registration requests must be rejected when the permission setting is disabled.
+- Early reactivation must calculate actual frozen days and resulting expiration deterministically.
+- Freeze, customer-package, and audit updates must be transactional.
 
 ### Log Requirement
 
@@ -1739,7 +1746,7 @@ Yes. Reactivation or renewal behavior should be clearly logged.
 
 ### Confirmed / Unclear
 
-Confirmed for MVP. Both admin/manager users and registration/reception users can reactivate frozen customer packages. Reactivation must be logged.
+Confirmed for MVP and expanded for Phases 37-39. Advanced reactivation records actual end date, recalculates expiration from actual frozen days, and requires setting-controlled Registration access.
 
 ---
 
@@ -2015,6 +2022,7 @@ Public routes and public API routes may expose only general Smartfit.am informat
 - Map/location link.
 - Working days and working hours.
 - Public live occupancy count.
+- Privacy-safe aggregate occupancy and attendance analytics when enabled by admin.
 - Crowd color/status based on admin thresholds.
 - Motivational text if enabled.
 - Public app display links enabled by admin settings.
@@ -2032,16 +2040,19 @@ Public routes and public API routes may expose only general Smartfit.am informat
 - Customer current status as individual records.
 - Check-in/check-out logs.
 - Visit records.
+- Analytics source rows or individual visit rows.
 - Notes.
 - Audit logs.
+- Export files or export result data.
 - Staff/admin account data.
 - Internal database IDs for private records.
 - Admin settings that are not meant for public display.
 - Analytics that reveal private customer behavior.
+- Customer document metadata, storage keys, URLs, or file contents.
 
 ### Confirmed / Unclear
 
-Confirmed. The uploaded requirements explicitly state that the public user panel must show only general gym information and live occupancy count, not private customer data.
+Confirmed and expanded. Public routes may show only general gym information, live occupancy, and approved aggregate analytics. They must not expose private or customer-level data.
 
 ---
 
@@ -2062,7 +2073,9 @@ Confirmed. The uploaded requirements explicitly state that the public user panel
 | `/admin` | No | Yes | No | Admin private area |
 | `/admin/content` | No | Yes | No | Admin content management |
 | `/admin/customers` | No | Yes | No | Admin customer management |
+| `/admin/customers/[customerId]` | No | Yes | No | Customer detail, documents, and recent visit history |
 | `/admin/packages` | No | Yes | No | Admin package management |
+| `/admin/categories` | No | Yes | No | Admin package-category management |
 | `/admin/coaches` | No | Yes | No | Admin coach management |
 | `/admin/logs` | No | Yes | No | Logs visible only to admin |
 | `/admin/data` | No | Yes | No | Admin Excel exports |
@@ -2081,8 +2094,10 @@ Confirmed. The uploaded requirements explicitly state that the public user panel
 | `saveManualOccupancyCorrection` | No | Unclear | Yes | Admin approval/password unclear |
 | `saveNote` | No | Yes | Yes | Exact note permissions unclear |
 | `deleteNote` | No | Yes | Unclear | Reception delete permission unclear |
-| `freezeCustomerPackage` | No | Unclear | Unclear | Permission must be confirmed |
-| `reactivateCustomerPackage` | No | Unclear | Unclear | Permission must be confirmed |
+| `freezeCustomerPackage` | No | Yes | Setting-controlled | Admin always; Registration only when enabled |
+| `reactivateCustomerPackage` | No | Yes | Setting-controlled | Admin always; Registration only when enabled |
+| Customer document actions | No | Yes | No | Admin-only private file operations |
+| Category management actions | No | Yes | No | Admin-only create/edit/archive/reorder/visibility |
 | `GET /api/admin/export` | No | Yes | No | Admin only |
 | `POST /api/admin/media` | No | Yes | No | Upload method unconfirmed |
 
@@ -2313,6 +2328,180 @@ No other roles are confirmed for MVP. Coach login, customer login, and platform 
 
 ---
 
+## 16A. Approved Post-Phase 29 Route and Action Plan
+
+This section documents manually approved route and action expansion for Phases 31-41. Names are planning names and should be aligned with existing code conventions during implementation.
+
+### Public Route: `/our-app`
+
+Planned additions:
+
+- Keep the current occupancy experience.
+- Add aggregate analytics below occupancy when `showPublicAnalyticsOnOurApp` is enabled.
+- Show current occupancy, today's check-ins, hourly check-ins, weekly check-in trend, weekly peak hours, and reliable historical occupancy.
+- Prefer responsive cards and simple bar charts.
+- Return no customer identifiers, individual visits, package ownership, or customer-level analytics.
+- Hide the entire analytics section when the setting is disabled.
+
+Possible server boundary:
+
+- Extend the existing public occupancy query when its contract remains simple, or add a narrowly scoped `GET /api/public/analytics`.
+- Return only pre-aggregated, public-safe values.
+- Do not reuse a private admin response object directly.
+
+### Admin Route: `/admin/analytics`
+
+Planned additions:
+
+- Current occupancy.
+- Today's check-ins.
+- Hourly check-ins.
+- Weekly check-in trend.
+- Weekly peak hours.
+- Historical occupancy only when a reliable source exists.
+
+The route remains Admin-only. Existing analytics patterns should be reused before adding a chart dependency.
+
+### Public Route: `/packages`
+
+Planned additions:
+
+- Show active packages that pass category visibility rules.
+- Filter by one or more approved category selections according to the final UI.
+- Filter by minimum and maximum price.
+- Sort by price ascending, price descending, or name.
+- Place controls above results on mobile and in a sidebar on desktop.
+- Hide a package when any assigned category is hidden.
+- Expose no customer-package or admin-only data.
+
+Query parameters should be validated, normalized, and reflected in a shareable URL where practical.
+
+### Admin Route: `/admin/categories`
+
+Admin-only package-category management.
+
+Displayed data:
+
+- Category name and slug.
+- Sort order.
+- Public visibility.
+- Archive status.
+- Assigned package count.
+- Hidden-package impact where useful.
+
+Actions:
+
+- `createPackageCategory`
+- `updatePackageCategory`
+- `deleteOrArchivePackageCategory`
+- `reorderPackageCategories`
+- `setPackageCategoryVisibility`
+- `assignCategoriesToPackage`
+
+Every action requires Admin authorization, validation, safe handling of existing package assignments, and an audit log. Archive is preferred over destructive deletion when assignments exist.
+
+### Admin Route: `/admin/customers/[customerId]`
+
+The customer detail may add two Admin-only sections.
+
+Recent visits:
+
+- Latest three visits.
+- Check-in and check-out.
+- Derived duration.
+- Guest count if stored.
+- Packages used if existing relations support it.
+- Optional simple "View all" navigation.
+
+Documents:
+
+- List active and archived documents as approved.
+- Upload PDF, JPG, JPEG, or PNG up to 10 MB.
+- Open or download through an authorized private-file response.
+- Archive/delete according to the confirmed retention strategy.
+- Never expose document data to Registration.
+
+Planned document actions:
+
+- `uploadCustomerDocument`
+- `archiveCustomerDocument`
+- `deleteCustomerDocument` only if physical deletion is explicitly approved
+- `restoreCustomerDocument` if archive recovery is supported
+- Authorized download/open handler
+
+The document upload route or action must not be implemented until a production-safe storage provider, private access method, and retention behavior are confirmed.
+
+### Advanced Freeze Actions
+
+`freezeCustomerPackage` planned input:
+
+- Customer-package ID.
+- Mode: normal or retroactive.
+- Requested/planned freeze days.
+- Planned end date when supplied.
+- Optional note.
+- Acting user.
+
+Required behavior:
+
+- Admin is always authorized.
+- Registration is authorized only when `allowRegistrationPackageFreeze` is true.
+- Resolve retroactive start from the latest valid checkout when available.
+- Calculate retroactive days from that checkout through today.
+- Reject zero remaining freeze chances.
+- Create `PackageFreeze`, decrement the counter, update status, and log in one transaction.
+
+`reactivateCustomerPackage` planned input:
+
+- Customer-package ID or active freeze ID.
+- Actual end date, normally current date/time.
+- Optional note.
+- Acting user.
+
+Required behavior:
+
+- Apply the same role and setting checks.
+- Calculate actual frozen days.
+- Persist actual days on the freeze record.
+- Set resulting expiration to original expiration plus actual frozen days.
+- Update freeze and assignment records and audit log in one transaction.
+
+Planned Admin-only action:
+
+- `setCustomerPackageFreezeChances`
+
+This action must validate a non-negative integer, record before/after values, and never run automatically as part of renewal unless a later approved rule explicitly says so.
+
+### Settings Actions
+
+`saveGymSettings` may accept:
+
+- `showPublicAnalyticsOnOurApp`
+- `allowRegistrationPackageFreeze`
+
+Both fields require Admin authorization, boolean validation, and audit logs. Defaults for existing and new settings rows are `false`.
+
+### Homepage Route: `/`
+
+Phase 40 changes presentation only:
+
+- CSS-first 3D offer carousel with automatic and manual navigation.
+- Replace the current hero and provide default fallback slides when no active offers exist.
+- Responsive rectangular cards.
+- Package image and stable fallback handling.
+- Large section-navigation controls.
+- Stronger Our App emphasis.
+- Concise section previews and links.
+- Smooth section navigation and scroll-to-top.
+
+Do not change public authorization, data privacy, or business logic. Do not add a carousel/animation dependency without project-owner approval.
+
+### Phase 41 Regression Boundary
+
+Phase 41 reviews all approved routes and actions, exports, demo data, authorization, public privacy, responsive layouts, error states, and build/typecheck behavior. It adds no Phase 42 and no unapproved route family.
+
+---
+
 ## 17. Do Not Include Yet
 
 Do not include the following routes, actions, or APIs until confirmed by the client or later project documents:
@@ -2348,7 +2537,7 @@ Do not include the following routes, actions, or APIs until confirmed by the cli
 - Revenue analytics routes.
 - Marketing campaign analytics routes.
 - WebSocket routes or real-time infrastructure unless live update behavior is confirmed.
-- Any route or API not directly supporting the confirmed public website, public occupancy page, Admin Panel, Registration Panel, customer/package/coach management, check-in/check-out, session tracking, occupancy tracking, notes, logs, exports, settings, or basic analytics.
+- Any route or API not directly supporting the confirmed system or the manually approved Phase 31-41 analytics, category, filtering, document, visit-history, freeze, permission, homepage, and final-review scope.
 
 ---
 

@@ -93,9 +93,9 @@ Document roles:
 - `docs/06-codex-prompt-guide.md` controls how Codex should behave while implementing.
 - `docs/design-colors.md` provides Smartfit.am design tokens and color definitions.
 
-`docs/05-development-phases.md` is the official phase plan. Phase 0 through Phase 15 are the completed original MVP phases. Phase 16 through Phase 21 are completed post-MVP Registration Panel improvement phases. The project owner manually added Phase 22 through Phase 29 for confirmed customer, package, guest, service, and public-offer expansion work. These phases are official only because the phase document has now been manually updated.
+`docs/05-development-phases.md` is the official phase plan. Phase 0 through Phase 29 are complete. The project owner manually added Phase 30 through Phase 41 for analytics, package categories and public filters, customer documents and visit history, advanced package freezing, Registration freeze permission, homepage redesign, and final regression.
 
-The post-MVP phases do not weaken the anti-hallucination, simplicity, privacy, permission, or phase-control rules. Codex must follow them one at a time. No Phase 30 or later exists unless the project owner manually updates the official phase document again.
+The post-MVP phases do not weaken the anti-hallucination, simplicity, privacy, permission, or phase-control rules. Phase 30 is documentation-only. Implementation begins with Phase 31 only after Phase 30 is completed and reviewed, then proceeds one phase at a time through Phase 41. No Phase 42 or later exists unless the project owner manually updates the official phase document again.
 
 Confirmed expansion rules:
 
@@ -104,6 +104,12 @@ Confirmed expansion rules:
 - Package upgrades edit the existing assigned customer package and log old/new values; renewal may still create a new assignment.
 - Swimming, cardio, trainer, group-training, and similar services remain packages unless the owner later confirms a separate Services system.
 - Birth date is required for new customer registration after Phase 25 is implemented.
+- Public analytics must remain aggregate, setting-controlled, and free of customer-identifying data.
+- Package categories are many-to-many; assignment to any hidden category hides the package publicly.
+- Customer documents are Admin-only and require production-safe private storage before implementation.
+- Advanced freezing uses explicit freeze records, remaining chances, transactions, and actual-day expiration recalculation.
+- Registration freeze access defaults to disabled and must be enforced server-side.
+- The Phase 40 carousel must be CSS-first unless a new dependency receives owner approval.
 
 ---
 
@@ -312,8 +318,10 @@ Review rules:
 - If Phase 15 is complete, ChatGPT may move to Phase 16 because the project owner manually added Phase 16 through Phase 21.
 - If Phase 21 is complete, ChatGPT may move to Phase 22 because the project owner manually added Phase 22 through Phase 29.
 - Phase 22 is documentation-only; implementation begins in Phase 23.
-- If Phase 29 is complete, ChatGPT must not suggest Phase 30.
-- If something remains after Phase 29, ChatGPT should create a `Remaining Issues` list, not a new phase.
+- If Phase 29 is complete, ChatGPT may move to the manually approved Phase 30 documentation update.
+- Phase 30 is documentation-only; implementation begins in Phase 31.
+- If Phase 41 is complete, ChatGPT must not suggest Phase 42.
+- If something remains after Phase 41, ChatGPT should create a `Remaining Issues` list, not a new phase.
 
 ---
 
@@ -418,7 +426,7 @@ Do not add unconfirmed features.
 Make the prompt guide Codex toward the simplest correct implementation.
 ```
 
-ChatGPT must check the official phase index before responding. The current plan has been manually extended through Phase 29. If the completed phase is Phase 29, there is no next phase unless `docs/05-development-phases.md` is manually updated again.
+ChatGPT must check the official phase index before responding. The current plan has been manually extended through Phase 41. Phase 31 is the next implementation phase after the Phase 30 documentation update. If the completed phase is Phase 41, there is no next phase unless `docs/05-development-phases.md` is manually updated again.
 
 ---
 
@@ -429,18 +437,20 @@ Phase hallucination means ChatGPT or Codex invents new phase numbers, skips the 
 Strict rules:
 
 - Always check the Full Phase Index in `docs/05-development-phases.md`.
-- The current approved plan contains **Phase 0 through Phase 29**.
+- The current approved plan contains **Phase 0 through Phase 41**.
 - Phase 0 through Phase 15 are the completed original MVP phases.
 - Phase 16 through Phase 21 are completed post-MVP Registration Panel improvement phases.
-- Phase 22 through Phase 29 are manually approved post-MVP customer/package/guest/offer expansion phases.
+- Phase 22 through Phase 29 are completed post-MVP customer/package/guest/offer expansion phases.
+- Phase 30 through Phase 41 are manually approved analytics/category/document/freeze/homepage expansion phases.
 - Never continue beyond the final phase.
-- The current plan ends at Phase 29, so stop at Phase 29.
-- Do not create Phase 30 or any later phase.
-- If something is left unfinished after the final phase, create a `Remaining Issues` list, not Phase 30.
+- The current plan ends at Phase 41, so stop at Phase 41.
+- Do not create Phase 42 or any later phase.
+- If something is left unfinished after the final phase, create a `Remaining Issues` list, not Phase 42.
 - New phases require manual update to `docs/05-development-phases.md`.
 - ChatGPT may refer to Phase 16 through Phase 21 because the phase document has now been manually updated.
 - ChatGPT may refer to Phase 22 through Phase 29 because this documentation update makes them official.
-- ChatGPT must never say “next is Phase 30” unless the phase document is manually updated again.
+- ChatGPT may refer to Phase 30 through Phase 41 because this documentation update makes them official.
+- ChatGPT must never say "next is Phase 42" unless the phase document is manually updated again.
 - Codex must not add phase numbers in its output unless it is referring to the official phase being implemented.
 - If a feature does not fit into the fixed phase plan, state that `docs/05-development-phases.md` must be manually updated first.
 
@@ -478,6 +488,18 @@ Official phase index:
 | Phase 27 | Flexible Customer Package Editing and Upgrade Workflow |
 | Phase 28 | Services as Flexible Packages |
 | Phase 29 | Customer/Package/Guest Regression, Exports, Demo Data, and Client Review |
+| Phase 30 | Post-Phase 29 Scope Documentation Update |
+| Phase 31 | Public and Admin Analytics Expansion |
+| Phase 32 | Package Category Management Foundation |
+| Phase 33 | Package Category Assignment and Public Package Filtering |
+| Phase 34 | Customer Document Upload Storage Foundation |
+| Phase 35 | Admin Customer Document Upload UI |
+| Phase 36 | Customer Visit History on Admin Customer Detail |
+| Phase 37 | Advanced Package Freezing Data Model and Freeze Chances |
+| Phase 38 | Advanced Admin Freeze Workflows |
+| Phase 39 | Registration Freeze Permission Control |
+| Phase 40 | Homepage 3D Offer Carousel and Section Navigation Redesign |
+| Phase 41 | Final Regression, Exports, Demo Data, and Client Review |
 
 ---
 
@@ -555,6 +577,37 @@ Confirmed post-MVP expansion work must stay focused on Phase 22 through Phase 29
 - Guest occupancy changes only when staff selects the actual guest count used during check-in.
 - Services must remain `Package` and `CustomerPackage` records unless the project owner later confirms a separate Services system.
 - New customer registration must require birth date after Phase 25; legacy missing values must be handled safely without invented data.
+
+Confirmed Phase 30-41 work must stay focused on:
+
+- Phase 30 documents the approved scope only and changes no implementation files.
+- Phase 31 expands public aggregate and Admin analytics.
+- Phase 32 adds package-category data and Admin management.
+- Phase 33 adds package assignments, public visibility, filtering, and sorting.
+- Phase 34 confirms and builds the production-safe private document storage foundation.
+- Phase 35 adds the Admin-only customer document UI.
+- Phase 36 adds Admin customer visit history.
+- Phase 37 adds freeze records and freeze-chance data.
+- Phase 38 adds advanced Admin freeze workflows.
+- Phase 39 adds default-disabled Registration freeze permission.
+- Phase 40 redesigns the homepage carousel and section navigation.
+- Phase 41 performs final regression, export, demo-data, deployment, privacy, and client-review checks.
+
+**Phase 30-41 scope warnings:**
+
+- Do not implement Phase 31 during Phase 30.
+- Public analytics must use aggregate-only contracts and an Admin visibility toggle.
+- Historical occupancy must be omitted or clearly limited when no reliable source exists.
+- Preserve package `type` compatibility while categories become the primary public grouping.
+- A package assigned to any hidden category is hidden publicly.
+- Customer documents are Admin-only; Registration and public routes receive no metadata or file access.
+- Phase 34 must inspect existing storage first. Stop and report a blocker if no production-safe private storage path exists.
+- Visit-history export is postponed.
+- Freeze chances default to three, decrement once per confirmed freeze, never auto-reset, and may be edited directly only by Admin.
+- Freeze creation/reactivation must update history, counters, status, expiration, and logs transactionally.
+- Registration freeze access defaults to disabled and requires server-side checks.
+- Phase 40 must prefer CSS and existing primitives; no carousel dependency without owner approval.
+- Phase 41 is final. Do not create Phase 42.
 
 ---
 
@@ -806,8 +859,8 @@ These unclear points must not be solved by guessing inside Codex prompts. If a p
 17. Whether selected packages can deduct more than one session in special cases is unclear.
 18. Exact time-restriction structure is unclear beyond simple rules such as “before 3:00 PM”.
 19. Whether package time restrictions support weekdays, holidays, or multiple time windows is unclear.
-20. Whether package freezing extends expiration date is unclear.
-21. Who can freeze/reactivate packages is unclear.
+20. Exact timezone/date-boundary handling for advanced freeze duration calculations must be verified during implementation.
+21. Registration freeze access is setting-controlled and defaults to disabled; direct counter edits remain Admin-only.
 22. Exact package renewal behavior is unclear.
 23. Whether package names must be unique is unclear.
 24. Whether package types should be hard-coded, editable, or free text is unclear.
@@ -817,11 +870,11 @@ These unclear points must not be solved by guessing inside Codex prompts. If a p
 28. Whether public content images are required is unclear.
 29. Exact Excel export filters and date ranges are unclear.
 30. Whether export history should be stored is unclear.
-31. Exact analytics formulas are unclear.
+31. Exact analytics bucket formulas and reliable historical occupancy source must be verified.
 32. Whether occupancy updates should be instant, polling-based, or refresh-only is unclear.
 33. Whether historical occupancy analytics should use visits, occupancy events, or snapshots is unclear.
 34. Exact deployment provider is not confirmed.
-35. Exact production file/image storage method is not confirmed.
+35. Exact production-safe private customer-document storage, authorized download, retention, and deletion method is not confirmed and blocks Phase 34 implementation if unresolved.
 36. Exact backup policy is not confirmed.
 
 ---
@@ -829,5 +882,5 @@ These unclear points must not be solved by guessing inside Codex prompts. If a p
 ## 18. Final Rule
 
 ```txt
-Codex and ChatGPT must follow docs/05-development-phases.md exactly. Phase 16 through Phase 21 are completed post-MVP Registration phases. Phase 22 through Phase 29 are the only manually approved expansion phases. No Phase 30, unconfirmed feature, unrelated refactor, or over-engineered implementation is allowed unless the project owner manually updates the documentation again.
+Codex and ChatGPT must follow docs/05-development-phases.md exactly. Phase 0 through Phase 29 are complete. Phase 30 through Phase 41 are the manually approved next sequence. Phase 30 is documentation-only, implementation begins with Phase 31, and Phase 41 is final. No Phase 42, unconfirmed feature, unrelated refactor, or over-engineered implementation is allowed unless the project owner manually updates the documentation again.
 ```

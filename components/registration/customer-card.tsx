@@ -41,6 +41,7 @@ type PackageCardValue = {
     timeRestrictionLabel: string | null;
   };
   remainingGuestPasses: number;
+  remainingFreezeChances: number;
   remainingSessions: number;
   reactivatedAt: Date | null;
   status: CustomerPackageStatus;
@@ -126,11 +127,13 @@ function packageStatus(
 }
 
 export function RegistrationCustomerCard({
+  allowPackageFreeze,
   compact,
   customer,
   recentActivity,
   showAllPackages,
 }: {
+  allowPackageFreeze: boolean;
   compact: boolean;
   customer: CustomerCardValue;
   recentActivity: CustomerRecentActivityItem[];
@@ -325,6 +328,13 @@ export function RegistrationCustomerCard({
           ) : null}
         </div>
 
+        {!allowPackageFreeze ? (
+          <p className="mt-5 rounded-lg border border-border bg-page px-4 py-3 text-sm font-semibold leading-6 text-secondary">
+            Package freeze access is disabled for Registration. Admin can
+            enable it in Settings.
+          </p>
+        ) : null}
+
         {visiblePackages.length ? (
           <div className="mt-5 grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
             {visiblePackages.map((customerPackage) => {
@@ -338,6 +348,7 @@ export function RegistrationCustomerCard({
                 customerPackage.status === "ACTIVE" &&
                 customerPackage.expirationDate >= today &&
                 customerPackage.remainingSessions > 0 &&
+                customerPackage.remainingFreezeChances > 0 &&
                 !customerPackage.package.deletedAt &&
                 customerPackage.package.isActive;
               const isFrozen = customerPackage.status === "FROZEN";
@@ -422,6 +433,7 @@ export function RegistrationCustomerCard({
                     </p>
                   ) : null}
                   <PackageStatusActions
+                    allowPackageFreeze={allowPackageFreeze}
                     canFreeze={canFreeze}
                     compact={compact}
                     customerCode={customer.customerCode}

@@ -29,6 +29,22 @@ enum CustomerPackageStatus {
   FROZEN
 }
 
+enum PackageFreezeMode {
+  NORMAL
+  RETROACTIVE
+}
+
+enum PackageFreezeStatus {
+  ACTIVE
+  REACTIVATED
+  CANCELLED
+}
+
+enum CustomerDocumentStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 enum SessionChangeType {
   CHECK_IN_DEDUCTION
   MANUAL_CORRECTION
@@ -49,8 +65,12 @@ enum AuditActionType {
   PACKAGE_FREEZE
   PACKAGE_REACTIVATION
   PACKAGE_RENEWAL
+  CUSTOMER_DOCUMENT_CREATE
+  CUSTOMER_DOCUMENT_ARCHIVE
+  CUSTOMER_DOCUMENT_DOWNLOAD
   CUSTOMER_EDIT
   PACKAGE_EDIT
+  CATEGORY_EDIT
   COACH_EDIT
   SETTINGS_EDIT
   PUBLIC_CONTENT_EDIT
@@ -85,6 +105,10 @@ model StaffUser {
   sessionChanges         PackageSessionChange[]
   notesCreated           Note[]                 @relation("NoteCreatedBy")
   notesUpdated           Note[]                 @relation("NoteUpdatedBy")
+  uploadedDocuments      CustomerDocument[]     @relation("CustomerDocumentUploadedBy")
+  archivedDocuments      CustomerDocument[]     @relation("CustomerDocumentArchivedBy")
+  packageFreezesCreated  PackageFreeze[]        @relation("PackageFreezeCreatedBy")
+  packageFreezesEnded    PackageFreeze[]        @relation("PackageFreezeReactivatedBy")
   occupancyStatesUpdated OccupancyState[]
   occupancyEvents        OccupancyEvent[]
   auditLogs              AuditLog[]
@@ -113,6 +137,8 @@ model GymSettings {
   showInstagramInPublicApp              Boolean  @default(true)
   showLocationInPublicApp               Boolean  @default(true)
   showMotivationalTextInPublicApp       Boolean  @default(true)
+  showPublicAnalyticsOnOurApp           Boolean  @default(false)
+  allowRegistrationPackageFreeze        Boolean  @default(false)
   motivationalText                      String?
   hideInactiveCustomersFromRegistration Boolean  @default(false)
   createdAt                             DateTime @default(now())
@@ -160,6 +186,7 @@ model Customer {
   packages  CustomerPackage[]
   visits    GymVisit[]
   notes     Note[]
+  documents CustomerDocument[]
   auditLogs AuditLog[]
 
   @@index([fullName])
@@ -195,6 +222,7 @@ model Package {
   price                Decimal   @db.Decimal(10, 2)
   sessionCount         Int
   defaultGuestPasses   Int       @default(0)
+  defaultFreezeChances Int       @default(3)
   packageType          String
   assignedCoachId      String?
   assignedCoach        Coach?    @relation(fields: [assignedCoachId], references: [id])
@@ -208,6 +236,7 @@ model Package {
   updatedAt            DateTime  @updatedAt
 
   customerPackages CustomerPackage[]
+  categories       PackageCategory[]
 
   @@index([name])
   @@index([packageType])
@@ -215,29 +244,63 @@ model Package {
   @@index([assignedCoachId])
 }
 
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  sortOrder   Int       @default(0)
+  isPublic    Boolean   @default(true)
+  isArchived  Boolean   @default(false)
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  packages PackageCategory[]
+
+  @@index([name])
+  @@index([sortOrder])
+  @@index([isPublic])
+  @@index([isArchived])
+}
+
+model PackageCategory {
+  packageId  String
+  package    Package  @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+
+  @@id([packageId, categoryId])
+  @@index([packageId])
+  @@index([categoryId])
+}
+
 model CustomerPackage {
-  id                   String                @id @default(cuid())
-  customerId           String
-  customer             Customer              @relation(fields: [customerId], references: [id])
-  packageId            String
-  package              Package               @relation(fields: [packageId], references: [id])
-  coachId              String?
-  coach                Coach?                @relation(fields: [coachId], references: [id])
-  activationDate       DateTime
-  expirationDate       DateTime
-  initialSessions      Int
-  remainingSessions    Int
-  initialGuestPasses   Int                   @default(0)
-  remainingGuestPasses Int                   @default(0)
-  status               CustomerPackageStatus @default(ACTIVE)
-  frozenAt             DateTime?
-  reactivatedAt        DateTime?
-  deletedAt            DateTime?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  id                     String                @id @default(cuid())
+  customerId             String
+  customer               Customer              @relation(fields: [customerId], references: [id])
+  packageId              String
+  package                Package               @relation(fields: [packageId], references: [id])
+  coachId                String?
+  coach                  Coach?                @relation(fields: [coachId], references: [id])
+  activationDate         DateTime
+  expirationDate         DateTime
+  initialSessions        Int
+  remainingSessions      Int
+  initialGuestPasses     Int                   @default(0)
+  remainingGuestPasses   Int                   @default(0)
+  remainingFreezeChances Int                   @default(3)
+  status                 CustomerPackageStatus @default(ACTIVE)
+  frozenAt               DateTime?
+  reactivatedAt          DateTime?
+  deletedAt              DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 
   visitUsages    VisitPackageUsage[]
   sessionChanges PackageSessionChange[]
+  freezes        PackageFreeze[]
 
   @@index([customerId])
   @@index([packageId])
@@ -245,6 +308,35 @@ model CustomerPackage {
   @@index([status])
   @@index([expirationDate])
   @@index([remainingSessions])
+}
+
+model PackageFreeze {
+  id                      String              @id @default(cuid())
+  customerPackageId       String
+  customerPackage         CustomerPackage     @relation(fields: [customerPackageId], references: [id])
+  mode                    PackageFreezeMode
+  status                  PackageFreezeStatus @default(ACTIVE)
+  plannedDays             Int
+  actualDays              Int?
+  startDate               DateTime
+  plannedEndDate          DateTime?
+  actualEndDate           DateTime?
+  originalExpirationDate  DateTime
+  resultingExpirationDate DateTime?
+  createdById             String
+  createdBy               StaffUser           @relation("PackageFreezeCreatedBy", fields: [createdById], references: [id])
+  reactivatedById         String?
+  reactivatedBy           StaffUser?          @relation("PackageFreezeReactivatedBy", fields: [reactivatedById], references: [id])
+  notes                   String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  @@index([customerPackageId])
+  @@index([status])
+  @@index([startDate])
+  @@index([actualEndDate])
+  @@index([createdById])
+  @@index([reactivatedById])
 }
 
 model GymVisit {
@@ -276,11 +368,11 @@ model GymVisit {
 }
 
 model VisitPackageUsage {
-  id                String          @id @default(cuid())
-  visitId           String
-  visit             GymVisit        @relation(fields: [visitId], references: [id])
-  customerPackageId String
-  customerPackage   CustomerPackage @relation(fields: [customerPackageId], references: [id])
+  id                  String          @id @default(cuid())
+  visitId             String
+  visit               GymVisit        @relation(fields: [visitId], references: [id])
+  customerPackageId   String
+  customerPackage     CustomerPackage @relation(fields: [customerPackageId], references: [id])
   sessionsDeducted    Int             @default(1)
   guestPassesDeducted Int             @default(0)
   createdAt           DateTime        @default(now())
@@ -329,6 +421,40 @@ model Note {
 
   @@index([customerId])
   @@index([createdById])
+  @@index([createdAt])
+}
+
+model CustomerDocument {
+  id                  String                 @id @default(cuid())
+  customerId          String
+  customer            Customer               @relation(fields: [customerId], references: [id])
+  originalFileName    String
+  storedFileName      String
+  storageProvider     String
+  storageKey          String
+  storagePublicId     String?
+  storageResourceType String?
+  storageDeliveryType String?
+  storageFolder       String?
+  storageFormat       String?
+  mimeType            String
+  fileExtension       String
+  sizeBytes           Int
+  label               String?
+  notes               String?
+  status              CustomerDocumentStatus @default(ACTIVE)
+  uploadedById        String
+  uploadedBy          StaffUser              @relation("CustomerDocumentUploadedBy", fields: [uploadedById], references: [id])
+  archivedById        String?
+  archivedBy          StaffUser?             @relation("CustomerDocumentArchivedBy", fields: [archivedById], references: [id])
+  archivedAt          DateTime?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@index([customerId, status])
+  @@index([uploadedById])
+  @@index([archivedById])
+  @@index([storageProvider, storageKey])
   @@index([createdAt])
 }
 
