@@ -23,7 +23,7 @@ const errorMessages: Record<string, string> = {
   "invalid-url": "Image URL must use a valid http or https URL.",
   "missing-image": "Choose an image URL or upload an image.",
   "upload-configuration":
-    "Image upload is not configured. Add Cloudinary values to .env or use an image URL.",
+    "Image upload storage is not configured. Add storage values to .env or use an image URL.",
   "upload-failed": "Image upload failed. Try again or use an image URL.",
   "upload-file-size": "Image files must be 5 MB or smaller.",
   "upload-file-type": "Choose a valid image file.",
@@ -115,7 +115,7 @@ export default async function AdminGalleryPage({
           Manage public gallery
         </h2>
         <p className="mt-3 max-w-3xl leading-7 text-secondary">
-          Add gym photos by public URL or Cloudinary upload, control their
+          Add gym photos by public URL or storage upload, control their
           display order, and choose which images appear publicly.
         </p>
       </header>

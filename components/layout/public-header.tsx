@@ -22,6 +22,8 @@ const transparentHeroRoutes = new Set([
   "/about",
   "/coaches",
   "/contact",
+  "/gallery",
+  "/our-app",
   "/packages",
 ]);
 

@@ -9,7 +9,7 @@ import { writeAuditLog } from "../../../lib/logging";
 import {
   imageUploadErrorCode,
   uploadImageFromForm,
-} from "../../../lib/uploads/cloudinary";
+} from "../../../lib/uploads/storage";
 
 const COACHES_PATH = "/admin/coaches";
 
@@ -54,6 +54,7 @@ export async function saveCoachAction(formData: FormData) {
   const uploadedPhotoUrl = await uploadImageFromForm(
     formData,
     "photoUpload",
+    { prefix: "coaches" },
   ).catch((error) => {
     redirect(`${COACHES_PATH}?error=upload-${imageUploadErrorCode(error)}`);
   });

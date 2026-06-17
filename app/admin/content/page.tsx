@@ -25,7 +25,7 @@ const errorMessages: Record<string, string> = {
   "invalid-required": "A valid content type and title are required.",
   "invalid-url": "Image URL must use a valid http or https URL.",
   "upload-configuration":
-    "Image upload is not configured. Add Cloudinary values to .env or use an image URL.",
+    "Image upload storage is not configured. Add storage values to .env or use an image URL.",
   "upload-failed": "Image upload failed. Try again or use an image URL.",
   "upload-file-size": "Image files must be 5 MB or smaller.",
   "upload-file-type": "Choose a valid image file.",

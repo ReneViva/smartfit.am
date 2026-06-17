@@ -9,7 +9,7 @@ import { writeAuditLog } from "../../../lib/logging";
 import {
   imageUploadErrorCode,
   uploadImageFromForm,
-} from "../../../lib/uploads/cloudinary";
+} from "../../../lib/uploads/storage";
 
 const GALLERY_PATH = "/admin/gallery";
 
@@ -63,6 +63,7 @@ export async function saveGalleryImageAction(formData: FormData) {
   const uploadedImageUrl = await uploadImageFromForm(
     formData,
     "imageUpload",
+    { prefix: "gallery" },
   ).catch((error) => {
     redirect(`${GALLERY_PATH}?error=upload-${imageUploadErrorCode(error)}`);
   });

@@ -9,7 +9,7 @@ Smartfit.am is a gym website and internal gym-management MVP. It combines a publ
 - Shared ADMIN and REGISTRATION customer lookup, package review, check-in/check-out, occupancy correction, session correction, and customer notes
 - Audit logging for operational changes
 - Private Excel exports generated in memory
-- Optional Cloudinary image uploads for admin-managed public content
+- Optional object-storage image uploads for admin-managed public content
 
 ## Requirements
 
@@ -51,15 +51,15 @@ Open [http://localhost:3000](http://localhost:3000).
 | `SEED_REGISTRATION_USERNAME` | For intentional seed runs | Initial registration username |
 | `SEED_REGISTRATION_EMAIL` | For intentional seed runs | Initial registration email |
 | `SEED_REGISTRATION_PASSWORD` | For intentional seed runs | Initial registration password |
-| `CLOUDINARY_CLOUD_NAME` | For file uploads | Cloudinary cloud name |
-| `CLOUDINARY_API_KEY` | For file uploads | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | For file uploads | Cloudinary API secret; server-only |
-| `CLOUDINARY_UPLOAD_FOLDER` | No | Cloudinary folder, defaults to `smartfit-am` |
-| `CUSTOMER_DOCUMENT_STORAGE_PROVIDER` | For customer documents | Private customer document provider, currently `cloudinary` |
+| `STORAGE_PROVIDER` | For file uploads | Object storage provider, currently `r2` |
+| `CLOUD_NAME` | For file uploads | Storage bucket or container name |
+| `ACCESS_KEY_ID` | For file uploads | Storage access key ID; server-only |
+| `SECRET_ACCESS_KEY` | For file uploads | Storage secret access key; server-only |
+| `STORAGE_ENDPOINT` | For file uploads | S3-compatible storage endpoint |
+| `STORAGE_REGION` | For file uploads | Storage region, usually `auto` for R2-compatible storage |
+| `STORAGE_PUBLIC_BASE_URL` | For public image uploads | Public CDN/bucket base URL for uploaded images |
 | `CUSTOMER_DOCUMENT_MAX_FILE_SIZE_MB` | No | Customer document upload limit, capped at 10 MB |
 | `CUSTOMER_DOCUMENT_ALLOWED_MIME_TYPES` | No | Customer document MIME allowlist; safe values are PDF, JPEG, and PNG |
-| `CUSTOMER_DOCUMENT_CLOUDINARY_FOLDER` | No | Cloudinary folder for private customer documents |
-| `CUSTOMER_DOCUMENT_CLOUDINARY_DELIVERY_TYPE` | No | Cloudinary delivery type for customer documents; use `authenticated` or `private` |
 
 ## Routes and Access
 
@@ -109,17 +109,19 @@ Do not add `ALLOW_DEMO_SEED` permanently to a production environment.
 
 ## Image Uploads
 
-Admin image fields accept a public `http` or `https` URL. With Cloudinary configured, they also accept a local image file and store only the resulting public URL.
+Admin image fields accept a public `http` or `https` URL. With storage configured, they also accept a local image file and store only the resulting public URL.
 
-`CLOUDINARY_API_SECRET` is used only by server-side upload actions. Pasted image URLs continue to work when Cloudinary is not configured.
+Storage credentials are used only by server-side upload actions. Pasted image URLs continue to work when storage is not configured.
+
+New public uploads use the generic S3-compatible storage variables and require `STORAGE_PUBLIC_BASE_URL`. Existing public image URLs already stored in the database remain normal external URLs and continue to render when they pass the public URL allowlist.
 
 ## Customer Document Storage
 
-Customer documents use a separate private storage foundation from public image uploads. The current provider is Cloudinary with authenticated/private delivery; the database stores provider metadata and private object keys, not public `secure_url` values or file bytes.
+Customer documents use the same provider-neutral object storage configuration but remain private. The database stores provider metadata and private object keys, not public URLs or file bytes.
 
-Document access must go through Admin-only server logic that validates the staff role before creating a short-lived private download URL. Archive keeps metadata and the provider object for retention; physical deletion is limited to internal cleanup for failed metadata writes until deletion policy is confirmed.
+Document access must go through Admin-only server logic that validates the staff role before fetching the private object and returning the file response. Archive keeps metadata and the provider object for retention; physical deletion is limited to internal cleanup for failed metadata writes until deletion policy is confirmed.
 
-Cloudflare/R2 can be added later by implementing a new customer-document storage adapter and switching `CUSTOMER_DOCUMENT_STORAGE_PROVIDER`; it is not a one-URL swap.
+The current implementation expects `STORAGE_PROVIDER="r2"` and an R2-compatible S3 endpoint behind the generic variable names.
 
 ## Verification
 

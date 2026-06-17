@@ -3,14 +3,17 @@ import { randomUUID } from "node:crypto";
 import "server-only";
 
 import {
-  createCloudinaryCustomerDocumentDownloadUrl,
-  deleteCustomerDocumentFromCloudinary,
-  uploadCustomerDocumentToCloudinary,
-} from "./cloudinary-storage";
+  deleteObject,
+  downloadObject,
+  normalizeObjectPrefix,
+  ObjectStorageError,
+  safeObjectKeySegment,
+  uploadObject,
+} from "../storage/object-storage";
 import { CustomerDocumentStorageError } from "./storage-error";
 import { assertValidCustomerDocumentFile } from "./validation";
 
-export type CustomerDocumentStorageProvider = "cloudinary";
+export type CustomerDocumentStorageProvider = "r2";
 
 export type CustomerDocumentStorageReference = {
   fileExtension: string;
@@ -22,6 +25,20 @@ export type CustomerDocumentStorageReference = {
   storageResourceType: string | null;
 };
 
+export type CustomerDocumentDownloadReference =
+  CustomerDocumentStorageReference & {
+    mimeType: string;
+    originalFileName: string;
+    sizeBytes: number;
+  };
+
+export type CustomerDocumentDownload = {
+  body: Uint8Array;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
 export type StoredCustomerDocument = CustomerDocumentStorageReference & {
   mimeType: string;
   originalFileName: string;
@@ -30,21 +47,35 @@ export type StoredCustomerDocument = CustomerDocumentStorageReference & {
   storedFileName: string;
 };
 
-function safeStorageSegment(value: string) {
-  return value
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
+const CUSTOMER_DOCUMENT_STORAGE_PREFIX = "customer-documents";
+
+function toCustomerDocumentStorageError(
+  error: unknown,
+  fallbackCode: "delete-failed" | "download-failed" | "upload-failed",
+) {
+  if (error instanceof CustomerDocumentStorageError) {
+    return error;
+  }
+
+  if (error instanceof ObjectStorageError) {
+    const code =
+      error.code === "configuration" || error.code === "provider"
+        ? error.code
+        : fallbackCode;
+
+    return new CustomerDocumentStorageError(code, error.message);
+  }
+
+  return new CustomerDocumentStorageError(
+    fallbackCode,
+    "Customer document storage operation failed.",
+  );
 }
 
 export function getCustomerDocumentStorageProvider(): CustomerDocumentStorageProvider {
-  const provider =
-    process.env.CUSTOMER_DOCUMENT_STORAGE_PROVIDER?.trim().toLowerCase() ||
-    "cloudinary";
+  const provider = process.env.STORAGE_PROVIDER?.trim().toLowerCase();
 
-  if (provider === "cloudinary") {
+  if (provider === "r2") {
     return provider;
   }
 
@@ -57,12 +88,16 @@ export function getCustomerDocumentStorageProvider(): CustomerDocumentStoragePro
 export function buildCustomerDocumentStorageKey(
   customerId: string,
   originalFileName: string,
+  fileExtension: string,
 ) {
-  const baseName =
-    safeStorageSegment(originalFileName.replace(/\.[^.]+$/, "")) || "document";
-  const customerSegment = safeStorageSegment(customerId) || "customer";
+  const baseName = safeObjectKeySegment(
+    originalFileName.replace(/\.[^.]+$/, ""),
+    "document",
+  );
+  const customerSegment = safeObjectKeySegment(customerId, "customer");
+  const prefix = normalizeObjectPrefix(CUSTOMER_DOCUMENT_STORAGE_PREFIX);
 
-  return `${customerSegment}/${Date.now()}-${randomUUID()}-${baseName}`;
+  return `${prefix}/${customerSegment}/${Date.now()}-${randomUUID()}-${baseName}${fileExtension}`;
 }
 
 export async function uploadCustomerDocumentToStorage(
@@ -74,28 +109,36 @@ export async function uploadCustomerDocumentToStorage(
   const storedFileName = buildCustomerDocumentStorageKey(
     options.customerId,
     validation.originalFileName,
+    validation.fileExtension,
   );
 
-  if (provider === "cloudinary") {
-    const result = await uploadCustomerDocumentToCloudinary({
-      file,
-      publicId: storedFileName,
-    });
+  if (provider === "r2") {
+    try {
+      const result = await uploadObject({
+        access: "private",
+        body: new Uint8Array(await file.arrayBuffer()),
+        cacheControl: "private, no-store",
+        contentType: validation.mimeType,
+        key: storedFileName,
+      });
 
-    return {
-      fileExtension: validation.fileExtension,
-      mimeType: validation.mimeType,
-      originalFileName: validation.originalFileName,
-      sizeBytes: validation.sizeBytes,
-      storageDeliveryType: result.storageDeliveryType,
-      storageFolder: result.storageFolder,
-      storageFormat: result.storageFormat,
-      storageKey: result.storageKey,
-      storageProvider: provider,
-      storagePublicId: result.storagePublicId,
-      storageResourceType: result.storageResourceType,
-      storedFileName,
-    };
+      return {
+        fileExtension: validation.fileExtension,
+        mimeType: validation.mimeType,
+        originalFileName: validation.originalFileName,
+        sizeBytes: validation.sizeBytes,
+        storageDeliveryType: "private",
+        storageFolder: CUSTOMER_DOCUMENT_STORAGE_PREFIX,
+        storageFormat: validation.fileExtension.replace(/^\./, ""),
+        storageKey: result.key,
+        storageProvider: provider,
+        storagePublicId: null,
+        storageResourceType: null,
+        storedFileName,
+      };
+    } catch (error) {
+      throw toCustomerDocumentStorageError(error, "upload-failed");
+    }
   }
 
   throw new CustomerDocumentStorageError(
@@ -107,12 +150,13 @@ export async function uploadCustomerDocumentToStorage(
 export async function deleteCustomerDocumentFromStorage(
   document: CustomerDocumentStorageReference,
 ) {
-  if (document.storageProvider === "cloudinary") {
-    await deleteCustomerDocumentFromCloudinary({
-      deliveryType: document.storageDeliveryType,
-      publicId: document.storagePublicId ?? document.storageKey,
-      resourceType: document.storageResourceType,
-    });
+  if (document.storageProvider === "r2") {
+    try {
+      await deleteObject(document.storageKey);
+    } catch (error) {
+      throw toCustomerDocumentStorageError(error, "delete-failed");
+    }
+
     return;
   }
 
@@ -122,19 +166,22 @@ export async function deleteCustomerDocumentFromStorage(
   );
 }
 
-export function createCustomerDocumentDownloadUrl(
-  document: CustomerDocumentStorageReference,
-  options: { ttlSeconds?: number } = {},
-) {
-  if (document.storageProvider === "cloudinary") {
-    return createCloudinaryCustomerDocumentDownloadUrl({
-      deliveryType: document.storageDeliveryType,
-      fileExtension: document.fileExtension,
-      format: document.storageFormat,
-      publicId: document.storagePublicId ?? document.storageKey,
-      resourceType: document.storageResourceType,
-      ttlSeconds: options.ttlSeconds,
-    });
+export async function downloadCustomerDocumentFromStorage(
+  document: CustomerDocumentDownloadReference,
+): Promise<CustomerDocumentDownload> {
+  if (document.storageProvider === "r2") {
+    try {
+      const result = await downloadObject(document.storageKey);
+
+      return {
+        body: result.body,
+        fileName: document.originalFileName,
+        mimeType: document.mimeType || result.contentType,
+        sizeBytes: document.sizeBytes || result.contentLength,
+      };
+    } catch (error) {
+      throw toCustomerDocumentStorageError(error, "download-failed");
+    }
   }
 
   throw new CustomerDocumentStorageError(

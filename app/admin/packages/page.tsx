@@ -16,7 +16,7 @@ const errorMessages: Record<string, string> = {
   "invalid-categories":
     "Select at least one available category. Archived or unknown categories cannot be assigned.",
   "invalid-freeze-chances":
-    "Default freeze chances must be a non-negative whole number.",
+    "Default freeze chances must be a whole number from 0 to 3.",
   "invalid-guest-passes":
     "Default guest passes must be a non-negative whole number.",
   "invalid-price":

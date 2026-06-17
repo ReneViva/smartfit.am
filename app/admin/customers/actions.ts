@@ -14,9 +14,11 @@ import { writeAuditLog } from "../../../lib/logging";
 import {
   calculateActualFrozenDays,
   calculateAdjustedExpiration,
+  calculateFreezeUsage,
   calculatePlannedFreezeEndDate,
+  MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE,
   validateFreezeDays,
-  validateRemainingFreezeChances,
+  validateFreezePolicy,
 } from "../../../lib/package-freezes";
 
 const CUSTOMERS_PATH = "/admin/customers";
@@ -59,10 +61,12 @@ class AssignedPackageEditError extends Error {
 
 class AdvancedFreezeError extends Error {
   code: string;
+  freezeDaysLeft?: number;
 
-  constructor(code: string) {
+  constructor(code: string, freezeDaysLeft?: number) {
     super(code);
     this.code = code;
+    this.freezeDaysLeft = freezeDaysLeft;
   }
 }
 
@@ -197,6 +201,21 @@ function freezeErrorCode(error: unknown, fallback: string) {
   }
 
   return fallback;
+}
+
+function freezeErrorQuery(error: unknown, fallback: string) {
+  const params = new URLSearchParams({
+    error: freezeErrorCode(error, fallback),
+  });
+
+  if (
+    error instanceof AdvancedFreezeError &&
+    typeof error.freezeDaysLeft === "number"
+  ) {
+    params.set("freezeDaysLeft", error.freezeDaysLeft.toString());
+  }
+
+  return params.toString();
 }
 
 function revalidatePackageWorkflow(customerId: string) {
@@ -552,7 +571,10 @@ export async function assignCustomerPackageAction(formData: FormData) {
           initialSessions,
           packageId,
           remainingGuestPasses,
-          remainingFreezeChances: gymPackage.defaultFreezeChances,
+          remainingFreezeChances: Math.min(
+            gymPackage.defaultFreezeChances,
+            MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE,
+          ),
           remainingSessions,
           status: rawStatus as CustomerPackageStatus,
         },
@@ -654,6 +676,13 @@ export async function editCustomerPackageAction(formData: FormData) {
             customer: {
               select: { customerCode: true, fullName: true, id: true },
             },
+            freezes: {
+              select: {
+                actualDays: true,
+                plannedDays: true,
+                status: true,
+              },
+            },
             package: {
               select: { id: true, name: true },
             },
@@ -696,6 +725,11 @@ export async function editCustomerPackageAction(formData: FormData) {
         (existing.status !== "FROZEN" && nextStatus === "FROZEN")
       ) {
         throw new AssignedPackageEditError("package-edit-frozen-status");
+      }
+
+      const freezeUsage = calculateFreezeUsage(existing.freezes);
+      if (remainingFreezeChances > freezeUsage.remainingFreezeCount) {
+        throw new AssignedPackageEditError("package-edit-freeze-counter");
       }
 
       const nextCoach = coachId
@@ -831,9 +865,13 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
             select: { customerCode: true, fullName: true, id: true },
           },
           freezes: {
-            select: { id: true },
-            take: 1,
-            where: { status: "ACTIVE" },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: {
+              actualDays: true,
+              id: true,
+              plannedDays: true,
+              status: true,
+            },
           },
           package: {
             select: { deletedAt: true, isActive: true, name: true },
@@ -854,12 +892,8 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
         throw new AdvancedFreezeError("invalid-package-action");
       }
 
-      if (customerPackage.freezes.length > 0) {
+      if (customerPackage.freezes.some((freeze) => freeze.status === "ACTIVE")) {
         throw new AdvancedFreezeError("package-active-freeze");
-      }
-
-      if (!validateRemainingFreezeChances(customerPackage)) {
-        throw new AdvancedFreezeError("package-no-freeze-chances");
       }
 
       const today = startOfTodayUtc();
@@ -871,6 +905,19 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
         !customerPackage.package.isActive
       ) {
         throw new AdvancedFreezeError("package-not-freezable");
+      }
+
+      const freezePolicy = validateFreezePolicy({
+        freezes: customerPackage.freezes,
+        remainingFreezeChances: customerPackage.remainingFreezeChances,
+        requestedDays: plannedDays,
+      });
+
+      if (!freezePolicy.ok) {
+        throw new AdvancedFreezeError(
+          freezePolicy.code,
+          freezePolicy.usage.remainingFreezeDays,
+        );
       }
 
       const startDate = new Date();
@@ -926,8 +973,19 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
         description: `Advanced normal freeze for ${customerPackage.package.name} on ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName} for ${plannedDays} day${plannedDays === 1 ? "" : "s"}.`,
         newValue: {
           freezeId: freeze.id,
+          freezeCountAfter: freezePolicy.usage.confirmedFreezeCount + 1,
+          freezeCountBefore: freezePolicy.usage.confirmedFreezeCount,
+          freezeDaysRemainingAfter: Math.max(
+            0,
+            freezePolicy.usage.remainingFreezeDays - plannedDays,
+          ),
+          freezeDaysUsedAfter:
+            freezePolicy.usage.usedFreezeDays + plannedDays,
+          freezeDaysUsedBefore: freezePolicy.usage.usedFreezeDays,
+          freezeNumber: freezePolicy.freezeNumber,
           mode: freeze.mode,
           originalExpirationDate: customerPackage.expirationDate,
+          paidFreezeNoticeRequired: freezePolicy.isPaid,
           plannedDays,
           plannedEndDate,
           remainingFreezeChances:
@@ -950,7 +1008,7 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
       customerActionPath(
         formData,
         customerId,
-        `error=${freezeErrorCode(error, "package-freeze-unavailable")}`,
+        freezeErrorQuery(error, "package-freeze-unavailable"),
       ),
     );
   }
@@ -1115,7 +1173,7 @@ export async function adminReactivateCustomerPackageAction(formData: FormData) {
       customerActionPath(
         formData,
         customerId,
-        `error=${freezeErrorCode(error, "package-reactivation-unavailable")}`,
+        freezeErrorQuery(error, "package-reactivation-unavailable"),
       ),
     );
   }
@@ -1156,9 +1214,13 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
               select: { customerCode: true, fullName: true, id: true },
             },
             freezes: {
-              select: { id: true },
-              take: 1,
-              where: { status: "ACTIVE" },
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              select: {
+                actualDays: true,
+                id: true,
+                plannedDays: true,
+                status: true,
+              },
             },
             package: {
               select: { deletedAt: true, isActive: true, name: true },
@@ -1188,12 +1250,8 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
         throw new AdvancedFreezeError("invalid-package-action");
       }
 
-      if (customerPackage.freezes.length > 0) {
+      if (customerPackage.freezes.some((freeze) => freeze.status === "ACTIVE")) {
         throw new AdvancedFreezeError("package-active-freeze");
-      }
-
-      if (!validateRemainingFreezeChances(customerPackage)) {
-        throw new AdvancedFreezeError("package-no-freeze-chances");
       }
 
       if (
@@ -1217,6 +1275,19 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
 
       if (!validateFreezeDays(actualDays)) {
         throw new AdvancedFreezeError("invalid-retroactive-freeze");
+      }
+
+      const freezePolicy = validateFreezePolicy({
+        freezes: customerPackage.freezes,
+        remainingFreezeChances: customerPackage.remainingFreezeChances,
+        requestedDays: actualDays,
+      });
+
+      if (!freezePolicy.ok) {
+        throw new AdvancedFreezeError(
+          freezePolicy.code,
+          freezePolicy.usage.remainingFreezeDays,
+        );
       }
 
       const resultingExpirationDate = calculateAdjustedExpiration(
@@ -1272,8 +1343,18 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
           actualDays,
           actualEndDate,
           freezeId: freeze.id,
+          freezeCountAfter: freezePolicy.usage.confirmedFreezeCount + 1,
+          freezeCountBefore: freezePolicy.usage.confirmedFreezeCount,
+          freezeDaysRemainingAfter: Math.max(
+            0,
+            freezePolicy.usage.remainingFreezeDays - actualDays,
+          ),
+          freezeDaysUsedAfter: freezePolicy.usage.usedFreezeDays + actualDays,
+          freezeDaysUsedBefore: freezePolicy.usage.usedFreezeDays,
+          freezeNumber: freezePolicy.freezeNumber,
           latestCheckoutAt: latestVisit.checkedOutAt,
           mode: freeze.mode,
+          paidFreezeNoticeRequired: freezePolicy.isPaid,
           remainingFreezeChances:
             customerPackage.remainingFreezeChances - 1,
           resultingExpirationDate,
@@ -1293,7 +1374,7 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
       customerActionPath(
         formData,
         customerId,
-        `error=${freezeErrorCode(error, "retroactive-freeze-unavailable")}`,
+        freezeErrorQuery(error, "retroactive-freeze-unavailable"),
       ),
     );
   }

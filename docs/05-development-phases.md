@@ -3500,7 +3500,7 @@ Specific business workflow dependencies:
 - Analytics depends on visit records and occupancy records.
 - Excel export depends on customer, package, coach, visit, public content, note, and log data.
 - Admin logs depend on server-side logging being added during earlier admin and registration actions.
-- Customer document UI uses the implemented private Cloudinary storage adapter and Admin-only authorized download strategy.
+- Customer document UI uses the implemented private provider-neutral object storage adapter and Admin-only authorized download strategy.
 - Advanced freezing depends on transactional counter, status, date, and audit updates.
 
 ---
@@ -3590,7 +3590,7 @@ Codex should also follow these rules:
 | Phase 31 — Public and Admin Analytics Expansion | Complete |  | Public-safe aggregates and Admin analytics |
 | Phase 32 — Package Category Management Foundation | Complete |  | Category data and Admin management |
 | Phase 33 — Package Category Assignment and Public Package Filtering | Complete |  | Public eligibility, filters, and sorting |
-| Phase 34 — Customer Document Upload Storage Foundation | Complete |  | Private Cloudinary storage adapter and metadata |
+| Phase 34 — Customer Document Upload Storage Foundation | Complete |  | Private provider-neutral object storage adapter and metadata |
 | Phase 35 — Admin Customer Document Upload UI | Complete |  | Admin-only upload/list/download/archive UI |
 | Phase 36 — Customer Visit History on Admin Customer Detail | Complete |  | Admin-only recent and full visit history |
 | Phase 37 — Advanced Package Freezing Data Model and Freeze Chances | Complete |  | Freeze history and counters |
@@ -3609,9 +3609,9 @@ The following items should not be forced into implementation phases until confir
 2. Whether Gallery images are uploaded through Admin Panel or provided as external URLs.
 3. Whether reception staff can delete notes or only create/edit them.
 4. Whether note edits/deletions must create separate logs.
-5. Future non-Cloudinary document storage providers, such as R2, require a new adapter and migration plan; they are not a one-URL swap.
+5. Future document storage providers beyond the current R2-compatible adapter require a new adapter and migration plan; they are not a one-URL swap.
 6. Customer document retention policy beyond the current Admin archive/delete plus provider-object deletion behavior.
-7. Production CDN/private delivery tuning beyond the current Admin-only short-lived Cloudinary download route.
+7. Production CDN/private delivery tuning beyond the current Admin-only private object download route.
 8. Future timezone edge cases beyond the implemented Phase 37-38 server date rules for advanced freeze duration calculations.
 9. Whether admin override is allowed for time-restricted packages.
 10. Whether admin override is allowed for expired packages or zero-session packages.

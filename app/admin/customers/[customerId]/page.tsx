@@ -16,7 +16,11 @@ import { db } from "../../../../lib/db";
 
 type CustomerDetailPageProps = {
   params: Promise<{ customerId: string }>;
-  searchParams: Promise<{ error?: string; status?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    freezeDaysLeft?: string;
+    status?: string;
+  }>;
 };
 
 const errorMessages: Record<string, string> = {
@@ -47,6 +51,8 @@ const errorMessages: Record<string, string> = {
     "Use the dedicated freeze/reactivate control to change frozen status.",
   "package-edit-open-visit":
     "This package is being used by an open visit and cannot be edited yet.",
+  "package-edit-freeze-counter":
+    "Remaining freeze chances cannot exceed the package's remaining slots out of 3.",
   "package-edit-stale":
     "This package changed before Save. Review the latest values and try again.",
   "package-edit-unavailable":
@@ -59,6 +65,13 @@ const errorMessages: Record<string, string> = {
     "No completed checkout was found for a retroactive freeze.",
   "package-no-freeze-chances":
     "This assignment has no remaining freeze chances. Edit the counter before freezing.",
+  "package-freeze-counter-invalid":
+    "Remaining freeze chances are invalid for this package.",
+  "package-freeze-counter-mismatch":
+    "Remaining freeze chances do not match the freeze record limit. Review the assignment counter.",
+  "package-freeze-days-limit":
+    "This package already used the maximum 30 freeze days.",
+  "package-freeze-limit": "Maximum 3 freezes already used.",
   "package-not-freezable":
     "Only an active, unexpired package with remaining sessions can be frozen.",
   "package-not-frozen": "This package is no longer frozen.",
@@ -100,6 +113,16 @@ function staffName(staff: {
   username: string | null;
 }) {
   return staff.name ?? staff.username ?? "Staff user";
+}
+
+function freezeDaysExceededMessage(value: string | undefined) {
+  const freezeDaysLeft = Number(value);
+
+  if (Number.isInteger(freezeDaysLeft) && freezeDaysLeft >= 0) {
+    return `Only ${freezeDaysLeft} freeze day${freezeDaysLeft === 1 ? "" : "s"} remain for this package.`;
+  }
+
+  return "The requested freeze would exceed the maximum 30 freeze days.";
 }
 
 export default async function CustomerDetailPage({
@@ -180,8 +203,6 @@ export default async function CustomerDetailPage({
                   startDate: true,
                   status: true,
                 },
-                take: 1,
-                where: { status: "ACTIVE" },
               },
             },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -239,7 +260,12 @@ export default async function CustomerDetailPage({
     notFound();
   }
 
-  const errorMessage = query.error ? errorMessages[query.error] : null;
+  const errorMessage =
+    query.error === "package-freeze-days-exceeded"
+      ? freezeDaysExceededMessage(query.freezeDaysLeft)
+      : query.error
+        ? errorMessages[query.error]
+        : null;
   const statusMessage = query.status ? statusMessages[query.status] : null;
   const latestNotes = customer.notes.map((note) => ({
     content: note.content,

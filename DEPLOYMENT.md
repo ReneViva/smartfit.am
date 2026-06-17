@@ -7,7 +7,7 @@ Use this checklist for staging and production deployments.
 - Use Node.js 20.9 or newer.
 - Provision a PostgreSQL database with backups enabled.
 - Serve the application only over HTTPS.
-- Keep `.env`, database credentials, `AUTH_SECRET`, seed passwords, and Cloudinary credentials outside source control.
+- Keep `.env`, database credentials, `AUTH_SECRET`, seed passwords, and storage credentials outside source control.
 - Confirm the deployment platform persists no generated export files. Exports are generated in memory by the application.
 
 ## 2. Environment
@@ -33,17 +33,20 @@ SEED_REGISTRATION_PASSWORD="..."
 Set these values to enable file uploads:
 
 ```env
-CLOUDINARY_CLOUD_NAME="..."
-CLOUDINARY_API_KEY="..."
-CLOUDINARY_API_SECRET="..."
-CLOUDINARY_UPLOAD_FOLDER="smartfit-am"
+STORAGE_PROVIDER="r2"
+CLOUD_NAME="..."
+ACCESS_KEY_ID="..."
+SECRET_ACCESS_KEY="..."
+STORAGE_ENDPOINT="https://ACCOUNT_ID.r2.cloudflarestorage.com"
+STORAGE_REGION="auto"
+STORAGE_PUBLIC_BASE_URL="https://cdn.example.com"
 ```
 
 Checklist:
 
 - `AUTH_SECRET` is long, random, production-specific, and stored as a secret.
 - Seed passwords are strong, unique, and production-specific.
-- Cloudinary API secret is never exposed to browser code.
+- Storage secret access key is never exposed to browser code.
 - `.env` and `.env.local` are not committed.
 - `.env.example` contains placeholders only.
 
@@ -124,11 +127,11 @@ Use clearly marked temporary data and delete it after verification:
 9. Sign in as ADMIN and verify logs, all export categories, and analytics.
 10. Delete temporary records and restore occupancy.
 
-## 9. Cloudinary Verification
+## 9. Storage Verification
 
-- Verify URL-based images still work without Cloudinary.
-- With Cloudinary configured, upload a small supported image from an ADMIN form.
-- Confirm the browser receives only the resulting image URL, never the API secret.
+- Verify URL-based images still work without configured storage.
+- With storage configured, upload a small supported image from an ADMIN form.
+- Confirm the browser receives only the resulting image URL, never storage credentials.
 - Confirm an invalid or oversized file returns a clear form error.
 
 ## 10. Backups, Monitoring, and Recovery

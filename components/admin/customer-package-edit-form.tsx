@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { editCustomerPackageAction } from "../../app/admin/customers/actions";
 import { packageTypeLabel } from "../../lib/package-types";
+import { MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE } from "../../lib/package-freezes";
 import { Button } from "../ui/button";
 
 const inputClass =
@@ -248,6 +249,7 @@ export function CustomerPackageEditForm({
           Remaining freeze chances
           <input
             className={inputClass}
+            max={MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE}
             min={0}
             name="remainingFreezeChances"
             onChange={(event) => setRemainingFreezeChances(event.target.value)}
@@ -256,6 +258,10 @@ export function CustomerPackageEditForm({
             type="number"
             value={remainingFreezeChances}
           />
+          <span className="mt-1 block text-xs font-normal text-secondary">
+            Cannot exceed the remaining slots out of{" "}
+            {MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE}.
+          </span>
         </label>
       </div>
       <p className="mt-4 text-sm leading-6 text-secondary">

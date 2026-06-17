@@ -3,7 +3,7 @@ import "server-only";
 export type CustomerDocumentStorageErrorCode =
   | "configuration"
   | "delete-failed"
-  | "download-url-failed"
+  | "download-failed"
   | "provider"
   | "upload-failed";
 

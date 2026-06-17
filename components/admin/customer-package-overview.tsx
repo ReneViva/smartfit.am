@@ -353,7 +353,9 @@ export function CustomerPackageOverview({
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
             {currentPackages.map((customerPackage) => {
               const state = packageState(customerPackage, today);
-              const hasActiveFreeze = customerPackage.freezes.length > 0;
+              const hasActiveFreeze = customerPackage.freezes.some(
+                (freeze) => freeze.status === "ACTIVE",
+              );
 
               return (
                 <article
@@ -588,6 +590,9 @@ export function CustomerPackageOverview({
             <div className="mt-5 space-y-3 md:hidden">
               {visibleHistory.map((customerPackage) => {
                 const state = packageState(customerPackage, today);
+                const hasActiveFreeze = customerPackage.freezes.some(
+                  (freeze) => freeze.status === "ACTIVE",
+                );
 
                 return (
                   <article
@@ -666,12 +671,10 @@ export function CustomerPackageOverview({
                         openSelectedPanel(customerPackage.id, "freeze")
                       }
                       variant={
-                        customerPackage.freezes.length ? "primary" : "warning"
+                        hasActiveFreeze ? "primary" : "warning"
                       }
                     >
-                      {customerPackage.freezes.length
-                        ? "Reactivate"
-                        : "Freeze options"}
+                      {hasActiveFreeze ? "Reactivate" : "Freeze options"}
                     </Button>
                   </article>
                 );
@@ -695,6 +698,9 @@ export function CustomerPackageOverview({
                 <tbody>
                   {visibleHistory.map((customerPackage) => {
                     const state = packageState(customerPackage, today);
+                    const hasActiveFreeze = customerPackage.freezes.some(
+                      (freeze) => freeze.status === "ACTIVE",
+                    );
 
                     return (
                       <tr
@@ -750,14 +756,10 @@ export function CustomerPackageOverview({
                               openSelectedPanel(customerPackage.id, "freeze")
                             }
                             variant={
-                              customerPackage.freezes.length
-                                ? "primary"
-                                : "warning"
+                              hasActiveFreeze ? "primary" : "warning"
                             }
                           >
-                            {customerPackage.freezes.length
-                              ? "Reactivate"
-                              : "Freeze"}
+                            {hasActiveFreeze ? "Reactivate" : "Freeze"}
                           </Button>
                         </td>
                       </tr>

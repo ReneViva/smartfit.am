@@ -142,8 +142,8 @@ Phase 31-40 expansion.
 
 ### Customer Documents
 
-- Confirm the private Cloudinary provider is configured for authenticated or
-  private delivery before testing uploads.
+- Confirm private R2-compatible object storage is configured before testing
+  uploads.
 - Confirm database records contain provider metadata and private storage keys,
   but public pages, exports, and non-Admin responses do not expose storage
   keys, signed URLs, or file contents.
@@ -220,8 +220,8 @@ Phase 31-40 expansion.
 - Run the demo seed only against a confirmed local or disposable database,
   using the documented safety flag.
 - Complete production customer-document storage verification during Phase 41
-  sign-off, including required Cloudinary environment variables and private
-  delivery behavior.
+  sign-off, including required generic storage environment variables and
+  private delivery behavior.
 
 ## Cleanup And Sign-Off
 

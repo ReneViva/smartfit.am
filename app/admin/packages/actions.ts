@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireStaffRole } from "../../../lib/auth";
 import { db } from "../../../lib/db";
 import { writeAuditLog } from "../../../lib/logging";
+import { MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE } from "../../../lib/package-freezes";
 
 const PACKAGES_PATH = "/admin/packages";
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -130,7 +131,10 @@ export async function savePackageAction(formData: FormData) {
     redirectPackageError("invalid-guest-passes", id);
   }
 
-  if (defaultFreezeChances === null) {
+  if (
+    defaultFreezeChances === null ||
+    defaultFreezeChances > MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE
+  ) {
     redirectPackageError("invalid-freeze-chances", id);
   }
 

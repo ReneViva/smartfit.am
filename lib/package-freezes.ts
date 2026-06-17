@@ -1,5 +1,42 @@
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
+export const MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE = 3;
+export const MAX_TOTAL_FREEZE_DAYS_PER_CUSTOMER_PACKAGE = 30;
+
+export type FreezeUsageRecord = {
+  actualDays: number | null;
+  plannedDays: number;
+  status: string;
+};
+
+export type FreezeUsage = {
+  confirmedFreezeCount: number;
+  remainingFreezeCount: number;
+  remainingFreezeDays: number;
+  usedFreezeDays: number;
+};
+
+export type FreezePolicyValidation =
+  | {
+      freezeNumber: number;
+      isPaid: boolean;
+      ok: true;
+      usage: FreezeUsage;
+    }
+  | {
+      code:
+        | "package-freeze-counter-invalid"
+        | "package-freeze-counter-mismatch"
+        | "package-freeze-days-exceeded"
+        | "package-freeze-days-limit"
+        | "package-freeze-limit"
+        | "package-no-freeze-chances";
+      freezeNumber: number;
+      isPaid: boolean;
+      ok: false;
+      usage: FreezeUsage;
+    };
+
 function assertValidDate(value: Date, name: string) {
   if (Number.isNaN(value.getTime())) {
     throw new RangeError(`${name} must be a valid date.`);
@@ -23,6 +60,105 @@ export function validateRemainingFreezeChances(customerPackage: {
     Number.isInteger(customerPackage.remainingFreezeChances) &&
     customerPackage.remainingFreezeChances > 0
   );
+}
+
+function countedFreezeDays(freeze: FreezeUsageRecord) {
+  if (freeze.status === "CANCELLED") {
+    return 0;
+  }
+
+  const days =
+    freeze.status === "ACTIVE"
+      ? freeze.plannedDays
+      : (freeze.actualDays ?? freeze.plannedDays);
+
+  return Number.isInteger(days) && days > 0 ? days : 0;
+}
+
+export function calculateFreezeUsage(
+  freezes: FreezeUsageRecord[],
+): FreezeUsage {
+  const confirmedFreezes = freezes.filter(
+    (freeze) => freeze.status !== "CANCELLED",
+  );
+  const usedFreezeDays = confirmedFreezes.reduce(
+    (total, freeze) => total + countedFreezeDays(freeze),
+    0,
+  );
+  const confirmedFreezeCount = confirmedFreezes.length;
+
+  return {
+    confirmedFreezeCount,
+    remainingFreezeCount: Math.max(
+      0,
+      MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE - confirmedFreezeCount,
+    ),
+    remainingFreezeDays: Math.max(
+      0,
+      MAX_TOTAL_FREEZE_DAYS_PER_CUSTOMER_PACKAGE - usedFreezeDays,
+    ),
+    usedFreezeDays,
+  };
+}
+
+export function getNextFreezeNumber(freezesOrUsage: FreezeUsageRecord[] | FreezeUsage) {
+  const usage = Array.isArray(freezesOrUsage)
+    ? calculateFreezeUsage(freezesOrUsage)
+    : freezesOrUsage;
+
+  return usage.confirmedFreezeCount + 1;
+}
+
+export function isPaidFreezeNumber(freezeNumber: number) {
+  return freezeNumber === 2 || freezeNumber === 3;
+}
+
+export function validateFreezePolicy({
+  freezes,
+  remainingFreezeChances,
+  requestedDays,
+}: {
+  freezes: FreezeUsageRecord[];
+  remainingFreezeChances: number;
+  requestedDays: number;
+}): FreezePolicyValidation {
+  const usage = calculateFreezeUsage(freezes);
+  const freezeNumber = getNextFreezeNumber(usage);
+  const isPaid = isPaidFreezeNumber(freezeNumber);
+
+  function blocked(
+    code: Exclude<FreezePolicyValidation, { ok: true }>["code"],
+  ): FreezePolicyValidation {
+    return { code, freezeNumber, isPaid, ok: false, usage };
+  }
+
+  if (!Number.isInteger(remainingFreezeChances) || remainingFreezeChances < 0) {
+    return blocked("package-freeze-counter-invalid");
+  }
+
+  if (
+    usage.confirmedFreezeCount >= MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE
+  ) {
+    return blocked("package-freeze-limit");
+  }
+
+  if (remainingFreezeChances > usage.remainingFreezeCount) {
+    return blocked("package-freeze-counter-mismatch");
+  }
+
+  if (usage.remainingFreezeDays <= 0) {
+    return blocked("package-freeze-days-limit");
+  }
+
+  if (remainingFreezeChances === 0) {
+    return blocked("package-no-freeze-chances");
+  }
+
+  if (requestedDays > usage.remainingFreezeDays) {
+    return blocked("package-freeze-days-exceeded");
+  }
+
+  return { freezeNumber, isPaid, ok: true, usage };
 }
 
 export function calculatePlannedFreezeEndDate(

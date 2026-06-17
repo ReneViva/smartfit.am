@@ -26,6 +26,7 @@ export function PackageStatusActions({
   customerCode,
   customerId,
   customerPackageId,
+  freezeDaysRemaining,
   inline = false,
   isFrozen,
   returnPath,
@@ -37,6 +38,7 @@ export function PackageStatusActions({
   customerCode: string;
   customerId: string;
   customerPackageId: string;
+  freezeDaysRemaining: number;
   inline?: boolean;
   isFrozen: boolean;
   returnPath?: string;
@@ -118,6 +120,7 @@ export function PackageStatusActions({
               className="mt-3 min-h-11 w-full rounded-lg border border-input-border bg-card px-3 py-2 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue"
               defaultValue={1}
               inputMode="numeric"
+              max={freezeDaysRemaining || undefined}
               min={1}
               name="freezeDays"
               required
@@ -127,7 +130,8 @@ export function PackageStatusActions({
           </label>
           <p className="mt-2 text-xs leading-5 text-secondary">
             Expiration is planned from this duration and recalculated if the
-            package is reactivated early.
+            package is reactivated early. Up to {freezeDaysRemaining} freeze
+            day{freezeDaysRemaining === 1 ? "" : "s"} remain.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button type="submit" variant="warning">

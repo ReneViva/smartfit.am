@@ -20,6 +20,7 @@ type RegistrationPageProps = {
   searchParams: Promise<{
     customer?: string;
     error?: string;
+    freezeDaysLeft?: string;
     customerFilter?: string;
     q?: string;
     showAll?: string;
@@ -131,6 +132,13 @@ const errorMessages: Record<string, string> = {
     "This package already has an active freeze.",
   "package-no-freeze-chances":
     "This package has no remaining freeze chances.",
+  "package-freeze-counter-invalid":
+    "Remaining freeze chances are invalid for this package.",
+  "package-freeze-counter-mismatch":
+    "Remaining freeze chances do not match the freeze record limit. Ask Admin to review the assignment counter.",
+  "package-freeze-days-limit":
+    "This package already used the maximum 30 freeze days.",
+  "package-freeze-limit": "Maximum 3 freezes already used.",
   "package-not-freezable":
     "Only active, unexpired packages with remaining sessions can be frozen.",
   "package-not-frozen":
@@ -146,6 +154,16 @@ const errorMessages: Record<string, string> = {
   "stale-occupancy":
     "Occupancy changed after this page loaded. Review the current count and try again.",
 };
+
+function freezeDaysExceededMessage(value: string | undefined) {
+  const freezeDaysLeft = Number(value);
+
+  if (Number.isInteger(freezeDaysLeft) && freezeDaysLeft >= 0) {
+    return `Only ${freezeDaysLeft} freeze day${freezeDaysLeft === 1 ? "" : "s"} remain for this package.`;
+  }
+
+  return "The requested freeze would exceed the maximum 30 freeze days.";
+}
 
 export default async function RegistrationPage({
   searchParams,
@@ -259,6 +277,14 @@ export default async function RegistrationPage({
                 coach: {
                   select: { firstName: true, lastName: true },
                 },
+                freezes: {
+                  orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                  select: {
+                    actualDays: true,
+                    plannedDays: true,
+                    status: true,
+                  },
+                },
                 package: {
                   select: {
                     allowedEndTime: true,
@@ -294,7 +320,12 @@ export default async function RegistrationPage({
       },
     }),
   ]);
-  const errorMessage = params.error ? errorMessages[params.error] : null;
+  const errorMessage =
+    params.error === "package-freeze-days-exceeded"
+      ? freezeDaysExceededMessage(params.freezeDaysLeft)
+      : params.error
+        ? errorMessages[params.error]
+        : null;
   const statusMessage =
     params.status === "checked-in"
       ? "Customer checked in successfully."

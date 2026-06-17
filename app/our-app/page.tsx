@@ -19,8 +19,13 @@ export const metadata = createPublicMetadata({
   description:
     "Check Smartfit.am live gym occupancy, public contact links, and add the public app to your device home screen.",
   path: "/our-app",
-  title: "Smartfit.am Our App — Live Gym Occupancy & Add to Home Screen",
+  title: "Smartfit.am Our App - Live Gym Occupancy & Add to Home Screen",
 });
+
+const OUR_APP_HERO_IMAGE =
+  "/images/danielle-cerullo-CQfNt66ttZM-unsplash.jpg";
+const OUR_APP_DEVICE_IMAGE =
+  "/images/84b59626-2c9e-4420-8269-8e34e607bfdc_z2kw5u.avif";
 
 const occupancyCircleClasses: Record<PublicCrowdStatus, string> = {
   high: "bg-status-high text-white",
@@ -29,9 +34,28 @@ const occupancyCircleClasses: Record<PublicCrowdStatus, string> = {
 };
 
 const publicLinkClasses =
-  "group flex min-h-24 min-w-0 flex-col items-center justify-center gap-2 rounded-xl border border-border bg-neutral px-3 py-4 text-center font-semibold text-foreground transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-brand hover:bg-soft-blue hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+  "group flex min-h-24 min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-4 text-center font-semibold text-foreground shadow-sm transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-brand hover:bg-soft-blue hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
 const iconClasses =
   "size-7 fill-none stroke-current stroke-[1.8] transition-transform group-hover:scale-105";
+
+const installSteps = [
+  {
+    items: [
+      "Open Smartfit.am in Safari.",
+      "Tap Share.",
+      "Tap Add to Home Screen.",
+    ],
+    title: "iPhone and Safari",
+  },
+  {
+    items: [
+      "Open Smartfit.am in Chrome.",
+      "Tap the menu.",
+      "Tap Add to home screen or Install app.",
+    ],
+    title: "Android and Chrome",
+  },
+];
 
 function PhoneIcon() {
   return (
@@ -94,83 +118,116 @@ export default async function OurAppPage() {
   const hasPublicLinks = Object.values(appData.links).some(Boolean);
   const occupancyClasses = occupancy.crowdStatus
     ? occupancyCircleClasses[occupancy.crowdStatus]
-    : "bg-neutral text-secondary";
+    : "bg-white/10 text-white";
 
   return (
-    <PublicLayout>
+    <PublicLayout fullWidth>
       <JsonLd data={createBreadcrumbJsonLd("Our App", "/our-app")} />
 
-      <div className="mx-auto max-w-3xl">
-        <header className="text-center">
-          <SmartfitLogo
-            alt={`${appData.gymName} logo`}
-            className="mx-auto max-h-20 max-w-56 object-contain"
-            darkSrc={appData.ourAppLogoDarkUrl ?? undefined}
-            lightSrc={appData.ourAppLogoLightUrl ?? undefined}
-          />
-          <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-            Live gym status
-          </p>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-            Plan your visit
-          </h1>
-          <p className="mt-4 leading-7 text-secondary">
-            Check how busy {appData.gymName} is before you head out.
-          </p>
-        </header>
-
-        <Card className="mt-8 text-center">
-          <div
-            aria-label={`Current occupancy: ${occupancy.currentCount} people`}
-            aria-live="polite"
-            className={`mx-auto flex size-44 flex-col items-center justify-center rounded-full ${occupancyClasses}`}
-          >
-            <span className="text-7xl font-bold leading-none">
-              {occupancy.currentCount}
-            </span>
-            <span className="mt-2 text-sm font-semibold uppercase tracking-wide">
-              people inside
-            </span>
+      <section className="home-full-bleed relative isolate overflow-hidden bg-black text-white">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url("${OUR_APP_HERO_IMAGE}")` }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/55 to-[#061521]"
+        />
+        <div className="home-wide-rail relative grid min-h-[82svh] gap-8 py-28 sm:py-32 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.42fr)] lg:items-end">
+          <div className="max-w-4xl">
+            <div className="public-header-over-hero inline-block">
+              <SmartfitLogo
+                alt={`${appData.gymName} logo`}
+                className="max-h-20 max-w-56 object-contain"
+                darkSrc={appData.ourAppLogoDarkUrl ?? undefined}
+                lightSrc={appData.ourAppLogoLightUrl ?? undefined}
+              />
+            </div>
+            <p className="mt-8 text-sm font-bold uppercase tracking-[0.18em] text-white/75">
+              Live gym status
+            </p>
+            <h1 className="mt-4 text-5xl font-bold text-white sm:text-7xl">
+              Plan your visit before you leave
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-white/85 sm:text-xl sm:leading-8">
+              Check how busy {appData.gymName} is, open the fastest contact
+              links, and keep the public app one tap away.
+            </p>
           </div>
 
-          <StatusBadge
-            className="mt-6"
-            status={occupancy.crowdStatus ?? "notInGym"}
-          >
-            {occupancy.crowdLabel}
-          </StatusBadge>
-
-          {!occupancy.available ? (
-            <p className="mt-5 text-sm leading-6 text-secondary">
-              Live occupancy is temporarily unavailable. A safe zero fallback
-              is shown.
+          <div className="rounded-lg border border-white/15 bg-white/10 p-5 text-center shadow-2xl shadow-black/25 backdrop-blur sm:p-6">
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-white/65">
+              Right now
             </p>
-          ) : !occupancy.thresholdsAvailable ? (
-            <p className="mt-5 text-sm leading-6 text-secondary">
-              Crowd status is unavailable until occupancy thresholds are set.
+            <div
+              aria-label={`Current occupancy: ${occupancy.currentCount} people`}
+              aria-live="polite"
+              className={`mx-auto mt-5 flex size-44 flex-col items-center justify-center rounded-full shadow-2xl shadow-black/20 ${occupancyClasses}`}
+            >
+              <span className="text-7xl font-bold leading-none">
+                {occupancy.currentCount}
+              </span>
+              <span className="mt-2 text-sm font-semibold uppercase tracking-wide">
+                people inside
+              </span>
+            </div>
+
+            <StatusBadge
+              className="mt-6 border-white/20 bg-white/10 text-white"
+              status={occupancy.crowdStatus ?? "notInGym"}
+            >
+              {occupancy.crowdLabel}
+            </StatusBadge>
+
+            {!occupancy.available ? (
+              <p className="mt-5 text-sm leading-6 text-white/70">
+                Live occupancy is temporarily unavailable. A safe zero fallback
+                is shown.
+              </p>
+            ) : !occupancy.thresholdsAvailable ? (
+              <p className="mt-5 text-sm leading-6 text-white/70">
+                Crowd status is unavailable until occupancy thresholds are set.
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      <section className="home-wide-rail relative z-10 -mt-10 grid gap-5 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
+        <Card className="rounded-lg p-6 sm:p-7">
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
+            Visit smarter
+          </p>
+          <h2 className="mt-2 text-3xl font-bold text-foreground">
+            Live status, public links, and quick directions in one place
+          </h2>
+          <p className="mt-4 text-sm leading-6 text-secondary">
+            The public app is built for planning: see the current crowd level,
+            choose a quieter hour, then get straight to the right contact or
+            location link.
+          </p>
+          {appData.motivationalText ? (
+            <p className="mt-5 rounded-lg border border-brand/25 bg-soft-blue px-4 py-3 text-sm font-bold leading-6 text-primary-active">
+              {appData.motivationalText}
             </p>
           ) : null}
         </Card>
 
-        {appData.showPublicAnalytics ? (
-          <PublicAnalytics analytics={publicAnalytics} />
-        ) : null}
-
-        {appData.motivationalText ? (
-          <Card className="mt-6 bg-soft-blue text-center">
-            <p className="text-lg font-semibold leading-7 text-foreground">
-              {appData.motivationalText}
-            </p>
-          </Card>
-        ) : null}
-
         {hasPublicLinks || appData.location?.address ? (
-          <Card className="mt-6">
+          <Card className="rounded-lg p-6 sm:p-7">
             {hasPublicLinks ? (
               <>
-                <h2 className="text-2xl font-bold text-foreground">
-                  Quick links
-                </h2>
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
+                      Quick links
+                    </p>
+                    <h2 className="mt-2 text-3xl font-bold text-foreground">
+                      Reach Smartfit.am fast
+                    </h2>
+                  </div>
+                </div>
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {appData.links.phone ? (
                     <a
@@ -230,7 +287,7 @@ export default async function OurAppPage() {
               <div
                 className={`max-w-xl ${hasPublicLinks ? "mt-6 border-t border-border pt-5" : ""}`}
               >
-                <p className="text-sm font-semibold uppercase tracking-[0.14em] text-brand">
+                <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
                   Location
                 </p>
                 <p className="mt-2 [overflow-wrap:anywhere] text-sm leading-6 text-secondary">
@@ -240,72 +297,89 @@ export default async function OurAppPage() {
             ) : null}
           </Card>
         ) : null}
+      </section>
 
-        <section className="mt-10">
-          <div className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-              Add to Home Screen
-            </p>
-            <h2 className="mt-2 text-3xl font-bold text-foreground">
-              Keep Smartfit.am one tap away
-            </h2>
-          </div>
-
-          <div className="mt-6 grid gap-6 md:grid-cols-2">
-            <Card>
-              <h3 className="text-xl font-bold text-foreground">
-                iPhone and Safari
-              </h3>
-              <ol className="mt-4 list-decimal space-y-3 pl-5 leading-6 text-secondary">
-                <li>Open Smartfit.am in Safari.</li>
-                <li>Tap Share.</li>
-                <li>Tap Add to Home Screen.</li>
-              </ol>
-            </Card>
-
-            <Card>
-              <h3 className="text-xl font-bold text-foreground">
-                Android and Chrome
-              </h3>
-              <ol className="mt-4 list-decimal space-y-3 pl-5 leading-6 text-secondary">
-                <li>Open Smartfit.am in Chrome.</li>
-                <li>Tap the menu.</li>
-                <li>Tap Add to home screen or Install app.</li>
-              </ol>
-            </Card>
-          </div>
+      {appData.showPublicAnalytics ? (
+        <section className="home-wide-rail py-12 sm:py-16">
+          <PublicAnalytics analytics={publicAnalytics} />
         </section>
+      ) : null}
 
-        {appData.location?.mapEmbedUrl ? (
-          <section className="mt-10">
-            <div className="text-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+      <section className="home-full-bleed overflow-hidden bg-[#05070a] py-12 text-white sm:py-16 lg:py-20">
+        <div className="home-wide-rail grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-stretch">
+          <div className="relative min-h-80 overflow-hidden rounded-lg border border-white/15 bg-white/10 shadow-2xl shadow-black/25">
+            <img
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 size-full object-cover object-center"
+              loading="lazy"
+              src={OUR_APP_DEVICE_IMAGE}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
+                One tap away
+              </p>
+              <h2 className="mt-2 text-3xl font-bold text-white sm:text-4xl">
+                Add Smartfit.am to your home screen
+              </h2>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            {installSteps.map((step) => (
+              <article
+                className="rounded-lg border border-white/15 bg-white/10 p-6 shadow-xl shadow-black/20 backdrop-blur"
+                key={step.title}
+              >
+                <h3 className="text-2xl font-bold text-white">{step.title}</h3>
+                <ol className="mt-5 list-decimal space-y-3 pl-5 text-sm leading-6 text-white/75">
+                  {step.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ol>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {appData.location?.mapEmbedUrl ? (
+        <section className="home-wide-rail py-12 sm:py-16">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
                 Location
               </p>
-              <h2 className="mt-2 text-3xl font-bold text-foreground">
+              <h2 className="mt-2 text-4xl font-bold text-foreground">
                 Find us
               </h2>
             </div>
-            <Card className="mt-6 overflow-hidden p-0">
-              <iframe
-                allowFullScreen
-                className="block h-[270px] w-full border-0 sm:h-[360px]"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                src={appData.location.mapEmbedUrl}
-                title={`${appData.gymName} map`}
-              />
-            </Card>
-          </section>
-        ) : null}
+            {appData.location?.address ? (
+              <p className="max-w-xl [overflow-wrap:anywhere] text-sm leading-6 text-secondary">
+                {appData.location.address}
+              </p>
+            ) : null}
+          </div>
+          <div className="mt-6 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+            <iframe
+              allowFullScreen
+              className="block h-[270px] w-full border-0 sm:h-[420px]"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              src={appData.location.mapEmbedUrl}
+              title={`${appData.gymName} map`}
+            />
+          </div>
+        </section>
+      ) : null}
 
-        {!appData.settingsAvailable ? (
-          <p className="mt-8 text-center text-sm leading-6 text-secondary">
-            Public gym settings are temporarily unavailable. Smartfit.am
-            fallback content is shown.
-          </p>
-        ) : null}
-      </div>
+      {!appData.settingsAvailable ? (
+        <p className="home-wide-rail pb-10 text-center text-sm leading-6 text-secondary">
+          Public gym settings are temporarily unavailable. Smartfit.am fallback
+          content is shown.
+        </p>
+      ) : null}
     </PublicLayout>
   );
 }

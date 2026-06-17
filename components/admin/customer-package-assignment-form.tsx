@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { assignCustomerPackageAction } from "../../app/admin/customers/actions";
 import { packageTypeKey, packageTypeLabel } from "../../lib/package-types";
+import { MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE } from "../../lib/package-freezes";
 import { Button } from "../ui/button";
 
 const inputClass =
@@ -169,7 +170,10 @@ export function CustomerPackageAssignmentForm({
                     <span className="mt-1 block text-sm text-secondary">
                       {gymPackage.sessionCount} sessions ·{" "}
                       {gymPackage.defaultGuestPasses} guest passes,{" "}
-                      {gymPackage.defaultFreezeChances} freeze chances
+                      {Math.min(
+                        gymPackage.defaultFreezeChances,
+                        MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE,
+                      )} freeze chances
                     </span>
                   </span>
                 </label>

@@ -314,12 +314,12 @@ export default async function PackagesPage({
                       </p>
                     ) : null}
 
-                    <Link
+                    {/* <Link
                       className="mt-auto inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-bold text-white transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                       href="/contact"
                     >
                       Ask about this package
-                    </Link>
+                    </Link> */}
                   </div>
                 </article>
               ))}

@@ -5,6 +5,13 @@ import type {
 } from "@prisma/client";
 import Link from "next/link";
 
+import {
+  calculateFreezeUsage,
+  getNextFreezeNumber,
+  isPaidFreezeNumber,
+  MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE,
+  MAX_TOTAL_FREEZE_DAYS_PER_CUSTOMER_PACKAGE,
+} from "../../lib/package-freezes";
 import { packageUsability } from "../../lib/registration/package-usability";
 import { packageTypeLabel } from "../../lib/package-types";
 import type { CustomerNoteView } from "../../lib/notes";
@@ -24,6 +31,11 @@ type PackageCardValue = {
     lastName: string;
   } | null;
   expirationDate: Date;
+  freezes: {
+    actualDays: number | null;
+    plannedDays: number;
+    status: string;
+  }[];
   frozenAt: Date | null;
   id: string;
   package: {
@@ -344,14 +356,54 @@ export function RegistrationCustomerCard({
               const isZero = customerPackage.remainingSessions === 0;
               const packageCoach =
                 customerPackage.coach ?? customerPackage.package.assignedCoach;
+              const freezeUsage = calculateFreezeUsage(
+                customerPackage.freezes,
+              );
+              const nextFreezeNumber = getNextFreezeNumber(freezeUsage);
+              const hasValidFreezeCounter =
+                Number.isInteger(customerPackage.remainingFreezeChances) &&
+                customerPackage.remainingFreezeChances >= 0;
+              const hasFreezeChance =
+                customerPackage.remainingFreezeChances > 0;
+              const hasFreezeCountRoom =
+                freezeUsage.confirmedFreezeCount <
+                MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE;
+              const hasFreezeDayRoom = freezeUsage.remainingFreezeDays > 0;
+              const hasCounterMismatch =
+                customerPackage.remainingFreezeChances >
+                freezeUsage.remainingFreezeCount;
+              const policyAllowsFreeze =
+                hasValidFreezeCounter &&
+                hasFreezeChance &&
+                hasFreezeCountRoom &&
+                hasFreezeDayRoom &&
+                !hasCounterMismatch;
               const canFreeze =
                 customerPackage.status === "ACTIVE" &&
                 customerPackage.expirationDate >= today &&
                 customerPackage.remainingSessions > 0 &&
-                customerPackage.remainingFreezeChances > 0 &&
+                policyAllowsFreeze &&
                 !customerPackage.package.deletedAt &&
                 customerPackage.package.isActive;
               const isFrozen = customerPackage.status === "FROZEN";
+              const activeFreeze = customerPackage.freezes.find(
+                (freeze) => freeze.status === "ACTIVE",
+              );
+              const freezeNotice = activeFreeze
+                ? `Active freeze reserves ${activeFreeze.plannedDays} planned day${activeFreeze.plannedDays === 1 ? "" : "s"} until reactivation.`
+                : !hasValidFreezeCounter
+                  ? "Freeze counter is invalid. Ask Admin to review it."
+                  : hasCounterMismatch
+                    ? "Freeze counter needs Admin review before freezing."
+                    : !hasFreezeChance
+                      ? "No remaining freeze chances."
+                      : !hasFreezeCountRoom
+                        ? "Maximum 3 freezes already used."
+                        : !hasFreezeDayRoom
+                          ? "Maximum 30 freeze days already used."
+                          : isPaidFreezeNumber(nextFreezeNumber)
+                            ? `Freeze #${nextFreezeNumber} is paid. Collect payment before confirming.`
+                            : "Freeze #1 is free.";
 
               return (
                 <section
@@ -380,10 +432,24 @@ export function RegistrationCustomerCard({
                     <p className="mt-1 text-sm text-secondary">
                       remaining sessions
                     </p>
-                    <p className="mt-3 w-fit rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
-                      Guest passes: {customerPackage.remainingGuestPasses}{" "}
-                      remaining
-                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <p className="w-fit rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
+                        Guest passes: {customerPackage.remainingGuestPasses}{" "}
+                        remaining
+                      </p>
+                      <p className="w-fit rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
+                        Freeze chances:{" "}
+                        {customerPackage.remainingFreezeChances}
+                      </p>
+                      <p className="w-fit rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
+                        Freezes: {freezeUsage.confirmedFreezeCount} /{" "}
+                        {MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE}
+                      </p>
+                      <p className="w-fit rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
+                        Freeze days: {freezeUsage.usedFreezeDays} /{" "}
+                        {MAX_TOTAL_FREEZE_DAYS_PER_CUSTOMER_PACKAGE}
+                      </p>
+                    </div>
                   </div>
                   <dl className="mt-4 grid gap-3 text-sm">
                     <div>
@@ -432,6 +498,18 @@ export function RegistrationCustomerCard({
                       {usability.reason}
                     </p>
                   ) : null}
+                  {allowPackageFreeze ? (
+                    <p className="mt-4 rounded-lg border border-status-medium bg-page px-3 py-2 text-sm font-semibold leading-5 text-foreground">
+                      {freezeNotice}{" "}
+                      {!activeFreeze && hasFreezeDayRoom ? (
+                        <span className="text-secondary">
+                          {freezeUsage.remainingFreezeDays} freeze day
+                          {freezeUsage.remainingFreezeDays === 1 ? "" : "s"}{" "}
+                          remain.
+                        </span>
+                      ) : null}
+                    </p>
+                  ) : null}
                   <PackageStatusActions
                     allowPackageFreeze={allowPackageFreeze}
                     canFreeze={canFreeze}
@@ -439,6 +517,7 @@ export function RegistrationCustomerCard({
                     customerCode={customer.customerCode}
                     customerId={customer.id}
                     customerPackageId={customerPackage.id}
+                    freezeDaysRemaining={freezeUsage.remainingFreezeDays}
                     isFrozen={isFrozen}
                     showAllPackages={showAllPackages}
                   />

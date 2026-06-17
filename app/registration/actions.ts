@@ -13,7 +13,7 @@ import {
   calculateAdjustedExpiration,
   calculatePlannedFreezeEndDate,
   validateFreezeDays,
-  validateRemainingFreezeChances,
+  validateFreezePolicy,
 } from "../../lib/package-freezes";
 import { packageUsability } from "../../lib/registration/package-usability";
 
@@ -39,10 +39,12 @@ class Phase11Error extends Error {
 
 class PackageStatusError extends Error {
   code: string;
+  freezeDaysLeft?: number;
 
-  constructor(code: string) {
+  constructor(code: string, freezeDaysLeft?: number) {
     super(code);
     this.code = code;
+    this.freezeDaysLeft = freezeDaysLeft;
   }
 }
 
@@ -362,6 +364,21 @@ function freezeErrorCode(error: unknown, fallback: string) {
   }
 
   return fallback;
+}
+
+function freezeErrorQuery(error: unknown, fallback: string) {
+  const params = new URLSearchParams({
+    error: freezeErrorCode(error, fallback),
+  });
+
+  if (
+    error instanceof PackageStatusError &&
+    typeof error.freezeDaysLeft === "number"
+  ) {
+    params.set("freezeDaysLeft", error.freezeDaysLeft.toString());
+  }
+
+  return params.toString();
 }
 
 async function assertRegistrationPackageFreezeAllowed(
@@ -1260,9 +1277,13 @@ export async function freezeCustomerPackageAction(formData: FormData) {
             },
           },
           freezes: {
-            select: { id: true },
-            take: 1,
-            where: { status: "ACTIVE" },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: {
+              actualDays: true,
+              id: true,
+              plannedDays: true,
+              status: true,
+            },
           },
           package: {
             select: {
@@ -1287,12 +1308,8 @@ export async function freezeCustomerPackageAction(formData: FormData) {
         throw new PackageStatusError("invalid-package-action");
       }
 
-      if (customerPackage.freezes.length > 0) {
+      if (customerPackage.freezes.some((freeze) => freeze.status === "ACTIVE")) {
         throw new PackageStatusError("package-active-freeze");
-      }
-
-      if (!validateRemainingFreezeChances(customerPackage)) {
-        throw new PackageStatusError("package-no-freeze-chances");
       }
 
       const today = startOfTodayUtc();
@@ -1305,6 +1322,19 @@ export async function freezeCustomerPackageAction(formData: FormData) {
         !customerPackage.package.isActive
       ) {
         throw new PackageStatusError("package-not-freezable");
+      }
+
+      const freezePolicy = validateFreezePolicy({
+        freezes: customerPackage.freezes,
+        remainingFreezeChances: customerPackage.remainingFreezeChances,
+        requestedDays: plannedDays,
+      });
+
+      if (!freezePolicy.ok) {
+        throw new PackageStatusError(
+          freezePolicy.code,
+          freezePolicy.usage.remainingFreezeDays,
+        );
       }
 
       const startDate = new Date();
@@ -1360,8 +1390,19 @@ export async function freezeCustomerPackageAction(formData: FormData) {
         description: `Advanced normal freeze for ${customerPackage.package.name} on ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName} for ${plannedDays} day${plannedDays === 1 ? "" : "s"}.`,
         newValue: {
           freezeId: freeze.id,
+          freezeCountAfter: freezePolicy.usage.confirmedFreezeCount + 1,
+          freezeCountBefore: freezePolicy.usage.confirmedFreezeCount,
+          freezeDaysRemainingAfter: Math.max(
+            0,
+            freezePolicy.usage.remainingFreezeDays - plannedDays,
+          ),
+          freezeDaysUsedAfter:
+            freezePolicy.usage.usedFreezeDays + plannedDays,
+          freezeDaysUsedBefore: freezePolicy.usage.usedFreezeDays,
+          freezeNumber: freezePolicy.freezeNumber,
           mode: freeze.mode,
           originalExpirationDate: customerPackage.expirationDate,
+          paidFreezeNoticeRequired: freezePolicy.isPaid,
           plannedDays,
           plannedEndDate,
           remainingFreezeChances:
@@ -1380,11 +1421,11 @@ export async function freezeCustomerPackageAction(formData: FormData) {
       });
     });
   } catch (error) {
-    const errorCode = freezeErrorCode(error, "package-freeze-unavailable");
+    const errorQuery = freezeErrorQuery(error, "package-freeze-unavailable");
     redirect(
       adminReturnPath
-        ? `${adminReturnPath}?error=${errorCode}`
-        : customerPath(customerCode, `error=${errorCode}`, true, compact),
+        ? `${adminReturnPath}?${errorQuery}`
+        : customerPath(customerCode, errorQuery, true, compact),
     );
   }
 

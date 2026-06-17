@@ -10,6 +10,7 @@ import {
   packageTypeKey,
   packageTypeLabel,
 } from "../../lib/package-types";
+import { MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE } from "../../lib/package-freezes";
 import { Button } from "../ui/button";
 
 const inputClass =
@@ -283,12 +284,16 @@ function PackageFormFields({
           <input
             className={inputClass}
             defaultValue={gymPackage?.defaultFreezeChances ?? 3}
+            max={MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE}
             min={0}
             name="defaultFreezeChances"
             required
             step={1}
             type="number"
           />
+          <span className="mt-1 block text-xs font-normal text-secondary">
+            Max {MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE} per assigned package.
+          </span>
         </label>
         <label className={labelClass}>
           Assigned coach

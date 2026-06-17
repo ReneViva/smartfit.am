@@ -11,7 +11,14 @@ import {
   adminReactivateCustomerPackageAction,
   adminRetroactiveFreezeCustomerPackageAction,
 } from "../../app/admin/customers/actions";
-import { calculateActualFrozenDays } from "../../lib/package-freezes";
+import {
+  calculateActualFrozenDays,
+  calculateFreezeUsage,
+  getNextFreezeNumber,
+  isPaidFreezeNumber,
+  MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE,
+  MAX_TOTAL_FREEZE_DAYS_PER_CUSTOMER_PACKAGE,
+} from "../../lib/package-freezes";
 import { Button } from "../ui/button";
 
 const inputClass =
@@ -112,16 +119,34 @@ export function CustomerPackageFreezeControls({
   customerPackage: CustomerPackageFreezeValue;
   latestCompletedCheckoutAt: Date | null;
 }) {
-  const activeFreeze = customerPackage.freezes[0] ?? null;
+  const activeFreeze =
+    customerPackage.freezes.find((freeze) => freeze.status === "ACTIVE") ??
+    null;
+  const freezeUsage = calculateFreezeUsage(customerPackage.freezes);
+  const nextFreezeNumber = getNextFreezeNumber(freezeUsage);
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const packageDefinitionAvailable =
     !customerPackage.package.deletedAt && customerPackage.package.isActive;
+  const hasValidFreezeCounter =
+    Number.isInteger(customerPackage.remainingFreezeChances) &&
+    customerPackage.remainingFreezeChances >= 0;
   const hasFreezeChance = customerPackage.remainingFreezeChances > 0;
+  const hasFreezeCountRoom =
+    freezeUsage.confirmedFreezeCount < MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE;
+  const hasFreezeDayRoom = freezeUsage.remainingFreezeDays > 0;
+  const hasCounterMismatch =
+    customerPackage.remainingFreezeChances > freezeUsage.remainingFreezeCount;
+  const policyAllowsNewFreeze =
+    hasValidFreezeCounter &&
+    hasFreezeChance &&
+    hasFreezeCountRoom &&
+    hasFreezeDayRoom &&
+    !hasCounterMismatch;
   const hasUsableSessions = customerPackage.remainingSessions > 0;
   const canNormalFreeze =
     !activeFreeze &&
-    hasFreezeChance &&
+    policyAllowsNewFreeze &&
     hasUsableSessions &&
     packageDefinitionAvailable &&
     customerPackage.status === "ACTIVE" &&
@@ -129,22 +154,52 @@ export function CustomerPackageFreezeControls({
   const retroactiveDays = latestCheckoutDays(latestCompletedCheckoutAt);
   const canRetroactiveFreeze =
     !activeFreeze &&
-    hasFreezeChance &&
+    policyAllowsNewFreeze &&
     hasUsableSessions &&
     packageDefinitionAvailable &&
     (customerPackage.status === "ACTIVE" ||
       customerPackage.status === "EXPIRED") &&
-    retroactiveDays !== null;
+    retroactiveDays !== null &&
+    retroactiveDays <= freezeUsage.remainingFreezeDays;
   const canReactivate =
     Boolean(activeFreeze) && customerPackage.status === "FROZEN";
+  const freezeNotice = activeFreeze
+    ? `Active freeze reserves ${activeFreeze.plannedDays} planned day${activeFreeze.plannedDays === 1 ? "" : "s"} until reactivation.`
+    : !hasValidFreezeCounter
+      ? "Freeze counter is invalid. Review the assigned package before freezing."
+      : hasCounterMismatch
+        ? "Freeze counter needs review before freezing."
+        : !hasFreezeChance
+          ? "This assignment has no remaining freeze chances."
+          : !hasFreezeCountRoom
+            ? "Maximum 3 freezes already used."
+            : !hasFreezeDayRoom
+              ? "This package already used the maximum 30 freeze days."
+              : isPaidFreezeNumber(nextFreezeNumber)
+                ? `Freeze #${nextFreezeNumber} is paid. Collect payment before confirming.`
+                : "Freeze #1 is free.";
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 text-sm sm:grid-cols-3">
+      <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-5">
         <p className="rounded-lg bg-page px-3 py-2 text-secondary">
           Remaining freeze chances{" "}
           <strong className="text-foreground">
             {customerPackage.remainingFreezeChances}
+          </strong>
+        </p>
+        <p className="rounded-lg bg-page px-3 py-2 text-secondary">
+          Freeze count{" "}
+          <strong className="text-foreground">
+            {freezeUsage.confirmedFreezeCount} /{" "}
+            {MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE}
+          </strong>
+        </p>
+        <p className="rounded-lg bg-page px-3 py-2 text-secondary">
+          Freeze days{" "}
+          <strong className="text-foreground">
+            {freezeUsage.usedFreezeDays} /{" "}
+            {MAX_TOTAL_FREEZE_DAYS_PER_CUSTOMER_PACKAGE}
           </strong>
         </p>
         <p className="rounded-lg bg-page px-3 py-2 text-secondary">
@@ -160,6 +215,16 @@ export function CustomerPackageFreezeControls({
           </strong>
         </p>
       </div>
+
+      <p className="rounded-lg border border-status-medium bg-page px-3 py-2 text-sm font-semibold text-foreground">
+        {freezeNotice}{" "}
+        {!activeFreeze && hasFreezeDayRoom ? (
+          <span className="text-secondary">
+            {freezeUsage.remainingFreezeDays} freeze day
+            {freezeUsage.remainingFreezeDays === 1 ? "" : "s"} remain.
+          </span>
+        ) : null}
+      </p>
 
       {!hasFreezeChance ? (
         <p className="rounded-lg border border-status-medium bg-page px-3 py-2 text-sm font-semibold text-foreground">
@@ -261,6 +326,7 @@ export function CustomerPackageFreezeControls({
                 className={inputClass}
                 defaultValue={1}
                 inputMode="numeric"
+                max={freezeUsage.remainingFreezeDays || undefined}
                 min={1}
                 name="plannedDays"
                 required
@@ -293,7 +359,8 @@ export function CustomerPackageFreezeControls({
               <p className="mt-3 text-sm font-semibold text-secondary">
                 Normal freeze requires an active, unexpired assignment with
                 remaining sessions, an available package definition, no active
-                freeze, and at least one freeze chance.
+                freeze, at least one freeze chance, fewer than 3 freezes, and
+                available days inside the 30-day limit.
               </p>
             ) : null}
           </form>
@@ -353,7 +420,8 @@ export function CustomerPackageFreezeControls({
                 <p className="mt-3 text-sm font-semibold text-secondary">
                   Retroactive freeze requires a completed checkout, calculated
                   positive days, no active freeze, remaining sessions, and at
-                  least one freeze chance.
+                  least one freeze chance. Calculated days must also fit inside
+                  the remaining 30-day freeze budget.
                 </p>
               ) : null}
             </form>

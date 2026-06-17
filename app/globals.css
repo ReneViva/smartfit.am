@@ -234,6 +234,7 @@ select {
 }
 
 .public-site {
+  overflow-x: clip;
   transition:
     background-color 220ms ease,
     color 220ms ease;
@@ -244,10 +245,10 @@ select {
 }
 
 .home-full-bleed {
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
-  max-width: 100vw;
-  width: 100vw;
+  margin-left: 0;
+  margin-right: 0;
+  max-width: 100%;
+  width: 100%;
 }
 
 .home-wide-rail {

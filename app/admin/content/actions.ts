@@ -10,7 +10,7 @@ import { writeAuditLog } from "../../../lib/logging";
 import {
   imageUploadErrorCode,
   uploadImageFromForm,
-} from "../../../lib/uploads/cloudinary";
+} from "../../../lib/uploads/storage";
 
 const CONTENT_PATH = "/admin/content";
 const contentTypes = new Set(Object.values(PublicContentType));
@@ -76,6 +76,7 @@ export async function savePublicContentAction(formData: FormData) {
   const uploadedImageUrl = await uploadImageFromForm(
     formData,
     "imageUpload",
+    { prefix: "public-content" },
   ).catch((error) => {
     redirect(`${CONTENT_PATH}?error=upload-${imageUploadErrorCode(error)}`);
   });

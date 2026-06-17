@@ -10,7 +10,7 @@ import { normalizeMapEmbedUrl } from "../../../lib/map-embed";
 import {
   imageUploadErrorCode,
   uploadImageFromForm,
-} from "../../../lib/uploads/cloudinary";
+} from "../../../lib/uploads/storage";
 
 const SETTINGS_PATH = "/admin/settings";
 
@@ -74,20 +74,24 @@ export async function saveSettingsAction(formData: FormData) {
     redirect(`${SETTINGS_PATH}?error=invalid-thresholds`);
   }
 
-  const uploadedLogoUrl = await uploadImageFromForm(formData, "logoUpload").catch(
-    (error) => {
-      redirect(`${SETTINGS_PATH}?error=upload-${imageUploadErrorCode(error)}`);
-    },
-  );
+  const uploadedLogoUrl = await uploadImageFromForm(
+    formData,
+    "logoUpload",
+    { prefix: "logos" },
+  ).catch((error) => {
+    redirect(`${SETTINGS_PATH}?error=upload-${imageUploadErrorCode(error)}`);
+  });
   const uploadedOurAppLogoLightUrl = await uploadImageFromForm(
     formData,
     "ourAppLogoLightUpload",
+    { prefix: "logos/our-app" },
   ).catch((error) => {
     redirect(`${SETTINGS_PATH}?error=upload-${imageUploadErrorCode(error)}`);
   });
   const uploadedOurAppLogoDarkUrl = await uploadImageFromForm(
     formData,
     "ourAppLogoDarkUpload",
+    { prefix: "logos/our-app" },
   ).catch((error) => {
     redirect(`${SETTINGS_PATH}?error=upload-${imageUploadErrorCode(error)}`);
   });

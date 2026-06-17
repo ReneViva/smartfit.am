@@ -6,8 +6,8 @@ import { requireStaffRole } from "../auth";
 import { db } from "../db";
 import { writeAuditLog } from "../logging";
 import {
-  createCustomerDocumentDownloadUrl,
   deleteCustomerDocumentFromStorage,
+  downloadCustomerDocumentFromStorage,
   type StoredCustomerDocument,
   uploadCustomerDocumentToStorage,
 } from "./storage";
@@ -237,7 +237,7 @@ export async function archiveCustomerDocumentForAdmin(
   return saved;
 }
 
-export async function createAdminCustomerDocumentDownloadUrl(
+export async function getAdminCustomerDocumentDownload(
   documentId: string,
   options: { customerId?: string } = {},
 ) {
@@ -262,17 +262,16 @@ export async function createAdminCustomerDocumentDownloadUrl(
     );
   }
 
-  const download = createCustomerDocumentDownloadUrl(document);
+  const download = await downloadCustomerDocumentFromStorage(document);
 
   await db.$transaction(async (transaction) => {
     await writeAuditLog(transaction, {
       actionType: "CUSTOMER_DOCUMENT_DOWNLOAD",
       actorId: user.id,
       customerId: document.customer.id,
-      description: `Generated private download URL for customer document ${document.originalFileName} on ${document.customer.customerCode}: ${document.customer.fullName}.`,
+      description: `Downloaded private customer document ${document.originalFileName} on ${document.customer.customerCode}: ${document.customer.fullName}.`,
       newValue: {
         documentId: document.id,
-        expiresAt: download.expiresAt,
         storageProvider: document.storageProvider,
       },
       targetId: document.id,
