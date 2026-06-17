@@ -154,53 +154,77 @@ export function PublicContentCarousel({
   );
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [disableAutoplay, setDisableAutoplay] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const mobileScrollerRef = useRef<HTMLDivElement | null>(null);
   const mobileSlideRefs = useRef<Array<HTMLElement | null>>([]);
   const hasMultipleItems = slides.length > 1;
 
-  const scrollMobileSlideIntoView = useCallback((index: number) => {
+  const scrollMobileSlideToIndex = useCallback((index: number) => {
+    const scroller = mobileScrollerRef.current;
     const slide = mobileSlideRefs.current[index];
 
-    if (!slide || !window.matchMedia("(max-width: 767px)").matches) {
+    if (
+      !scroller ||
+      !slide ||
+      !window.matchMedia("(max-width: 767px)").matches
+    ) {
       return;
     }
 
-    slide.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center",
+    const centeredLeft =
+      slide.offsetLeft - (scroller.clientWidth - slide.offsetWidth) / 2;
+    const maxScrollLeft = scroller.scrollWidth - scroller.clientWidth;
+
+    scroller.scrollTo({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      left: Math.min(Math.max(centeredLeft, 0), maxScrollLeft),
     });
-  }, []);
+  }, [prefersReducedMotion]);
 
   const showItem = useCallback(
     (index: number) => {
       const nextIndex = (index + slides.length) % slides.length;
 
       setActiveIndex(nextIndex);
-      window.requestAnimationFrame(() => scrollMobileSlideIntoView(nextIndex));
+      window.requestAnimationFrame(() => scrollMobileSlideToIndex(nextIndex));
     },
-    [scrollMobileSlideIntoView, slides.length],
+    [scrollMobileSlideToIndex, slides.length],
   );
 
-  const showNext = useCallback(() => {
-    setActiveIndex((current) => {
-      const nextIndex = (current + 1) % slides.length;
+  const showNext = useCallback(
+    ({ scrollMobile = true }: { scrollMobile?: boolean } = {}) => {
+      setActiveIndex((current) => {
+        const nextIndex = (current + 1) % slides.length;
 
-      window.requestAnimationFrame(() => scrollMobileSlideIntoView(nextIndex));
+        if (scrollMobile) {
+          window.requestAnimationFrame(() =>
+            scrollMobileSlideToIndex(nextIndex),
+          );
+        }
 
-      return nextIndex;
-    });
-  }, [scrollMobileSlideIntoView, slides.length]);
+        return nextIndex;
+      });
+    },
+    [scrollMobileSlideToIndex, slides.length],
+  );
 
-  const showPrevious = useCallback(() => {
-    setActiveIndex((current) => {
-      const nextIndex = (current - 1 + slides.length) % slides.length;
+  const showPrevious = useCallback(
+    ({ scrollMobile = true }: { scrollMobile?: boolean } = {}) => {
+      setActiveIndex((current) => {
+        const nextIndex = (current - 1 + slides.length) % slides.length;
 
-      window.requestAnimationFrame(() => scrollMobileSlideIntoView(nextIndex));
+        if (scrollMobile) {
+          window.requestAnimationFrame(() =>
+            scrollMobileSlideToIndex(nextIndex),
+          );
+        }
 
-      return nextIndex;
-    });
-  }, [scrollMobileSlideIntoView, slides.length]);
+        return nextIndex;
+      });
+    },
+    [scrollMobileSlideToIndex, slides.length],
+  );
 
   useEffect(() => {
     if (activeIndex >= slides.length) {
@@ -219,14 +243,34 @@ export function PublicContentCarousel({
   }, []);
 
   useEffect(() => {
-    if (!hasMultipleItems || paused || prefersReducedMotion) {
+    const mediaQuery = window.matchMedia("(max-width: 767px), (pointer: coarse)");
+    const updatePreference = () => setDisableAutoplay(mediaQuery.matches);
+
+    updatePreference();
+    mediaQuery.addEventListener("change", updatePreference);
+
+    return () => mediaQuery.removeEventListener("change", updatePreference);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMultipleItems || paused || prefersReducedMotion || disableAutoplay) {
       return;
     }
 
-    const timer = window.setTimeout(showNext, ROTATION_INTERVAL_MS);
+    const timer = window.setTimeout(
+      () => showNext({ scrollMobile: false }),
+      ROTATION_INTERVAL_MS,
+    );
 
     return () => window.clearTimeout(timer);
-  }, [activeIndex, hasMultipleItems, paused, prefersReducedMotion, showNext]);
+  }, [
+    activeIndex,
+    disableAutoplay,
+    hasMultipleItems,
+    paused,
+    prefersReducedMotion,
+    showNext,
+  ]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (!hasMultipleItems) {
@@ -284,161 +328,166 @@ export function PublicContentCarousel({
       role="region"
       tabIndex={0}
     >
-      <div
-        className="home-scroll-snap -mx-[2vw] flex snap-x snap-mandatory gap-4 overflow-x-auto px-[2vw] pb-2 md:hidden"
-        onScroll={handleMobileScroll}
-      >
-        {slides.map((item, index) => {
-          const isActive = index === activeIndex;
-
-          return (
-            <article
-              aria-label={`Offer ${index + 1} of ${slides.length}`}
-              aria-roledescription="slide"
-              className="grid w-[86vw] max-w-[23rem] shrink-0 snap-center overflow-hidden rounded-lg border border-white/15 bg-card text-left shadow-xl shadow-black/30"
-              key={item.id}
-              ref={(element) => {
-                mobileSlideRefs.current[index] = element;
-              }}
-              role="group"
-            >
-              {item.imageUrl ? (
-                <div className="h-44 overflow-hidden border-b border-border bg-soft-blue">
-                  <PublicContentImage
-                    alt={item.title}
-                    className="h-full w-full"
-                    eager={isActive}
-                    src={item.imageUrl}
-                  />
-                </div>
-              ) : (
-                <FallbackVisual compact title={item.title} />
-              )}
-
-              <div className="flex min-h-56 flex-col justify-center px-4 py-5">
-                <p className="w-fit rounded-full bg-brand px-3 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-white">
-                  {displayType(item.type)}
-                </p>
-                <h3 className="mt-4 line-clamp-3 text-xl font-bold leading-tight text-foreground">
-                  {item.title}
-                </h3>
-                {item.body ? (
-                  <p className="mt-3 line-clamp-4 text-sm leading-6 text-secondary">
-                    {item.body}
-                  </p>
-                ) : (
-                  <p className="mt-3 text-sm leading-6 text-secondary">
-                    More details will be available soon.
-                  </p>
-                )}
-              </div>
-            </article>
-          );
-        })}
-      </div>
-
-      <div className="relative hidden min-h-[36rem] overflow-visible [perspective:1800px] md:block lg:min-h-[38rem]">
+      <div className="relative">
         <div
-          aria-hidden="true"
-          className="absolute left-1/2 top-8 h-[30rem] w-[min(90vw,78rem)] -translate-x-1/2 rotate-[-2.5deg] rounded-lg border border-white/10 bg-white/10 shadow-2xl shadow-black/30 backdrop-blur-sm"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute left-1/2 top-14 h-[27rem] w-[min(82vw,68rem)] -translate-x-1/2 rotate-[2deg] rounded-lg border border-brand/25 bg-brand/20 shadow-2xl shadow-brand/10"
-        />
-        {slides.map((item, index) => {
-          const offset = normalizedOffset(index, activeIndex, slides.length);
-          const isActive = offset === 0;
-          const visible =
-            Math.abs(offset) <= 1 && (!prefersReducedMotion || isActive);
+          className="home-scroll-snap flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2 md:hidden"
+          onScroll={handleMobileScroll}
+          ref={mobileScrollerRef}
+        >
+          {slides.map((item, index) => {
+            const isActive = index === activeIndex;
 
-          return (
-            <article
-              aria-hidden={!isActive}
-              aria-label={`Offer ${index + 1} of ${slides.length}`}
-              aria-roledescription="slide"
-              className={`absolute left-1/2 top-0 grid w-[min(86vw,82rem)] overflow-hidden rounded-lg border border-white/15 bg-card text-left shadow-2xl shadow-black/45 transition-[opacity,transform,filter] duration-500 ease-out [backface-visibility:hidden] [transform-style:preserve-3d] md:min-h-[34rem] md:grid-cols-[minmax(0,1fr)_minmax(23rem,0.78fr)] lg:grid-cols-[minmax(0,1fr)_minmax(31rem,0.82fr)] ${
-                visible ? "" : "pointer-events-none"
-              }`}
-              key={item.id}
-              role="group"
-              style={slideStyle(offset, prefersReducedMotion)}
-            >
-              <div className="flex min-h-[32rem] flex-col justify-center px-8 py-10 lg:min-h-[36rem] lg:px-16">
-                <p className="w-fit rounded-full bg-brand px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-white">
-                  {displayType(item.type)}
-                </p>
-                <h3 className="mt-5 line-clamp-3 text-4xl font-bold leading-tight text-foreground lg:text-6xl">
-                  {item.title}
-                </h3>
-                {item.body ? (
-                  <p className="mt-5 line-clamp-5 text-base leading-7 text-secondary sm:text-lg">
-                    {item.body}
-                  </p>
+            return (
+              <article
+                aria-label={`Offer ${index + 1} of ${slides.length}`}
+                aria-roledescription="slide"
+                className="grid w-[86vw] max-w-[23rem] shrink-0 snap-center overflow-hidden rounded-lg border border-white/15 bg-card text-left shadow-xl shadow-black/30"
+                key={item.id}
+                ref={(element) => {
+                  mobileSlideRefs.current[index] = element;
+                }}
+                role="group"
+              >
+                {item.imageUrl ? (
+                  <div className="h-44 overflow-hidden border-b border-border bg-soft-blue">
+                    <PublicContentImage
+                      alt={item.title}
+                      className="h-full w-full"
+                      eager={isActive}
+                      src={item.imageUrl}
+                    />
+                  </div>
                 ) : (
-                  <p className="mt-5 text-base leading-7 text-secondary sm:text-lg">
-                    More details will be available soon.
-                  </p>
+                  <FallbackVisual compact title={item.title} />
                 )}
-              </div>
 
-              {item.imageUrl ? (
-                <div className="min-h-64 overflow-hidden border-t border-border bg-soft-blue lg:min-h-full lg:border-l lg:border-t-0">
-                  <PublicContentImage
-                    alt={item.title}
-                    className="h-full min-h-[32rem] w-full lg:min-h-[36rem]"
-                    eager={isActive}
-                    src={item.imageUrl}
-                  />
+                <div className="flex min-h-56 flex-col justify-center px-4 py-5">
+                  <p className="w-fit rounded-full bg-brand px-3 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-white">
+                    {displayType(item.type)}
+                  </p>
+                  <h3 className="mt-4 line-clamp-3 text-xl font-bold leading-tight text-foreground">
+                    {item.title}
+                  </h3>
+                  {item.body ? (
+                    <p className="mt-3 line-clamp-4 text-sm leading-6 text-secondary">
+                      {item.body}
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-sm leading-6 text-secondary">
+                      More details will be available soon.
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <FallbackVisual title={item.title} />
-              )}
-            </article>
-          );
-        })}
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="relative hidden min-h-[36rem] overflow-visible [perspective:1800px] md:block lg:min-h-[38rem]">
+          <div
+            aria-hidden="true"
+            className="absolute left-1/2 top-8 h-[30rem] w-[min(90vw,78rem)] -translate-x-1/2 rotate-[-2.5deg] rounded-lg border border-white/10 bg-white/10 shadow-2xl shadow-black/30 backdrop-blur-sm"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute left-1/2 top-14 h-[27rem] w-[min(82vw,68rem)] -translate-x-1/2 rotate-[2deg] rounded-lg border border-brand/25 bg-brand/20 shadow-2xl shadow-brand/10"
+          />
+          {slides.map((item, index) => {
+            const offset = normalizedOffset(index, activeIndex, slides.length);
+            const isActive = offset === 0;
+            const visible =
+              Math.abs(offset) <= 1 && (!prefersReducedMotion || isActive);
+
+            return (
+              <article
+                aria-hidden={!isActive}
+                aria-label={`Offer ${index + 1} of ${slides.length}`}
+                aria-roledescription="slide"
+                className={`absolute left-1/2 top-0 grid w-[min(86vw,82rem)] overflow-hidden rounded-lg border border-white/15 bg-card text-left shadow-2xl shadow-black/45 transition-[opacity,transform,filter] duration-500 ease-out [backface-visibility:hidden] [transform-style:preserve-3d] md:min-h-[34rem] md:grid-cols-[minmax(0,1fr)_minmax(23rem,0.78fr)] lg:grid-cols-[minmax(0,1fr)_minmax(31rem,0.82fr)] ${
+                  visible ? "" : "pointer-events-none"
+                }`}
+                key={item.id}
+                role="group"
+                style={slideStyle(offset, prefersReducedMotion)}
+              >
+                <div className="flex min-h-[32rem] flex-col justify-center px-8 py-10 lg:min-h-[36rem] lg:px-16">
+                  <p className="w-fit rounded-full bg-brand px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-white">
+                    {displayType(item.type)}
+                  </p>
+                  <h3 className="mt-5 line-clamp-3 text-4xl font-bold leading-tight text-foreground lg:text-6xl">
+                    {item.title}
+                  </h3>
+                  {item.body ? (
+                    <p className="mt-5 line-clamp-5 text-base leading-7 text-secondary sm:text-lg">
+                      {item.body}
+                    </p>
+                  ) : (
+                    <p className="mt-5 text-base leading-7 text-secondary sm:text-lg">
+                      More details will be available soon.
+                    </p>
+                  )}
+                </div>
+
+                {item.imageUrl ? (
+                  <div className="min-h-64 overflow-hidden border-t border-border bg-soft-blue lg:min-h-full lg:border-l lg:border-t-0">
+                    <PublicContentImage
+                      alt={item.title}
+                      className="h-full min-h-[32rem] w-full lg:min-h-[36rem]"
+                      eager={isActive}
+                      src={item.imageUrl}
+                    />
+                  </div>
+                ) : (
+                  <FallbackVisual title={item.title} />
+                )}
+              </article>
+            );
+          })}
+        </div>
+
+        {hasMultipleItems ? (
+          <>
+            <button
+              aria-label="Previous offer"
+              className="absolute left-2 top-1/2 z-40 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-lg backdrop-blur transition-[background-color,border-color,color,transform] hover:border-white/60 hover:bg-white/15 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:left-3 sm:size-12 md:left-4 lg:left-6"
+              onClick={() => showPrevious()}
+              type="button"
+            >
+              <ArrowIcon direction="left" />
+            </button>
+
+            <button
+              aria-label="Next offer"
+              className="absolute right-2 top-1/2 z-40 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-lg backdrop-blur transition-[background-color,border-color,color,transform] hover:border-white/60 hover:bg-white/15 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:right-3 sm:size-12 md:right-4 lg:right-6"
+              onClick={() => showNext()}
+              type="button"
+            >
+              <ArrowIcon direction="right" />
+            </button>
+          </>
+        ) : null}
       </div>
 
       {hasMultipleItems ? (
-        <div className="mx-auto mt-5 flex max-w-2xl items-center justify-between gap-4">
-          <button
-            aria-label="Previous offer"
-            className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-white/25 bg-black/35 text-white shadow-sm backdrop-blur transition-[background-color,border-color,color,transform] hover:border-white/60 hover:bg-white/15 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            onClick={showPrevious}
-            type="button"
-          >
-            <ArrowIcon direction="left" />
-          </button>
-
-          <div
-            aria-label="Choose offer"
-            className="flex min-h-12 flex-wrap items-center justify-center gap-2"
-            role="group"
-          >
-            {slides.map((item, index) => (
-              <button
-                aria-label={`Go to offer ${index + 1}`}
-                aria-pressed={index === activeIndex}
-                className={`h-3 rounded-full border transition-[width,background-color,border-color,transform] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
-                  index === activeIndex
-                    ? "w-9 border-brand bg-brand"
-                    : "w-3 border-white/35 bg-white/25 hover:border-white/70 hover:bg-white/45"
-                }`}
-                key={item.id}
-                onClick={() => showItem(index)}
-                type="button"
-              />
-            ))}
-          </div>
-
-          <button
-            aria-label="Next offer"
-            className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-white/25 bg-black/35 text-white shadow-sm backdrop-blur transition-[background-color,border-color,color,transform] hover:border-white/60 hover:bg-white/15 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            onClick={showNext}
-            type="button"
-          >
-            <ArrowIcon direction="right" />
-          </button>
+        <div
+          aria-label="Choose offer"
+          className="mx-auto mt-5 flex min-h-12 items-center justify-center gap-2"
+          role="group"
+        >
+          {slides.map((item, index) => (
+            <button
+              aria-label={`Go to offer ${index + 1}`}
+              aria-pressed={index === activeIndex}
+              className={`h-3 rounded-full border transition-[width,background-color,border-color,transform] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+                index === activeIndex
+                  ? "w-9 border-brand bg-brand"
+                  : "w-3 border-white/35 bg-white/25 hover:border-white/70 hover:bg-white/45"
+              }`}
+              key={item.id}
+              onClick={() => showItem(index)}
+              type="button"
+            />
+          ))}
         </div>
       ) : null}
     </div>
