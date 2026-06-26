@@ -23,18 +23,22 @@ import {
 
 const CUSTOMERS_PATH = "/admin/customers";
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const customerStatuses = new Set(Object.values(CustomerStatus));
 const packageStatuses = new Set(Object.values(CustomerPackageStatus));
 
 type CustomerCreateField =
   | "birthDate"
   | "customerCode"
+  | "email"
   | "fullName"
   | "status";
 
 export type CustomerCreateValues = {
+  address: string;
   birthDate: string;
   customerCode: string;
+  email: string;
   emergencyPhone: string;
   firstName: string;
   fullName: string;
@@ -70,6 +74,15 @@ class AdvancedFreezeError extends Error {
   }
 }
 
+class CustomerArchiveError extends Error {
+  code: string;
+
+  constructor(code: string) {
+    super(code);
+    this.code = code;
+  }
+}
+
 function optionalText(formData: FormData, name: string, maxLength: number) {
   const value = formData.get(name);
 
@@ -78,6 +91,30 @@ function optionalText(formData: FormData, name: string, maxLength: number) {
   }
 
   return value.trim().slice(0, maxLength) || null;
+}
+
+function optionalEmail(formData: FormData, name: string) {
+  const value = formData.get(name);
+
+  if (typeof value !== "string") {
+    return { ok: true as const, value: null };
+  }
+
+  const rawEmail = value.trim();
+
+  if (!rawEmail) {
+    return { ok: true as const, value: null };
+  }
+
+  if (rawEmail.length > 254) {
+    return { ok: false as const, value: null };
+  }
+
+  const email = rawEmail.toLowerCase();
+
+  return EMAIL_PATTERN.test(email)
+    ? { ok: true as const, value: email }
+    : { ok: false as const, value: null };
 }
 
 function nonNegativeInteger(formData: FormData, name: string) {
@@ -105,6 +142,20 @@ function optionalNonNegativeInteger(formData: FormData, name: string) {
   return Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+function accessLimit(formData: FormData, unlimitedName: string, limitName: string) {
+  const unlimited = formData.get(unlimitedName) === "on";
+
+  if (unlimited) {
+    return { limit: null, ok: true as const, unlimited };
+  }
+
+  const limit = positiveInteger(formData, limitName);
+
+  return limit === null
+    ? { limit: null, ok: false as const, unlimited }
+    : { limit, ok: true as const, unlimited };
+}
+
 function requiredDate(formData: FormData, name: string) {
   const value = optionalText(formData, name, 10);
 
@@ -126,8 +177,10 @@ function draftText(formData: FormData, name: string, maxLength: number) {
 
 function customerCreateValues(formData: FormData): CustomerCreateValues {
   return {
+    address: draftText(formData, "address", 500),
     birthDate: draftText(formData, "birthDate", 10),
     customerCode: draftText(formData, "customerCode", 100),
+    email: draftText(formData, "email", 254),
     emergencyPhone: draftText(formData, "emergencyPhone", 120),
     firstName: draftText(formData, "firstName", 120),
     fullName: draftText(formData, "fullName", 240),
@@ -163,6 +216,44 @@ async function coachExists(coachId: string | null) {
       where: { deletedAt: null, id: coachId },
     }),
   );
+}
+
+async function activeMembershipCount(
+  transaction: Prisma.TransactionClient,
+  customerId: string,
+) {
+  return transaction.customerPackage.count({
+    where: {
+      customerId,
+      deletedAt: null,
+      status: "ACTIVE",
+    },
+  });
+}
+
+async function recalculateMembershipSessionTotals(
+  transaction: Prisma.TransactionClient,
+  customerPackageId: string,
+) {
+  const totals = await transaction.customerPackageService.aggregate({
+    _sum: {
+      initialSessions: true,
+      remainingSessions: true,
+    },
+    where: {
+      customerPackageId,
+      deletedAt: null,
+      isActive: true,
+    },
+  });
+
+  return transaction.customerPackage.update({
+    data: {
+      initialSessions: totals._sum.initialSessions ?? 0,
+      remainingSessions: totals._sum.remainingSessions ?? 0,
+    },
+    where: { id: customerPackageId },
+  });
 }
 
 function revalidateCustomerPages() {
@@ -234,6 +325,7 @@ export async function createCustomerAction(
   const customerCode = optionalText(formData, "customerCode", 100);
   const fullName = optionalText(formData, "fullName", 240);
   const birthDate = requiredDate(formData, "birthDate");
+  const email = optionalEmail(formData, "email");
   const rawStatus = optionalText(formData, "status", 30);
   const fieldErrors: CustomerCreateState["fieldErrors"] = {};
 
@@ -249,6 +341,10 @@ export async function createCustomerAction(
     fieldErrors.birthDate = "Enter a valid birth date.";
   }
 
+  if (!email.ok) {
+    fieldErrors.email = "Enter a valid email address or leave it empty.";
+  }
+
   if (!rawStatus || !customerStatuses.has(rawStatus as CustomerStatus)) {
     fieldErrors.status = "Choose a valid customer status.";
   }
@@ -257,6 +353,7 @@ export async function createCustomerAction(
     !customerCode ||
     !fullName ||
     !birthDate ||
+    !email.ok ||
     !rawStatus ||
     !customerStatuses.has(rawStatus as CustomerStatus)
   ) {
@@ -298,8 +395,10 @@ export async function createCustomerAction(
       const saved = await transaction.customer.create({
         data: {
           assignedCoachId: null,
+          address: optionalText(formData, "address", 500),
           birthDate,
           customerCode,
+          email: email.value,
           emergencyPhone: optionalText(formData, "emergencyPhone", 120),
           firstName: optionalText(formData, "firstName", 120),
           fullName,
@@ -360,6 +459,7 @@ export async function saveCustomerAction(formData: FormData) {
   const customerCode = optionalText(formData, "customerCode", 100);
   const fullName = optionalText(formData, "fullName", 240);
   const birthDate = requiredDate(formData, "birthDate");
+  const email = optionalEmail(formData, "email");
   const rawStatus = optionalText(formData, "status", 30);
   const assignedCoachId = optionalText(formData, "assignedCoachId", 100);
 
@@ -371,6 +471,10 @@ export async function saveCustomerAction(formData: FormData) {
     !customerStatuses.has(rawStatus as CustomerStatus)
   ) {
     redirect(customerActionPath(formData, id, "error=invalid-customer"));
+  }
+
+  if (!email.ok) {
+    redirect(customerActionPath(formData, id, "error=invalid-email"));
   }
 
   const today = new Date();
@@ -399,8 +503,10 @@ export async function saveCustomerAction(formData: FormData) {
 
   const data = {
     assignedCoachId,
+    address: optionalText(formData, "address", 500),
     birthDate,
     customerCode,
+    email: email.value,
     emergencyPhone: optionalText(formData, "emergencyPhone", 120),
     firstName: optionalText(formData, "firstName", 120),
     fullName,
@@ -478,6 +584,104 @@ export async function saveCustomerAction(formData: FormData) {
     redirect(`${CUSTOMERS_PATH}/${encodeURIComponent(savedCustomerId)}`);
   }
   redirect(customerActionPath(formData, id, "status=customer-saved"));
+}
+
+export async function archiveCustomerAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const customerId = optionalText(formData, "customerId", 100);
+
+  if (!customerId) {
+    redirect(`${CUSTOMERS_PATH}?error=invalid-customer`);
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const customer = await transaction.customer.findFirst({
+        select: {
+          customerCode: true,
+          fullName: true,
+          gymPresenceStatus: true,
+          id: true,
+          status: true,
+          updatedAt: true,
+        },
+        where: { deletedAt: null, id: customerId },
+      });
+
+      if (!customer) {
+        throw new CustomerArchiveError("customer-archive-unavailable");
+      }
+
+      if (customer.gymPresenceStatus === "IN_GYM") {
+        throw new CustomerArchiveError("customer-archive-in-gym");
+      }
+
+      const openVisit = await transaction.gymVisit.findFirst({
+        select: { id: true },
+        where: {
+          checkedOutAt: null,
+          customerId: customer.id,
+        },
+      });
+
+      if (openVisit) {
+        throw new CustomerArchiveError("customer-archive-open-visit");
+      }
+
+      const deletedAt = new Date();
+      const update = await transaction.customer.updateMany({
+        data: {
+          deletedAt,
+          status: "INACTIVE",
+        },
+        where: {
+          deletedAt: null,
+          gymPresenceStatus: "NOT_IN_GYM",
+          id: customer.id,
+          updatedAt: customer.updatedAt,
+        },
+      });
+
+      if (update.count !== 1) {
+        throw new CustomerArchiveError("customer-archive-stale");
+      }
+
+      await writeAuditLog(transaction, {
+        actionType: "CUSTOMER_EDIT",
+        actorId: user.id,
+        customerId: customer.id,
+        description: `Archived customer profile ${customer.customerCode}: ${customer.fullName}. Operational history was preserved.`,
+        newValue: {
+          deletedAt,
+          status: "INACTIVE",
+        },
+        oldValue: {
+          deletedAt: null,
+          gymPresenceStatus: customer.gymPresenceStatus,
+          status: customer.status,
+        },
+        targetId: customer.id,
+        targetType: "Customer",
+      });
+    });
+  } catch (error) {
+    const errorCode =
+      error instanceof CustomerArchiveError
+        ? error.code
+        : "customer-archive-unavailable";
+
+    redirect(
+      `${CUSTOMERS_PATH}/${encodeURIComponent(customerId)}?error=${errorCode}`,
+    );
+  }
+
+  revalidateCustomerPages();
+  revalidatePath(`${CUSTOMERS_PATH}/${encodeURIComponent(customerId)}`);
+  revalidatePath("/admin/logs");
+  revalidatePath("/registration");
+  revalidatePath("/registration/general");
+  revalidatePath("/registration/in-gym");
+  redirect(`${CUSTOMERS_PATH}?status=customer-archived`);
 }
 
 export async function assignCustomerPackageAction(formData: FormData) {
@@ -835,6 +1039,466 @@ export async function editCustomerPackageAction(formData: FormData) {
   redirect(
     customerActionPath(formData, customerId, "status=package-updated"),
   );
+}
+
+export async function saveCustomerMembershipAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const customerId = optionalText(formData, "customerId", 100);
+  const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const packageId = optionalText(formData, "packageId", 100);
+  const coachId = optionalText(formData, "coachId", 100);
+  const activationDate = requiredDate(formData, "activationDate");
+  const expirationDate = requiredDate(formData, "expirationDate");
+  const initialGuestPasses = nonNegativeInteger(
+    formData,
+    "initialGuestPasses",
+  );
+  const remainingGuestPasses = nonNegativeInteger(
+    formData,
+    "remainingGuestPasses",
+  );
+  const remainingFreezeChances = nonNegativeInteger(
+    formData,
+    "remainingFreezeChances",
+  );
+  const rawStatus = optionalText(formData, "status", 30);
+  const intervalLimit = accessLimit(
+    formData,
+    "hasUnlimitedIntervalCheckIns",
+    "intervalCheckInLimit",
+  );
+  const dailyLimit = accessLimit(
+    formData,
+    "hasUnlimitedDailyCheckIns",
+    "dailyCheckInLimit",
+  );
+
+  if (
+    !customerId ||
+    !packageId ||
+    !activationDate ||
+    !expirationDate ||
+    initialGuestPasses === null ||
+    remainingGuestPasses === null ||
+    remainingFreezeChances === null ||
+    !rawStatus ||
+    !packageStatuses.has(rawStatus as CustomerPackageStatus)
+  ) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-membership"));
+  }
+
+  if (expirationDate < activationDate) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-date-order"));
+  }
+
+  if (
+    remainingGuestPasses > initialGuestPasses ||
+    remainingFreezeChances > MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE
+  ) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-membership-balance"));
+  }
+
+  if (!intervalLimit.ok || !dailyLimit.ok) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-access-limit"));
+  }
+
+  if (!(await coachExists(coachId))) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-coach"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const [customer, gymPackage] = await Promise.all([
+        transaction.customer.findFirst({
+          select: { customerCode: true, fullName: true, id: true },
+          where: { deletedAt: null, id: customerId },
+        }),
+        transaction.package.findFirst({
+          select: { id: true, name: true },
+          where: { deletedAt: null, id: packageId },
+        }),
+      ]);
+
+      if (!customer) {
+        throw new AssignedPackageEditError("invalid-customer");
+      }
+
+      if (!gymPackage) {
+        throw new AssignedPackageEditError("invalid-package");
+      }
+
+      const activeCount = await activeMembershipCount(transaction, customerId);
+      if (activeCount > 1) {
+        throw new AssignedPackageEditError("membership-conflict");
+      }
+
+      const data = {
+        activationDate,
+        coachId,
+        expirationDate,
+        hasUnlimitedDailyCheckIns: dailyLimit.unlimited,
+        hasUnlimitedIntervalCheckIns: intervalLimit.unlimited,
+        initialGuestPasses,
+        intervalCheckInLimit: intervalLimit.limit,
+        dailyCheckInLimit: dailyLimit.limit,
+        packageId,
+        remainingFreezeChances,
+        remainingGuestPasses,
+        status: rawStatus as CustomerPackageStatus,
+      };
+
+      if (customerPackageId) {
+        const existing = await transaction.customerPackage.findFirst({
+          include: {
+            coach: {
+              select: { firstName: true, lastName: true },
+            },
+            package: {
+              select: { name: true },
+            },
+          },
+          where: {
+            customerId,
+            deletedAt: null,
+            id: customerPackageId,
+          },
+        });
+
+        if (!existing) {
+          throw new AssignedPackageEditError("invalid-membership");
+        }
+
+        if (
+          rawStatus === "ACTIVE" &&
+          (await transaction.customerPackage.count({
+            where: {
+              customerId,
+              deletedAt: null,
+              id: { not: customerPackageId },
+              status: "ACTIVE",
+            },
+          })) > 0
+        ) {
+          throw new AssignedPackageEditError("membership-conflict");
+        }
+
+        const saved = await transaction.customerPackage.update({
+          data,
+          where: { id: customerPackageId },
+        });
+
+        await writeAuditLog(transaction, {
+          actionType: "PACKAGE_EDIT",
+          actorId: user.id,
+          customerId,
+          description: `Updated membership container for ${customer.customerCode}: ${customer.fullName}.`,
+          newValue: saved,
+          oldValue: existing,
+          targetId: saved.id,
+          targetType: "CustomerPackage",
+        });
+        return;
+      }
+
+      const currentContainer = await transaction.customerPackage.findFirst({
+        select: { id: true },
+        where: {
+          customerId,
+          deletedAt: null,
+          status: { in: ["ACTIVE", "FROZEN"] },
+        },
+      });
+
+      if (currentContainer) {
+        throw new AssignedPackageEditError("membership-exists");
+      }
+
+      const saved = await transaction.customerPackage.create({
+        data: {
+          ...data,
+          customerId,
+          initialSessions: 0,
+          remainingSessions: 0,
+        },
+      });
+
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_RENEWAL",
+        actorId: user.id,
+        customerId,
+        description: `Created membership container from ${gymPackage.name} for ${customer.customerCode}: ${customer.fullName}.`,
+        newValue: saved,
+        targetId: saved.id,
+        targetType: "CustomerPackage",
+      });
+    });
+  } catch (error) {
+    redirect(
+      customerActionPath(
+        formData,
+        customerId,
+        `error=${
+          error instanceof AssignedPackageEditError
+            ? error.code
+            : "membership-unavailable"
+        }`,
+      ),
+    );
+  }
+
+  revalidatePackageWorkflow(customerId);
+  redirect(customerActionPath(formData, customerId, "status=membership-saved"));
+}
+
+export async function saveCustomerPackageServiceAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const customerId = optionalText(formData, "customerId", 100);
+  const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const serviceId = optionalText(formData, "serviceId", 100);
+  const packageId = optionalText(formData, "servicePackageId", 100);
+  const categoryId = optionalText(formData, "categoryId", 100);
+  const coachId = optionalText(formData, "serviceCoachId", 100);
+  const serviceName = optionalText(formData, "serviceName", 200);
+  const initialSessions = nonNegativeInteger(formData, "serviceInitialSessions");
+  const remainingSessions = nonNegativeInteger(
+    formData,
+    "serviceRemainingSessions",
+  );
+  const sortOrderInput = optionalNonNegativeInteger(formData, "sortOrder");
+  const sortOrder = sortOrderInput === undefined ? 0 : sortOrderInput;
+  const notes = optionalText(formData, "serviceNotes", 1000);
+  const isActive = formData.get("isActive") === "on";
+
+  if (
+    !customerId ||
+    !customerPackageId ||
+    !serviceName ||
+    initialSessions === null ||
+    remainingSessions === null ||
+    sortOrder === null
+  ) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-service"));
+  }
+
+  if (remainingSessions > initialSessions) {
+    redirect(customerActionPath(formData, customerId, "error=service-balance-invalid"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const membership = await transaction.customerPackage.findFirst({
+        include: {
+          customer: {
+            select: { customerCode: true, fullName: true, id: true },
+          },
+          package: {
+            select: { name: true },
+          },
+        },
+        where: {
+          customerId,
+          deletedAt: null,
+          id: customerPackageId,
+        },
+      });
+
+      if (!membership) {
+        throw new AssignedPackageEditError("invalid-membership");
+      }
+
+      if ((await activeMembershipCount(transaction, customerId)) > 1) {
+        throw new AssignedPackageEditError("membership-conflict");
+      }
+
+      const [servicePackage, category, coach] = await Promise.all([
+        packageId
+          ? transaction.package.findFirst({
+              select: { id: true, name: true },
+              where: { deletedAt: null, id: packageId, isActive: true },
+            })
+          : null,
+        categoryId
+          ? transaction.category.findFirst({
+              select: { id: true, name: true },
+              where: { id: categoryId, isArchived: false },
+            })
+          : null,
+        coachId
+          ? transaction.coach.findFirst({
+              select: { firstName: true, id: true, lastName: true },
+              where: { deletedAt: null, id: coachId },
+            })
+          : null,
+      ]);
+
+      if (
+        (packageId && !servicePackage) ||
+        (categoryId && !category) ||
+        (coachId && !coach)
+      ) {
+        throw new AssignedPackageEditError("invalid-service-reference");
+      }
+
+      const data = {
+        categoryId,
+        coachId,
+        initialSessions,
+        isActive,
+        notes,
+        packageId,
+        remainingSessions,
+        serviceName,
+        sortOrder,
+      };
+
+      if (serviceId) {
+        const existing = await transaction.customerPackageService.findFirst({
+          where: {
+            customerPackageId,
+            deletedAt: null,
+            id: serviceId,
+          },
+        });
+
+        if (!existing) {
+          throw new AssignedPackageEditError("invalid-service");
+        }
+
+        const saved = await transaction.customerPackageService.update({
+          data,
+          where: { id: serviceId },
+        });
+        await recalculateMembershipSessionTotals(
+          transaction,
+          customerPackageId,
+        );
+
+        await writeAuditLog(transaction, {
+          actionType: "PACKAGE_EDIT",
+          actorId: user.id,
+          customerId,
+          description: `Updated service line ${saved.serviceName} for ${membership.customer.customerCode}: ${membership.customer.fullName}.`,
+          newValue: saved,
+          oldValue: existing,
+          targetId: saved.id,
+          targetType: "CustomerPackageService",
+        });
+        return;
+      }
+
+      const saved = await transaction.customerPackageService.create({
+        data: {
+          ...data,
+          customerPackageId,
+        },
+      });
+      await recalculateMembershipSessionTotals(transaction, customerPackageId);
+
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_EDIT",
+        actorId: user.id,
+        customerId,
+        description: `Added service line ${saved.serviceName} to ${membership.package.name} for ${membership.customer.customerCode}: ${membership.customer.fullName}.`,
+        newValue: saved,
+        targetId: saved.id,
+        targetType: "CustomerPackageService",
+      });
+    });
+  } catch (error) {
+    redirect(
+      customerActionPath(
+        formData,
+        customerId,
+        `error=${
+          error instanceof AssignedPackageEditError
+            ? error.code
+            : "service-unavailable"
+        }`,
+      ),
+    );
+  }
+
+  revalidatePackageWorkflow(customerId);
+  redirect(customerActionPath(formData, customerId, "status=service-saved"));
+}
+
+export async function deactivateCustomerPackageServiceAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const customerId = optionalText(formData, "customerId", 100);
+  const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const serviceId = optionalText(formData, "serviceId", 100);
+
+  if (!customerId || !customerPackageId || !serviceId) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-service"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      if ((await activeMembershipCount(transaction, customerId)) > 1) {
+        throw new AssignedPackageEditError("membership-conflict");
+      }
+
+      const existing = await transaction.customerPackageService.findFirst({
+        include: {
+          customerPackage: {
+            select: {
+              customer: {
+                select: { customerCode: true, fullName: true },
+              },
+            },
+          },
+        },
+        where: {
+          customerPackageId,
+          customerPackage: {
+            customerId,
+            deletedAt: null,
+          },
+          deletedAt: null,
+          id: serviceId,
+        },
+      });
+
+      if (!existing) {
+        throw new AssignedPackageEditError("invalid-service");
+      }
+
+      const saved = await transaction.customerPackageService.update({
+        data: {
+          deletedAt: new Date(),
+          isActive: false,
+        },
+        where: { id: serviceId },
+      });
+      await recalculateMembershipSessionTotals(transaction, customerPackageId);
+
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_EDIT",
+        actorId: user.id,
+        customerId,
+        description: `Deactivated service line ${existing.serviceName} for ${existing.customerPackage.customer.customerCode}: ${existing.customerPackage.customer.fullName}.`,
+        newValue: saved,
+        oldValue: existing,
+        targetId: saved.id,
+        targetType: "CustomerPackageService",
+      });
+    });
+  } catch (error) {
+    redirect(
+      customerActionPath(
+        formData,
+        customerId,
+        `error=${
+          error instanceof AssignedPackageEditError
+            ? error.code
+            : "service-unavailable"
+        }`,
+      ),
+    );
+  }
+
+  revalidatePackageWorkflow(customerId);
+  redirect(customerActionPath(formData, customerId, "status=service-deactivated"));
 }
 
 export async function adminFreezeCustomerPackageAction(formData: FormData) {

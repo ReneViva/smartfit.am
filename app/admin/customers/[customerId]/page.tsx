@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CustomerArchiveAction } from "../../../../components/admin/customer-archive-action";
+import { CustomerProfileImagePanel } from "../../../../components/customer-profile-image-panel";
 import { CustomerDocumentsPanel } from "../../../../components/admin/customer-documents-panel";
 import { CustomerForm } from "../../../../components/admin/customer-form";
+import { CustomerMembershipEditor } from "../../../../components/admin/customer-membership-editor";
 import { CustomerNotesPanel } from "../../../../components/admin/customer-notes-panel";
-import { CustomerPackageAssignmentForm } from "../../../../components/admin/customer-package-assignment-form";
 import { CustomerPackageOverview } from "../../../../components/admin/customer-package-overview";
 import { CustomerVisitHistory } from "../../../../components/admin/customer-visit-history";
 import { CustomerWorkspaceActions } from "../../../../components/admin/customer-workspace-actions";
@@ -27,19 +29,34 @@ const errorMessages: Record<string, string> = {
   "assignment-unavailable":
     "The package assignment could not be saved. Please try again.",
   "customer-unavailable": "The customer could not be saved. Please try again.",
+  "customer-archive-in-gym":
+    "Check out this customer before archiving their profile.",
+  "customer-archive-open-visit":
+    "Close the open visit before archiving this customer profile.",
+  "customer-archive-stale":
+    "This customer changed before archive completed. Review and try again.",
+  "customer-archive-unavailable":
+    "The customer profile could not be archived. Please try again.",
   "duplicate-code": "That member code is already assigned to another customer.",
   "invalid-assignment":
     "Choose a package and enter valid dates, sessions, guest passes, and status.",
+  "invalid-access-limit":
+    "Limited access rules require a positive whole-number check-in limit.",
   "invalid-birth-date": "Birth date cannot be in the future.",
   "invalid-coach": "The selected coach is not available.",
   "invalid-customer":
     "Member code, full name, birth date, and a valid status are required.",
   "invalid-date-order": "Expiration date cannot be before activation date.",
+  "invalid-email": "Enter a valid email address or leave it empty.",
   "invalid-freeze-days":
     "Freeze duration must be a positive whole number of days.",
   "invalid-retroactive-freeze":
     "Retroactive freeze days could not be calculated from the latest checkout.",
   "invalid-package": "Choose an available package definition.",
+  "invalid-membership":
+    "Choose a package template and enter valid membership dates, guest passes, freeze chances, access limits, and status.",
+  "invalid-membership-balance":
+    "Remaining guest passes and freeze chances cannot exceed their allowed values.",
   "invalid-package-action": "The package status action is not available.",
   "invalid-package-balance":
     "Remaining sessions and guest passes cannot exceed their initial values.",
@@ -81,6 +98,20 @@ const errorMessages: Record<string, string> = {
     "The retroactive freeze could not be saved. Please try again.",
   "package-status-stale":
     "The package status changed before the action completed. Review it and try again.",
+  "membership-conflict":
+    "This customer has multiple active membership containers from older data. Resolve manually before using the new membership editor.",
+  "membership-exists":
+    "This customer already has an active or frozen membership container.",
+  "membership-unavailable":
+    "The membership could not be saved. Please review it and try again.",
+  "invalid-service":
+    "Enter a service name and valid whole-number service sessions.",
+  "invalid-service-reference":
+    "Selected service package, category, or coach is not available.",
+  "service-balance-invalid":
+    "Remaining service sessions cannot exceed initial service sessions.",
+  "service-unavailable":
+    "The service line could not be saved. Please review it and try again.",
 };
 
 const statusMessages: Record<string, string> = {
@@ -97,6 +128,9 @@ const statusMessages: Record<string, string> = {
     "Retroactive freeze saved. The package was not left frozen.",
   "package-updated":
     "Assigned package updated. Previous and new values were logged.",
+  "membership-saved": "Membership saved.",
+  "service-saved": "Service line saved.",
+  "service-deactivated": "Service line deactivated.",
 };
 
 function displayDate(value: Date | null) {
@@ -133,11 +167,12 @@ export default async function CustomerDetailPage({
   const [
     customer,
     coaches,
-    activePackages,
-    packageDefinitions,
+    packageOptions,
+    categories,
     customerDocuments,
     recentVisits,
     latestCompletedVisit,
+    openVisit,
   ] =
     await Promise.all([
       db.customer.findFirst({
@@ -204,6 +239,31 @@ export default async function CustomerDetailPage({
                   status: true,
                 },
               },
+              services: {
+                orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+                select: {
+                  category: {
+                    select: { name: true },
+                  },
+                  categoryId: true,
+                  coach: {
+                    select: { firstName: true, lastName: true },
+                  },
+                  coachId: true,
+                  id: true,
+                  initialSessions: true,
+                  isActive: true,
+                  notes: true,
+                  package: {
+                    select: { name: true },
+                  },
+                  packageId: true,
+                  remainingSessions: true,
+                  serviceName: true,
+                  sortOrder: true,
+                },
+                where: { deletedAt: null },
+              },
             },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             where: { deletedAt: null },
@@ -225,24 +285,24 @@ export default async function CustomerDetailPage({
         orderBy: { name: "asc" },
         select: {
           assignedCoachId: true,
+          dailyCheckInLimit: true,
           defaultFreezeChances: true,
           defaultGuestPasses: true,
+          hasUnlimitedDailyCheckIns: true,
+          hasUnlimitedIntervalCheckIns: true,
           id: true,
+          intervalCheckInLimit: true,
+          isActive: true,
           name: true,
           packageType: true,
           sessionCount: true,
         },
-        where: { deletedAt: null, isActive: true },
-      }),
-      db.package.findMany({
-        orderBy: { name: "asc" },
-        select: {
-          id: true,
-          isActive: true,
-          name: true,
-          packageType: true,
-        },
         where: { deletedAt: null },
+      }),
+      db.category.findMany({
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        select: { id: true, name: true },
+        where: { isArchived: false },
       }),
       listCustomerDocumentsForAdmin(customerId),
       getCustomerVisitHistoryForAdmin(customerId, { take: 3 }),
@@ -251,6 +311,13 @@ export default async function CustomerDetailPage({
         select: { checkedOutAt: true },
         where: {
           checkedOutAt: { not: null },
+          customerId,
+        },
+      }),
+      db.gymVisit.findFirst({
+        select: { id: true },
+        where: {
+          checkedOutAt: null,
           customerId,
         },
       }),
@@ -280,6 +347,15 @@ export default async function CustomerDetailPage({
     createdAt: document.createdAt.toISOString(),
     updatedAt: document.updatedAt.toISOString(),
   }));
+  const activeMemberships = customer.packages.filter(
+    (membership) => membership.status === "ACTIVE",
+  );
+  const activeMembershipConflict = activeMemberships.length > 1;
+  const editableMembership = activeMembershipConflict
+    ? null
+    : (activeMemberships[0] ??
+      customer.packages.find((membership) => membership.status === "FROZEN") ??
+      null);
 
   return (
     <>
@@ -306,7 +382,7 @@ export default async function CustomerDetailPage({
 
       <Card className="mt-4 overflow-hidden p-0">
         <div className="bg-soft-blue p-5 sm:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
             <div className="min-w-0">
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand">
                 Member ID: {customer.customerCode}
@@ -321,35 +397,64 @@ export default async function CustomerDetailPage({
                     }`
                   : "First name and surname have not been entered separately."}
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge
-                status={customer.status === "ACTIVE" ? "active" : "notInGym"}
-              >
-                {customer.status.toLowerCase()}
-              </StatusBadge>
-              <StatusBadge
-                status={
-                  customer.gymPresenceStatus === "IN_GYM"
-                    ? "inGym"
-                    : "notInGym"
-                }
-              >
-                {customer.gymPresenceStatus
-                  .toLowerCase()
-                  .replaceAll("_", " ")}
-              </StatusBadge>
-              {!customer.birthDate ||
-              !customer.phone ||
-              !customer.emergencyPhone ? (
-                <StatusBadge status="medium">profile data missing</StatusBadge>
+              {customer.email || customer.phone ? (
+                <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-foreground">
+                  {customer.email ? (
+                    <p className="break-all">Email: {customer.email}</p>
+                  ) : null}
+                  {customer.phone ? (
+                    <p className="break-words">Phone: {customer.phone}</p>
+                  ) : null}
+                </div>
               ) : null}
+            </div>
+            <div className="grid gap-4">
+              <div className="flex flex-wrap gap-2 xl:justify-end">
+                <StatusBadge
+                  status={
+                    customer.status === "ACTIVE" ? "active" : "notInGym"
+                  }
+                >
+                  {customer.status.toLowerCase()}
+                </StatusBadge>
+                <StatusBadge
+                  status={
+                    customer.gymPresenceStatus === "IN_GYM"
+                      ? "inGym"
+                      : "notInGym"
+                  }
+                >
+                  {customer.gymPresenceStatus
+                    .toLowerCase()
+                    .replaceAll("_", " ")}
+                </StatusBadge>
+                {!customer.birthDate ||
+                !customer.phone ||
+                !customer.emergencyPhone ? (
+                  <StatusBadge status="medium">
+                    profile data missing
+                  </StatusBadge>
+                ) : null}
+              </div>
+              <CustomerProfileImagePanel
+                customerId={customer.id}
+                customerName={customer.fullName}
+                hasProfileImage={Boolean(customer.profileImageUrl)}
+                version={customer.updatedAt.toISOString()}
+              />
             </div>
           </div>
 
           <CustomerWorkspaceActions />
+          <CustomerArchiveAction
+            customerCode={customer.customerCode}
+            customerId={customer.id}
+            customerName={customer.fullName}
+            hasOpenVisit={Boolean(openVisit)}
+            isInGym={customer.gymPresenceStatus === "IN_GYM"}
+          />
 
-          <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
+          <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-6">
             <div className="rounded-xl bg-card p-4">
               <dt className="font-semibold text-secondary">Birth date</dt>
               <dd className="mt-1 font-semibold text-foreground">
@@ -368,6 +473,12 @@ export default async function CustomerDetailPage({
               </dt>
               <dd className="mt-1 break-words font-semibold text-foreground">
                 {customer.emergencyPhone ?? "Not provided"}
+              </dd>
+            </div>
+            <div className="rounded-xl bg-card p-4 xl:col-span-2">
+              <dt className="font-semibold text-secondary">Address</dt>
+              <dd className="mt-1 break-words font-semibold text-foreground">
+                {customer.address ?? "Not provided"}
               </dd>
             </div>
             <div className="rounded-xl bg-card p-4">
@@ -420,43 +531,16 @@ export default async function CustomerDetailPage({
       </div>
 
       <Card className="mt-6 scroll-mt-6" id="customer-packages">
-        <CustomerPackageOverview
+        <CustomerMembershipEditor
+          activeMembershipConflict={activeMembershipConflict}
+          categories={categories}
           coaches={coaches}
-          customerCode={customer.customerCode}
           customerId={customer.id}
-          latestCompletedCheckoutAt={
-            latestCompletedVisit?.checkedOutAt ?? null
-          }
-          mode="current"
-          packageDefinitions={packageDefinitions}
-          packages={customer.packages}
+          legacyActiveMemberships={activeMemberships}
+          membership={editableMembership}
+          packages={packageOptions}
         />
       </Card>
-
-      <section className="mt-6">
-        <details
-          className="smooth-panel scroll-mt-6 rounded-2xl border border-border bg-card shadow-sm open:border-brand"
-          id="assign-customer-package"
-        >
-          <summary className="cursor-pointer list-none rounded-2xl px-5 py-4 font-bold text-foreground transition-colors hover:bg-soft-blue sm:px-6">
-            <span className="inline-flex rounded-lg bg-button-success px-4 py-2 text-white">
-              Assign / Renew package or service
-            </span>
-            <span className="mt-1 block text-sm font-normal text-secondary">
-              Creates a new assignment while preserving the complete package
-              history.
-            </span>
-          </summary>
-          <div className="animate-panel-in border-t border-border p-5 sm:p-6">
-            <CustomerPackageAssignmentForm
-              coaches={coaches}
-              customerId={customer.id}
-              packages={activePackages}
-              returnToDetail
-            />
-          </div>
-        </details>
-      </section>
 
       <div className="mt-6">
         <CustomerDocumentsPanel
@@ -474,8 +558,9 @@ export default async function CustomerDetailPage({
             latestCompletedVisit?.checkedOutAt ?? null
           }
           mode="history"
-          packageDefinitions={packageDefinitions}
+          packageDefinitions={packageOptions}
           packages={customer.packages}
+          readOnly
         />
       </Card>
 

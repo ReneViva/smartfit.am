@@ -27,8 +27,12 @@ function packageUsageText(usage: CustomerVisitHistoryItem["packageUsages"][numbe
   const guestText = usage.guestPassesDeducted
     ? `, ${usage.guestPassesDeducted} guest pass${usage.guestPassesDeducted === 1 ? "" : "es"}`
     : "";
+  const sessionText = usage.sessionsDeducted
+    ? `${usage.sessionsDeducted} service session${usage.sessionsDeducted === 1 ? "" : "s"}`
+    : "no service sessions deducted";
+  const usageName = usage.serviceName ?? usage.packageName;
 
-  return `${usage.packageName}: ${usage.sessionsDeducted} session${usage.sessionsDeducted === 1 ? "" : "s"}${guestText}`;
+  return `${usageName}: ${sessionText}${guestText}`;
 }
 
 export function CustomerVisitHistory({

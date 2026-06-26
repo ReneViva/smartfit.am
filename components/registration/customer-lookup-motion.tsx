@@ -194,7 +194,20 @@ export function CustomerWorkspaceMotion({
     }
 
     const frame = window.requestAnimationFrame(() => {
-      const container = containerRef.current;
+      const hash = window.location.hash.slice(1);
+      let decodedHash = hash;
+
+      try {
+        decodedHash = decodeURIComponent(hash);
+      } catch {
+        decodedHash = "";
+      }
+
+      const linkedTarget =
+        decodedHash && decodedHash !== "customer-workspace"
+          ? document.getElementById(decodedHash)
+          : null;
+      const container = linkedTarget ?? containerRef.current;
 
       if (!container) {
         return;

@@ -245,6 +245,7 @@ export function CustomerPackageOverview({
   mode = "all",
   packages,
   packageDefinitions,
+  readOnly = false,
 }: {
   coaches: CoachOption[];
   customerCode: string;
@@ -253,6 +254,7 @@ export function CustomerPackageOverview({
   mode?: OverviewMode;
   packages: CustomerPackageValue[];
   packageDefinitions: PackageOption[];
+  readOnly?: boolean;
 }) {
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -297,7 +299,10 @@ export function CustomerPackageOverview({
     ? filteredHistory
     : filteredHistory.slice(0, 10);
   const selectedPackage =
-    packages.find(({ id }) => id === selectedPanel?.customerPackageId) ?? null;
+    readOnly
+      ? null
+      : packages.find(({ id }) => id === selectedPanel?.customerPackageId) ??
+        null;
   const managePanelId =
     mode === "history"
       ? "manage-assigned-package-history"
@@ -554,10 +559,12 @@ export function CustomerPackageOverview({
               Complete assignment record
             </p>
             <h3 className="mt-1 text-2xl font-bold text-foreground">
-              Package history
+              {readOnly ? "Legacy package history" : "Package history"}
             </h3>
             <p className="mt-2 text-sm leading-6 text-secondary">
-              Every assignment is preserved. Newest records appear first.
+              {readOnly
+                ? "Earlier package records are preserved as read-only context. Membership and service edits happen above."
+                : "Every assignment is preserved. Newest records appear first."}
             </p>
           </div>
           <span className="text-sm font-semibold text-secondary">
@@ -656,26 +663,30 @@ export function CustomerPackageOverview({
                         </dd>
                       </div>
                     </dl>
-                    <Button
-                      className="mt-4 w-full"
-                      onClick={() =>
-                        openSelectedPanel(customerPackage.id, "edit")
-                      }
-                      variant="neutral"
-                    >
-                      Manage
-                    </Button>
-                    <Button
-                      className="mt-2 w-full"
-                      onClick={() =>
-                        openSelectedPanel(customerPackage.id, "freeze")
-                      }
-                      variant={
-                        hasActiveFreeze ? "primary" : "warning"
-                      }
-                    >
-                      {hasActiveFreeze ? "Reactivate" : "Freeze options"}
-                    </Button>
+                    {readOnly ? null : (
+                      <>
+                        <Button
+                          className="mt-4 w-full"
+                          onClick={() =>
+                            openSelectedPanel(customerPackage.id, "edit")
+                          }
+                          variant="neutral"
+                        >
+                          Manage
+                        </Button>
+                        <Button
+                          className="mt-2 w-full"
+                          onClick={() =>
+                            openSelectedPanel(customerPackage.id, "freeze")
+                          }
+                          variant={
+                            hasActiveFreeze ? "primary" : "warning"
+                          }
+                        >
+                          {hasActiveFreeze ? "Reactivate" : "Freeze options"}
+                        </Button>
+                      </>
+                    )}
                   </article>
                 );
               })}
@@ -692,7 +703,7 @@ export function CustomerPackageOverview({
                     <th className="px-4 py-3">Freeze chances</th>
                     <th className="px-4 py-3">Coach</th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Action</th>
+                    {readOnly ? null : <th className="px-4 py-3">Action</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -741,27 +752,29 @@ export function CustomerPackageOverview({
                             {state.label}
                           </StatusBadge>
                         </td>
-                        <td className="px-4 py-4">
-                          <Button
-                            onClick={() =>
-                              openSelectedPanel(customerPackage.id, "edit")
-                            }
-                            variant="neutral"
-                          >
-                            Manage
-                          </Button>
-                          <Button
-                            className="mt-2"
-                            onClick={() =>
-                              openSelectedPanel(customerPackage.id, "freeze")
-                            }
-                            variant={
-                              hasActiveFreeze ? "primary" : "warning"
-                            }
-                          >
-                            {hasActiveFreeze ? "Reactivate" : "Freeze"}
-                          </Button>
-                        </td>
+                        {readOnly ? null : (
+                          <td className="px-4 py-4">
+                            <Button
+                              onClick={() =>
+                                openSelectedPanel(customerPackage.id, "edit")
+                              }
+                              variant="neutral"
+                            >
+                              Manage
+                            </Button>
+                            <Button
+                              className="mt-2"
+                              onClick={() =>
+                                openSelectedPanel(customerPackage.id, "freeze")
+                              }
+                              variant={
+                                hasActiveFreeze ? "primary" : "warning"
+                              }
+                            >
+                              {hasActiveFreeze ? "Reactivate" : "Freeze"}
+                            </Button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

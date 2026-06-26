@@ -4,6 +4,23 @@ import { db } from "./db";
 import { normalizeMapEmbedUrl } from "./map-embed";
 
 const PRICE_FILTER_PATTERN = /^\d{1,8}(?:\.\d{1,2})?$/;
+const PUBLIC_INTERNAL_PATH_PATTERN = /^\/(?!\/)[^\s\\]*$/;
+
+const publicContentSelect = {
+  body: true,
+  ctaLabel: true,
+  ctaUrl: true,
+  id: true,
+  imageUrl: true,
+  sortOrder: true,
+  title: true,
+  type: true,
+  visibleOnApp: true,
+} satisfies Prisma.PublicContentSelect;
+
+type PublicContentRecord = Prisma.PublicContentGetPayload<{
+  select: typeof publicContentSelect;
+}>;
 
 function safePublicUrl(value: string | null) {
   if (!value) {
@@ -20,6 +37,27 @@ function safePublicUrl(value: string | null) {
   }
 }
 
+function safePublicHref(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (PUBLIC_INTERNAL_PATH_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? trimmed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function safePhoneHref(value: string | null) {
   if (!value) {
     return null;
@@ -28,6 +66,26 @@ function safePhoneHref(value: string | null) {
   const dialableNumber = value.replace(/[^\d+*#,;]/g, "");
 
   return dialableNumber ? `tel:${dialableNumber}` : null;
+}
+
+function publicWorkingSchedule({
+  workingDays,
+  workingHours,
+  workingScheduleText,
+}: {
+  workingDays?: string | null;
+  workingHours?: string | null;
+  workingScheduleText?: string | null;
+}) {
+  if (workingScheduleText?.trim()) {
+    return workingScheduleText;
+  }
+
+  const legacySchedule = [workingDays, workingHours]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join("\n");
+
+  return legacySchedule || null;
 }
 
 export type PublicCrowdStatus = "low" | "medium" | "high";
@@ -58,6 +116,41 @@ function getCrowdStatus(
   return "high";
 }
 
+function activePublicContentWhere(
+  now: Date,
+  extra?: Prisma.PublicContentWhereInput,
+): Prisma.PublicContentWhereInput {
+  return {
+    ...extra,
+    deletedAt: null,
+    isActive: true,
+    AND: [
+      {
+        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+      },
+      {
+        OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+      },
+    ],
+  };
+}
+
+function publicContentOrderBy(): Prisma.PublicContentOrderByWithRelationInput[] {
+  return [
+    { sortOrder: "asc" },
+    { createdAt: "asc" },
+    { id: "asc" },
+  ];
+}
+
+function safePublicContent(item: PublicContentRecord) {
+  return {
+    ...item,
+    ctaUrl: safePublicHref(item.ctaUrl),
+    imageUrl: safePublicUrl(item.imageUrl),
+  };
+}
+
 export async function getPublicAppData() {
   const [settings, occupancy] = await Promise.all([
     db.gymSettings
@@ -79,7 +172,9 @@ export async function getPublicAppData() {
           showMotivationalTextInPublicApp: true,
           showPhoneInPublicApp: true,
           showPublicAnalyticsOnOurApp: true,
+          showTelegramInPublicLinks: true,
           showWhatsappInPublicApp: true,
+          telegramLink: true,
           whatsappLink: true,
         },
       })
@@ -124,6 +219,9 @@ export async function getPublicAppData() {
   const mapEmbedUrl = settings?.showLocationInPublicApp
     ? normalizeMapEmbedUrl(settings.mapEmbedUrl)
     : null;
+  const telegramLink = settings?.showTelegramInPublicLinks
+    ? safePublicUrl(settings.telegramLink)
+    : null;
 
   return {
     gymName: settings?.gymName ?? "Smartfit.am",
@@ -153,6 +251,7 @@ export async function getPublicAppData() {
             label: settings?.contactNumber ?? "Call Smartfit.am",
           }
         : null,
+      telegram: telegramLink,
       whatsapp: whatsappLink,
     },
     occupancy: {
@@ -177,9 +276,12 @@ export async function getPublicSettings() {
         instagramLink: true,
         logoUrl: true,
         mapLink: true,
+        showTelegramInPublicLinks: true,
+        telegramLink: true,
         whatsappLink: true,
         workingDays: true,
         workingHours: true,
+        workingScheduleText: true,
       },
     });
 
@@ -192,7 +294,11 @@ export async function getPublicSettings() {
       instagramLink: safePublicUrl(settings.instagramLink),
       logoUrl: safePublicUrl(settings.logoUrl),
       mapLink: safePublicUrl(settings.mapLink),
+      telegramLink: settings.showTelegramInPublicLinks
+        ? safePublicUrl(settings.telegramLink)
+        : null,
       whatsappLink: safePublicUrl(settings.whatsappLink),
+      workingSchedule: publicWorkingSchedule(settings),
     };
   } catch {
     return null;
@@ -204,33 +310,30 @@ export async function getActivePublicContent(limit?: number) {
 
   try {
     const content = await db.publicContent.findMany({
-      where: {
-        deletedAt: null,
-        isActive: true,
-        AND: [
-          {
-            OR: [{ startsAt: null }, { startsAt: { lte: now } }],
-          },
-          {
-            OR: [{ endsAt: null }, { endsAt: { gte: now } }],
-          },
-        ],
-      },
-      select: {
-        body: true,
-        id: true,
-        imageUrl: true,
-        title: true,
-        type: true,
-      },
-      orderBy: { createdAt: "desc" },
+      where: activePublicContentWhere(now),
+      select: publicContentSelect,
+      orderBy: publicContentOrderBy(),
       take: limit,
     });
 
-    return content.map((item) => ({
-      ...item,
-      imageUrl: safePublicUrl(item.imageUrl),
-    }));
+    return content.map(safePublicContent);
+  } catch {
+    return [];
+  }
+}
+
+export async function getVisibleAppPublicContent(limit?: number) {
+  const now = new Date();
+
+  try {
+    const content = await db.publicContent.findMany({
+      where: activePublicContentWhere(now, { visibleOnApp: true }),
+      select: publicContentSelect,
+      orderBy: publicContentOrderBy(),
+      take: limit,
+    });
+
+    return content.map(safePublicContent);
   } catch {
     return [];
   }
@@ -244,6 +347,27 @@ export async function getActiveCoaches(limit?: number) {
         isActive: true,
       },
       select: {
+        categories: {
+          orderBy: {
+            category: {
+              sortOrder: "asc",
+            },
+          },
+          select: {
+            category: {
+              select: {
+                name: true,
+                slug: true,
+              },
+            },
+          },
+          where: {
+            category: {
+              isArchived: false,
+              isPublic: true,
+            },
+          },
+        },
         description: true,
         firstName: true,
         id: true,
@@ -257,6 +381,7 @@ export async function getActiveCoaches(limit?: number) {
 
     return coaches.map((coach) => ({
       ...coach,
+      categories: coach.categories.map(({ category }) => category),
       photoUrl: safePublicUrl(coach.photoUrl),
     }));
   } catch {
@@ -308,6 +433,16 @@ function priceFilter(value: string) {
     value: PRICE_FILTER_PATTERN.test(normalized) ? normalized : null,
     valid: PRICE_FILTER_PATTERN.test(normalized),
   };
+}
+
+function activePackagePriceValue({
+  discountPrice,
+  price,
+}: {
+  discountPrice: string | null;
+  price: string;
+}) {
+  return Number(discountPrice ?? price);
 }
 
 export async function getPublicPackageCatalog(
@@ -363,23 +498,8 @@ export async function getPublicPackageCatalog(
         ? "The selected sort option is not available."
         : null,
     ].filter((message): message is string => Boolean(message));
-    const priceWhere =
-      minPrice.valid && maxPrice.valid && rangeIsValid
-        ? {
-            price: {
-              gte: minPrice.value ?? undefined,
-              lte: maxPrice.value ?? undefined,
-            },
-          }
-        : {};
-    const orderBy: Prisma.PackageOrderByWithRelationInput[] =
-      sort === "price-asc"
-        ? [{ price: "asc" }, { name: "asc" }]
-        : sort === "price-desc"
-          ? [{ price: "desc" }, { name: "asc" }]
-          : [{ name: "asc" }];
     const packages = await db.package.findMany({
-      orderBy,
+      orderBy: [{ name: "asc" }],
       select: {
         assignedCoach: {
           select: {
@@ -405,7 +525,9 @@ export async function getPublicPackageCatalog(
           },
         },
         description: true,
+        discountPrice: true,
         defaultGuestPasses: true,
+        highlightOnPublicPackages: true,
         id: true,
         name: true,
         packageType: true,
@@ -429,9 +551,59 @@ export async function getPublicPackageCatalog(
                 },
               }
             : {},
-          priceWhere,
         ],
       },
+    });
+    const publicPackages = packages.map((gymPackage) => ({
+      assignedCoach:
+        gymPackage.assignedCoach?.isActive &&
+        !gymPackage.assignedCoach.deletedAt
+          ? {
+              firstName: gymPackage.assignedCoach.firstName,
+              lastName: gymPackage.assignedCoach.lastName,
+            }
+          : null,
+      categories: gymPackage.categories.map(({ category: option }) => option),
+      description: gymPackage.description,
+      discountPrice: gymPackage.discountPrice?.toString() ?? null,
+      defaultGuestPasses: gymPackage.defaultGuestPasses,
+      highlightOnPublicPackages: gymPackage.highlightOnPublicPackages,
+      id: gymPackage.id,
+      name: gymPackage.name,
+      packageType: gymPackage.packageType,
+      price: gymPackage.price.toString(),
+      sessionCount: gymPackage.sessionCount,
+      timeRestrictionLabel: gymPackage.timeRestrictionLabel,
+    }));
+    const filteredPackages =
+      minPrice.valid && maxPrice.valid && rangeIsValid
+        ? publicPackages.filter((gymPackage) => {
+            const activePrice = activePackagePriceValue(gymPackage);
+
+            return (
+              (minPrice.value === null ||
+                activePrice >= Number(minPrice.value)) &&
+              (maxPrice.value === null ||
+                activePrice <= Number(maxPrice.value))
+            );
+          })
+        : publicPackages;
+    const sortedPackages = [...filteredPackages].sort((left, right) => {
+      if (sort === "price-asc") {
+        return (
+          activePackagePriceValue(left) - activePackagePriceValue(right) ||
+          left.name.localeCompare(right.name)
+        );
+      }
+
+      if (sort === "price-desc") {
+        return (
+          activePackagePriceValue(right) - activePackagePriceValue(left) ||
+          left.name.localeCompare(right.name)
+        );
+      }
+
+      return left.name.localeCompare(right.name);
     });
 
     return {
@@ -444,25 +616,7 @@ export async function getPublicPackageCatalog(
         minPrice: requestedMinPrice,
         sort,
       },
-      packages: packages.map((gymPackage) => ({
-        assignedCoach:
-          gymPackage.assignedCoach?.isActive &&
-          !gymPackage.assignedCoach.deletedAt
-            ? {
-                firstName: gymPackage.assignedCoach.firstName,
-                lastName: gymPackage.assignedCoach.lastName,
-              }
-            : null,
-        categories: gymPackage.categories.map(({ category: option }) => option),
-        description: gymPackage.description,
-        defaultGuestPasses: gymPackage.defaultGuestPasses,
-        id: gymPackage.id,
-        name: gymPackage.name,
-        packageType: gymPackage.packageType,
-        price: gymPackage.price.toString(),
-        sessionCount: gymPackage.sessionCount,
-        timeRestrictionLabel: gymPackage.timeRestrictionLabel,
-      })),
+      packages: sortedPackages,
     };
   } catch {
     return {

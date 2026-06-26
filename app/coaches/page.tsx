@@ -29,6 +29,29 @@ const primaryCta =
 const darkCta =
   "inline-flex min-h-11 items-center justify-center rounded-lg border border-white/35 bg-white/10 px-5 py-2.5 text-sm font-bold text-white shadow-sm backdrop-blur transition-[background-color,border-color,transform] hover:-translate-y-0.5 hover:border-white/70 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
 
+function CoachCategoryPills({
+  categories,
+}: {
+  categories: { name: string; slug: string }[];
+}) {
+  if (!categories.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {categories.map((category) => (
+        <span
+          className="rounded-full border border-brand/20 bg-soft-blue px-3 py-1 text-xs font-bold text-brand"
+          key={category.slug}
+        >
+          {category.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default async function CoachesPage() {
   const coaches = await getActiveCoaches();
 
@@ -136,6 +159,7 @@ export default async function CoachesPage() {
                     <h3 className="mt-2 text-2xl font-bold text-foreground">
                       {coachName}
                     </h3>
+                    <CoachCategoryPills categories={coach.categories} />
                     {coach.description ? (
                       <p className="mt-3 line-clamp-3 text-sm leading-6 text-secondary">
                         {coach.description}

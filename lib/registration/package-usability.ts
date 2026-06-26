@@ -18,6 +18,36 @@ function timeMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
+export function packageTimeRestrictionReason(
+  customerPackage: Pick<PackageUsabilityValue, "package">,
+  now = new Date(),
+) {
+  if (!customerPackage.package.hasTimeRestriction) {
+    return null;
+  }
+
+  const startTime = customerPackage.package.allowedStartTime;
+  const endTime = customerPackage.package.allowedEndTime;
+
+  if (
+    (startTime && !TIME_PATTERN.test(startTime)) ||
+    !endTime ||
+    !TIME_PATTERN.test(endTime)
+  ) {
+    return "Package time restriction is invalid.";
+  }
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = startTime ? timeMinutes(startTime) : 0;
+  const endMinutes = timeMinutes(endTime);
+
+  return startMinutes >= endMinutes ||
+    currentMinutes < startMinutes ||
+    currentMinutes > endMinutes
+    ? "Package is outside its allowed time window."
+    : null;
+}
+
 export function packageUsability(
   customerPackage: PackageUsabilityValue,
   now = new Date(),
@@ -53,31 +83,14 @@ export function packageUsability(
   }
 
   if (customerPackage.package.hasTimeRestriction) {
-    const startTime = customerPackage.package.allowedStartTime;
-    const endTime = customerPackage.package.allowedEndTime;
+    const timeRestrictionReason = packageTimeRestrictionReason(
+      customerPackage,
+      now,
+    );
 
-    if (
-      (startTime && !TIME_PATTERN.test(startTime)) ||
-      !endTime ||
-      !TIME_PATTERN.test(endTime)
-    ) {
+    if (timeRestrictionReason) {
       return {
-        reason: "Package time restriction is invalid.",
-        usable: false,
-      };
-    }
-
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const startMinutes = startTime ? timeMinutes(startTime) : 0;
-    const endMinutes = timeMinutes(endTime);
-
-    if (
-      startMinutes >= endMinutes ||
-      currentMinutes < startMinutes ||
-      currentMinutes > endMinutes
-    ) {
-      return {
-        reason: "Package is outside its allowed time window.",
+        reason: timeRestrictionReason,
         usable: false,
       };
     }

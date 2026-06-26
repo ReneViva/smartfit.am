@@ -232,97 +232,141 @@ export default async function PackagesPage({
 
           {catalog.packages.length ? (
             <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {catalog.packages.map((gymPackage) => (
-                <article
-                  className="public-interactive-card group flex min-h-full flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm"
-                  key={gymPackage.id}
-                >
-                  <div className="h-2 bg-brand" />
-                  <div className="flex flex-1 flex-col p-6">
-                    <div className="flex flex-wrap gap-2">
-                      {gymPackage.categories.length ? (
-                        gymPackage.categories.map((category) => (
-                          <span
-                            className="w-fit rounded-full bg-soft-blue px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary-active"
-                            key={category.slug}
-                          >
-                            {category.name}
+              {catalog.packages.map((gymPackage) => {
+                const hasDiscount = Boolean(gymPackage.discountPrice);
+
+                return (
+                  <article
+                    className={`public-interactive-card group flex min-h-full flex-col overflow-hidden rounded-lg border shadow-sm ${
+                      gymPackage.highlightOnPublicPackages
+                        ? "border-brand/70 bg-soft-blue shadow-lg shadow-brand/10"
+                        : "border-border bg-card"
+                    }`}
+                    key={gymPackage.id}
+                  >
+                    <div
+                      className={
+                        gymPackage.highlightOnPublicPackages
+                          ? "h-2 bg-status-low"
+                          : "h-2 bg-brand"
+                      }
+                    />
+                    <div className="flex flex-1 flex-col p-6">
+                      <div className="flex flex-wrap gap-2">
+                        {gymPackage.highlightOnPublicPackages ? (
+                          <span className="w-fit rounded-full bg-brand px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
+                            Featured
                           </span>
-                        ))
+                        ) : null}
+                        {hasDiscount ? (
+                          <span className="w-fit rounded-full border border-status-low bg-card px-3 py-1 text-xs font-bold uppercase tracking-wide text-foreground">
+                            Discount
+                          </span>
+                        ) : null}
+                        {gymPackage.categories.length ? (
+                          gymPackage.categories.map((category) => (
+                            <span
+                              className="w-fit rounded-full bg-card px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary-active ring-1 ring-brand/20"
+                              key={category.slug}
+                            >
+                              {category.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="w-fit rounded-full bg-neutral px-3 py-1 text-xs font-bold uppercase tracking-wide text-secondary">
+                            Package option
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="mt-5 text-2xl font-bold text-foreground">
+                        {gymPackage.name}
+                      </h3>
+                      {gymPackage.description ? (
+                        <p className="mt-3 line-clamp-3 text-sm leading-6 text-secondary">
+                          {gymPackage.description}
+                        </p>
                       ) : (
-                        <span className="w-fit rounded-full bg-neutral px-3 py-1 text-xs font-bold uppercase tracking-wide text-secondary">
-                          Package option
-                        </span>
+                        <p className="mt-3 text-sm leading-6 text-secondary">
+                          Contact Smartfit.am for full package details.
+                        </p>
                       )}
-                    </div>
 
-                    <h3 className="mt-5 text-2xl font-bold text-foreground">
-                      {gymPackage.name}
-                    </h3>
-                    {gymPackage.description ? (
-                      <p className="mt-3 line-clamp-3 text-sm leading-6 text-secondary">
-                        {gymPackage.description}
-                      </p>
-                    ) : (
-                      <p className="mt-3 text-sm leading-6 text-secondary">
-                        Contact Smartfit.am for full package details.
-                      </p>
-                    )}
-
-                    <div className="mt-6 rounded-lg border border-border bg-page p-4">
-                      <p className="text-sm font-semibold text-secondary">
-                        Starting price
-                      </p>
-                      <p className="mt-1 text-4xl font-bold text-foreground">
-                        {formatAmd(gymPackage.price)}
-                      </p>
-                    </div>
-
-                    <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-                      <div>
-                        <dt className="font-semibold text-secondary">
-                          Sessions
-                        </dt>
-                        <dd className="mt-1 text-lg font-bold text-foreground">
-                          {gymPackage.sessionCount}
-                        </dd>
+                      <div
+                        className={`mt-6 rounded-lg border p-4 ${
+                          hasDiscount
+                            ? "border-status-low bg-card"
+                            : "border-border bg-page"
+                        }`}
+                      >
+                        <p className="text-sm font-semibold text-secondary">
+                          {hasDiscount ? "Discount price" : "Starting price"}
+                        </p>
+                        {hasDiscount && gymPackage.discountPrice ? (
+                          <>
+                            <p className="mt-1 text-lg font-bold text-secondary line-through">
+                              {formatAmd(gymPackage.price)}
+                            </p>
+                            <p className="mt-1 text-4xl font-bold text-brand">
+                              {formatAmd(gymPackage.discountPrice)}
+                            </p>
+                            <p className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-status-low">
+                              Final discounted price
+                            </p>
+                          </>
+                        ) : (
+                          <p className="mt-1 text-4xl font-bold text-foreground">
+                            {formatAmd(gymPackage.price)}
+                          </p>
+                        )}
                       </div>
-                      <div>
-                        <dt className="font-semibold text-secondary">
-                          Guest passes
-                        </dt>
-                        <dd className="mt-1 text-lg font-bold text-foreground">
-                          {gymPackage.defaultGuestPasses}
-                        </dd>
-                      </div>
-                      {gymPackage.assignedCoach ? (
-                        <div className="sm:col-span-2">
+
+                      <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+                        <div>
                           <dt className="font-semibold text-secondary">
-                            Coach
+                            Sessions
                           </dt>
-                          <dd className="mt-1 text-foreground">
-                            {gymPackage.assignedCoach.firstName}{" "}
-                            {gymPackage.assignedCoach.lastName}
+                          <dd className="mt-1 text-lg font-bold text-foreground">
+                            {gymPackage.sessionCount}
                           </dd>
                         </div>
+                        <div>
+                          <dt className="font-semibold text-secondary">
+                            Guest passes
+                          </dt>
+                          <dd className="mt-1 text-lg font-bold text-foreground">
+                            {gymPackage.defaultGuestPasses}
+                          </dd>
+                        </div>
+                        {gymPackage.assignedCoach ? (
+                          <div className="sm:col-span-2">
+                            <dt className="font-semibold text-secondary">
+                              Coach
+                            </dt>
+                            <dd className="mt-1 text-foreground">
+                              {gymPackage.assignedCoach.firstName}{" "}
+                              {gymPackage.assignedCoach.lastName}
+                            </dd>
+                          </div>
+                        ) : null}
+                      </dl>
+
+                      {gymPackage.timeRestrictionLabel ? (
+                        <p className="mt-5 rounded-lg border border-brand/30 bg-card px-3 py-2 text-sm font-semibold text-primary-active">
+                          {gymPackage.timeRestrictionLabel}
+                        </p>
                       ) : null}
-                    </dl>
 
-                    {gymPackage.timeRestrictionLabel ? (
-                      <p className="mt-5 rounded-lg border border-brand/30 bg-soft-blue px-3 py-2 text-sm font-semibold text-primary-active">
-                        {gymPackage.timeRestrictionLabel}
-                      </p>
-                    ) : null}
-
-                    {/* <Link
+                      {/* <Link
                       className="mt-auto inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-bold text-white transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                       href="/contact"
                     >
                       Ask about this package
                     </Link> */}
-                  </div>
-                </article>
-              ))}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className="mt-6">

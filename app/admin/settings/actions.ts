@@ -58,6 +58,7 @@ export async function saveSettingsAction(formData: FormData) {
     "ourAppLogoDarkUrl",
     "whatsappLink",
     "instagramLink",
+    "telegramLink",
     "mapLink",
   ] as const;
   const rawMapEmbedValue = optionalText(formData, "mapEmbedUrl", 5000);
@@ -147,11 +148,13 @@ export async function saveSettingsAction(formData: FormData) {
     showPhoneInPublicApp: formData.get("showPhoneInPublicApp") === "on",
     showPublicAnalyticsOnOurApp:
       formData.get("showPublicAnalyticsOnOurApp") === "on",
+    showTelegramInPublicLinks:
+      formData.get("showTelegramInPublicLinks") === "on",
     showWhatsappInPublicApp:
       formData.get("showWhatsappInPublicApp") === "on",
+    telegramLink: urls.telegramLink,
     whatsappLink: urls.whatsappLink,
-    workingDays: optionalText(formData, "workingDays", 200),
-    workingHours: optionalText(formData, "workingHours", 200),
+    workingScheduleText: optionalText(formData, "workingScheduleText", 2000),
   };
 
   try {

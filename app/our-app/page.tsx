@@ -7,6 +7,7 @@ import { StatusBadge } from "../../components/ui/status-badge";
 import { getPublicVisitAnalytics } from "../../lib/analytics/data";
 import {
   getPublicAppData,
+  getVisibleAppPublicContent,
   type PublicCrowdStatus,
 } from "../../lib/public-data";
 import {
@@ -57,6 +58,114 @@ const installSteps = [
   },
 ];
 
+type AppAnnouncement = Awaited<
+  ReturnType<typeof getVisibleAppPublicContent>
+>[number];
+
+function announcementTypeLabel(type: string) {
+  return type.toLowerCase().replaceAll("_", " ");
+}
+
+function linkTargetProps(href: string) {
+  return /^https?:\/\//i.test(href)
+    ? { rel: "noopener noreferrer", target: "_blank" }
+    : {};
+}
+
+function AnnouncementCta({ item }: { item: AppAnnouncement }) {
+  if (!item.ctaUrl) {
+    return null;
+  }
+
+  return (
+    <a
+      className="mt-5 inline-flex min-h-11 max-w-full items-center justify-center rounded-lg bg-brand px-5 py-2.5 text-center text-sm font-bold leading-5 text-white [overflow-wrap:anywhere] transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-primary-hover hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      href={item.ctaUrl}
+      {...linkTargetProps(item.ctaUrl)}
+    >
+      {item.ctaLabel ?? "View details"}
+    </a>
+  );
+}
+
+function OurAppAnnouncements({ items }: { items: AppAnnouncement[] }) {
+  if (!items.length) {
+    return null;
+  }
+
+  const [primary, ...secondaryItems] = items as [
+    AppAnnouncement,
+    ...AppAnnouncement[],
+  ];
+
+  return (
+    <div
+      aria-label="Our App announcements"
+      className="overflow-hidden rounded-lg border border-brand/30 bg-card shadow-xl shadow-brand/10"
+      role="region"
+    >
+      <article
+        className={`grid gap-0 ${
+          primary.imageUrl
+            ? "lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.38fr)]"
+            : ""
+        }`}
+      >
+        <div className="p-5 sm:p-7">
+          <p className="w-fit rounded-full bg-soft-blue px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-primary-active">
+            {announcementTypeLabel(primary.type)}
+          </p>
+          <h2 className="mt-4 text-2xl font-bold text-foreground sm:text-4xl">
+            {primary.title}
+          </h2>
+          {primary.body ? (
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-secondary sm:text-base sm:leading-7">
+              {primary.body}
+            </p>
+          ) : null}
+          <AnnouncementCta item={primary} />
+        </div>
+        {primary.imageUrl ? (
+          <div className="min-h-56 overflow-hidden border-t border-border bg-soft-blue lg:border-l lg:border-t-0">
+            <img
+              alt={primary.title}
+              className="h-full min-h-56 w-full object-cover"
+              loading="lazy"
+              src={primary.imageUrl}
+            />
+          </div>
+        ) : null}
+      </article>
+
+      {secondaryItems.length ? (
+        <div className="border-t border-border bg-soft-blue/40 p-4 sm:p-5">
+          <div className="grid gap-3 md:grid-cols-2">
+            {secondaryItems.map((item) => (
+              <article
+                className="rounded-lg border border-border bg-card p-4 shadow-sm"
+                key={item.id}
+              >
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand">
+                  {announcementTypeLabel(item.type)}
+                </p>
+                <h3 className="mt-2 text-lg font-bold text-foreground">
+                  {item.title}
+                </h3>
+                {item.body ? (
+                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-secondary">
+                    {item.body}
+                  </p>
+                ) : null}
+                <AnnouncementCta item={item} />
+              </article>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function PhoneIcon() {
   return (
     <svg aria-hidden="true" className={iconClasses} viewBox="0 0 24 24">
@@ -96,6 +205,18 @@ function InstagramIcon() {
   );
 }
 
+function TelegramIcon() {
+  return (
+    <svg aria-hidden="true" className={iconClasses} viewBox="0 0 24 24">
+      <path
+        d="m20.5 4.5-3.2 15.1c-.2.9-.8 1.1-1.6.7l-4.5-3.3-2.2 2.1c-.2.2-.5.4-.9.4l.3-4.7 8.5-7.7c.4-.3-.1-.5-.5-.2L5.9 13.5l-4.6-1.4c-1-.3-1-1 .2-1.5l17.9-6.9c.8-.3 1.5.2 1.1.8Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function LocationIcon() {
   return (
     <svg aria-hidden="true" className={iconClasses} viewBox="0 0 24 24">
@@ -110,7 +231,10 @@ function LocationIcon() {
 }
 
 export default async function OurAppPage() {
-  const appData = await getPublicAppData();
+  const [appData, appAnnouncements] = await Promise.all([
+    getPublicAppData(),
+    getVisibleAppPublicContent(4),
+  ]);
   const publicAnalytics = appData.showPublicAnalytics
     ? await getPublicVisitAnalytics()
     : null;
@@ -194,109 +318,126 @@ export default async function OurAppPage() {
         </div>
       </section>
 
-      <section className="home-wide-rail relative z-10 -mt-10 grid gap-5 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
-        <Card className="rounded-lg p-6 sm:p-7">
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
-            Visit smarter
-          </p>
-          <h2 className="mt-2 text-3xl font-bold text-foreground">
-            Live status, public links, and quick directions in one place
-          </h2>
-          <p className="mt-4 text-sm leading-6 text-secondary">
-            The public app is built for planning: see the current crowd level,
-            choose a quieter hour, then get straight to the right contact or
-            location link.
-          </p>
-          {appData.motivationalText ? (
-            <p className="mt-5 rounded-lg border border-brand/25 bg-soft-blue px-4 py-3 text-sm font-bold leading-6 text-primary-active">
-              {appData.motivationalText}
-            </p>
-          ) : null}
-        </Card>
+      <section className="home-wide-rail relative z-10 -mt-10 space-y-5">
+        <OurAppAnnouncements items={appAnnouncements} />
 
-        {hasPublicLinks || appData.location?.address ? (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
           <Card className="rounded-lg p-6 sm:p-7">
-            {hasPublicLinks ? (
-              <>
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
-                      Quick links
-                    </p>
-                    <h2 className="mt-2 text-3xl font-bold text-foreground">
-                      Reach Smartfit.am fast
-                    </h2>
-                  </div>
-                </div>
-                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {appData.links.phone ? (
-                    <a
-                      aria-label={`Call ${appData.gymName}`}
-                      className={publicLinkClasses}
-                      href={appData.links.phone.href}
-                      title={`Call ${appData.links.phone.label}`}
-                    >
-                      <PhoneIcon />
-                      <span>Call</span>
-                    </a>
-                  ) : null}
-                  {appData.links.whatsapp ? (
-                    <a
-                      aria-label={`Open ${appData.gymName} on WhatsApp`}
-                      className={publicLinkClasses}
-                      href={appData.links.whatsapp}
-                      rel="noreferrer"
-                      target="_blank"
-                      title="Open WhatsApp"
-                    >
-                      <WhatsAppIcon />
-                      <span>WhatsApp</span>
-                    </a>
-                  ) : null}
-                  {appData.links.instagram ? (
-                    <a
-                      aria-label={`Open ${appData.gymName} on Instagram`}
-                      className={publicLinkClasses}
-                      href={appData.links.instagram}
-                      rel="noreferrer"
-                      target="_blank"
-                      title="Open Instagram"
-                    >
-                      <InstagramIcon />
-                      <span>Instagram</span>
-                    </a>
-                  ) : null}
-                  {appData.links.location ? (
-                    <a
-                      aria-label={`Get directions to ${appData.gymName}`}
-                      className={publicLinkClasses}
-                      href={appData.links.location.href}
-                      rel="noreferrer"
-                      target="_blank"
-                      title="Open directions"
-                    >
-                      <LocationIcon />
-                      <span>Directions</span>
-                    </a>
-                  ) : null}
-                </div>
-              </>
-            ) : null}
-
-            {appData.location?.address ? (
-              <div
-                className={`max-w-xl ${hasPublicLinks ? "mt-6 border-t border-border pt-5" : ""}`}
-              >
-                <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
-                  Location
-                </p>
-                <p className="mt-2 [overflow-wrap:anywhere] text-sm leading-6 text-secondary">
-                  {appData.location.address}
-                </p>
-              </div>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
+              Visit smarter
+            </p>
+            <h2 className="mt-2 text-3xl font-bold text-foreground">
+              Live status, public links, and quick directions in one place
+            </h2>
+            <p className="mt-4 text-sm leading-6 text-secondary">
+              The public app is built for planning: see the current crowd level,
+              choose a quieter hour, then get straight to the right contact or
+              location link.
+            </p>
+            {appData.motivationalText ? (
+              <p className="mt-5 rounded-lg border border-brand/25 bg-soft-blue px-4 py-3 text-sm font-bold leading-6 text-primary-active">
+                {appData.motivationalText}
+              </p>
             ) : null}
           </Card>
-        ) : null}
+
+          {hasPublicLinks || appData.location?.address ? (
+            <Card className="rounded-lg p-6 sm:p-7">
+              {hasPublicLinks ? (
+                <>
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
+                        Quick links
+                      </p>
+                      <h2 className="mt-2 text-3xl font-bold text-foreground">
+                        Reach Smartfit.am fast
+                      </h2>
+                    </div>
+                  </div>
+                  <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                    {appData.links.phone ? (
+                      <a
+                        aria-label={`Call ${appData.gymName}`}
+                        className={publicLinkClasses}
+                        href={appData.links.phone.href}
+                        title={`Call ${appData.links.phone.label}`}
+                      >
+                        <PhoneIcon />
+                        <span>Call</span>
+                      </a>
+                    ) : null}
+                    {appData.links.whatsapp ? (
+                      <a
+                        aria-label={`Open ${appData.gymName} on WhatsApp`}
+                        className={publicLinkClasses}
+                        href={appData.links.whatsapp}
+                        rel="noreferrer"
+                        target="_blank"
+                        title="Open WhatsApp"
+                      >
+                        <WhatsAppIcon />
+                        <span>WhatsApp</span>
+                      </a>
+                    ) : null}
+                    {appData.links.instagram ? (
+                      <a
+                        aria-label={`Open ${appData.gymName} on Instagram`}
+                        className={publicLinkClasses}
+                        href={appData.links.instagram}
+                        rel="noreferrer"
+                        target="_blank"
+                        title="Open Instagram"
+                      >
+                        <InstagramIcon />
+                        <span>Instagram</span>
+                      </a>
+                    ) : null}
+                    {appData.links.telegram ? (
+                      <a
+                        aria-label={`Open ${appData.gymName} on Telegram`}
+                        className={publicLinkClasses}
+                        href={appData.links.telegram}
+                        rel="noreferrer"
+                        target="_blank"
+                        title="Open Telegram"
+                      >
+                        <TelegramIcon />
+                        <span>Telegram</span>
+                      </a>
+                    ) : null}
+                    {appData.links.location ? (
+                      <a
+                        aria-label={`Get directions to ${appData.gymName}`}
+                        className={publicLinkClasses}
+                        href={appData.links.location.href}
+                        rel="noreferrer"
+                        target="_blank"
+                        title="Open directions"
+                      >
+                        <LocationIcon />
+                        <span>Directions</span>
+                      </a>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
+
+              {appData.location?.address ? (
+                <div
+                  className={`max-w-xl ${hasPublicLinks ? "mt-6 border-t border-border pt-5" : ""}`}
+                >
+                  <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
+                    Location
+                  </p>
+                  <p className="mt-2 [overflow-wrap:anywhere] text-sm leading-6 text-secondary">
+                    {appData.location.address}
+                  </p>
+                </div>
+              ) : null}
+            </Card>
+          ) : null}
+        </div>
       </section>
 
       {appData.showPublicAnalytics ? (

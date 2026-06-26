@@ -12,9 +12,16 @@ export type CustomerVisitHistoryItem = {
   packageUsages: {
     guestPassesDeducted: number;
     packageName: string;
+    serviceName: string | null;
     sessionsDeducted: number;
   }[];
 };
+
+function serviceNameFromReason(reason: string | null) {
+  const match = reason?.match(/^Service check-in deduction: (.*?) \[service:/);
+
+  return match?.[1] ?? null;
+}
 
 export async function getCustomerVisitHistoryForAdmin(
   customerId: string,
@@ -35,6 +42,9 @@ export async function getCustomerVisitHistoryForAdmin(
         select: {
           guestPassesDeducted: true,
           sessionsDeducted: true,
+          sessionChange: {
+            select: { reason: true },
+          },
           customerPackage: {
             select: {
               package: {
@@ -60,6 +70,7 @@ export async function getCustomerVisitHistoryForAdmin(
     packageUsages: visit.packageUsages.map((usage) => ({
       guestPassesDeducted: usage.guestPassesDeducted,
       packageName: usage.customerPackage.package.name,
+      serviceName: serviceNameFromReason(usage.sessionChange?.reason ?? null),
       sessionsDeducted: usage.sessionsDeducted,
     })),
   }));

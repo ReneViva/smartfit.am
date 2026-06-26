@@ -28,6 +28,40 @@ function peakSummary(
   };
 }
 
+function UsageList({
+  emptyMessage,
+  items,
+}: {
+  emptyMessage: string;
+  items: { count: number; isPeak: boolean; label: string }[];
+}) {
+  return items.length ? (
+    <div className="mt-5 space-y-3">
+      {items.map((item) => (
+        <div
+          className={`rounded-xl border p-4 ${
+            item.isPeak ? "border-brand bg-soft-blue" : "border-border bg-page"
+          }`}
+          key={item.label}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="break-words font-bold text-foreground">
+              {item.label}
+            </p>
+            <p className="text-sm font-semibold text-secondary">
+              {item.count} session{item.count === 1 ? "" : "s"}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p className="mt-5 rounded-xl border border-dashed border-border bg-page px-5 py-8 text-center text-secondary">
+      {emptyMessage}
+    </p>
+  );
+}
+
 export default async function AnalyticsPage() {
   const analytics = await getBasicAnalytics();
   const weeklyPeakDay = peakSummary(analytics.weeklyCheckIns);
@@ -130,11 +164,48 @@ export default async function AnalyticsPage() {
         />
       </section>
 
+      <section className="mt-8 grid gap-6 xl:grid-cols-2">
+        <Card>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand">
+            Membership services
+          </p>
+          <h3 className="mt-2 text-2xl font-bold text-foreground">
+            Weekly service deductions
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            {analytics.serviceDeductions.totalSessionsUsed} service session
+            {analytics.serviceDeductions.totalSessionsUsed === 1 ? "" : "s"}{" "}
+            deducted from check-ins this week.
+          </p>
+          <UsageList
+            emptyMessage="No service-line session deductions have been recorded for the current server-local week."
+            items={analytics.serviceDeductions.topServices}
+          />
+        </Card>
+
+        <Card>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand">
+            Coach-linked usage
+          </p>
+          <h3 className="mt-2 text-2xl font-bold text-foreground">
+            Weekly service sessions by coach
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            Uses the service-line coach when available, then the membership or
+            package coach.
+          </p>
+          <UsageList
+            emptyMessage="No coach-linked service deductions have been recorded for the current server-local week."
+            items={analytics.serviceDeductions.topCoaches}
+          />
+        </Card>
+      </section>
+
       <Card className="mt-8 bg-soft-blue">
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary-active">
           Calculation notes
         </p>
-        <dl className="mt-5 grid gap-5 text-sm md:grid-cols-3">
+        <dl className="mt-5 grid gap-5 text-sm md:grid-cols-4">
           <div>
             <dt className="font-semibold text-secondary">Date boundaries</dt>
             <dd className="mt-1 text-foreground">
@@ -145,6 +216,12 @@ export default async function AnalyticsPage() {
             <dt className="font-semibold text-secondary">Check-in trends</dt>
             <dd className="mt-1 text-foreground">
               Counted from aggregate visit check-in timestamps
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-secondary">Service usage</dt>
+            <dd className="mt-1 text-foreground">
+              Counted from check-in session-change deductions
             </dd>
           </div>
           <div>

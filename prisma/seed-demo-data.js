@@ -96,7 +96,9 @@ const packages = [
   {
     ...ALL_DAY_RESTRICTION,
     description: "All-day access package for 1 month with 16 visits.",
+    discountPrice: 19000,
     durationDays: 30,
+    highlightOnPublicPackages: true,
     name: "All-Day Access — 1 Month / 16 Visits",
     packageType: "GYM_ACCESS",
     price: 21000,
@@ -489,20 +491,24 @@ const publicContents = [
     body: "A focused seasonal offer for members who want coached training plus open gym access.",
     imageUrl:
       "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1200&q=80",
+    sortOrder: 10,
     title: "Summer Training Pass",
     type: "OFFER",
   },
   {
     body: "Bring a training partner and ask reception about current couple package availability.",
     imageUrl: null,
+    sortOrder: 20,
     title: "Couple Access Packages",
     type: "PROMOTION",
   },
   {
     body: "The public app can show live occupancy, active offers, and contact details when enabled.",
     imageUrl: null,
+    sortOrder: 30,
     title: "Plan Your Visit",
     type: "ANNOUNCEMENT",
+    visibleOnApp: true,
   },
 ];
 
@@ -646,8 +652,10 @@ async function seedPackage(gymPackage, coachIdsByName, categoryIdsBySlug) {
   });
   const data = {
     ...packageData,
+    discountPrice: gymPackage.discountPrice ?? null,
     defaultFreezeChances: gymPackage.defaultFreezeChances ?? 3,
     defaultGuestPasses: gymPackage.name.includes("Couple") ? 2 : 0,
+    highlightOnPublicPackages: gymPackage.highlightOnPublicPackages ?? false,
     assignedCoachId: assignedCoachName
       ? coachIdsByName.get(assignedCoachName)
       : null,

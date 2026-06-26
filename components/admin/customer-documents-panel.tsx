@@ -148,7 +148,6 @@ export function CustomerDocumentsPanel({
         <form
           action={uploadAction}
           className="rounded-xl border border-border bg-page p-4"
-          encType="multipart/form-data"
           key={uploadState.submissionId}
           ref={formRef}
         >

@@ -36,6 +36,11 @@ const publicAppToggleFields = [
     name: "showLocationInPublicApp",
   },
   {
+    defaultChecked: false,
+    label: "Show Telegram on public pages",
+    name: "showTelegramInPublicLinks",
+  },
+  {
     defaultChecked: true,
     label: "Show motivational text",
     name: "showMotivationalTextInPublicApp",
@@ -74,6 +79,22 @@ const errorMessages: Record<string, string> = {
   "upload-file-type": "Choose a valid image file.",
   unavailable: "Settings could not be saved. Please try again.",
 };
+
+type SettingsScheduleSource = {
+  workingDays?: string | null;
+  workingHours?: string | null;
+  workingScheduleText?: string | null;
+} | null;
+
+function settingsScheduleDefault(settings: SettingsScheduleSource) {
+  if (settings?.workingScheduleText) {
+    return settings.workingScheduleText;
+  }
+
+  return [settings?.workingDays, settings?.workingHours]
+    .filter(Boolean)
+    .join("\n");
+}
 
 export default async function SettingsPage({
   searchParams,
@@ -149,21 +170,19 @@ export default async function SettingsPage({
                 name="address"
               />
             </label>
-            <label className={labelClass}>
-              Working days
-              <input
-                className={inputClass}
-                defaultValue={settings?.workingDays ?? ""}
-                name="workingDays"
+            <label className={`${labelClass} md:col-span-2`}>
+              Working schedule
+              <textarea
+                className={`${inputClass} min-h-32 whitespace-pre-wrap`}
+                defaultValue={settingsScheduleDefault(settings)}
+                maxLength={2000}
+                name="workingScheduleText"
+                placeholder={`Mon-Fri | 07:00-23:00\nSaturday | 09:00-22:00\nSunday | 10:00-20:00`}
               />
-            </label>
-            <label className={labelClass}>
-              Working hours
-              <input
-                className={inputClass}
-                defaultValue={settings?.workingHours ?? ""}
-                name="workingHours"
-              />
+              <span className="mt-2 block text-sm font-normal leading-6 text-secondary">
+                Use one line or multiple lines. Public pages preserve the line
+                breaks exactly as written.
+              </span>
             </label>
           </div>
         </Card>
@@ -187,6 +206,16 @@ export default async function SettingsPage({
                 className={inputClass}
                 defaultValue={settings?.instagramLink ?? ""}
                 name="instagramLink"
+                placeholder="https://..."
+                type="url"
+              />
+            </label>
+            <label className={labelClass}>
+              Telegram URL
+              <input
+                className={inputClass}
+                defaultValue={settings?.telegramLink ?? ""}
+                name="telegramLink"
                 placeholder="https://..."
                 type="url"
               />
@@ -260,9 +289,10 @@ export default async function SettingsPage({
           </h3>
           <p className="mt-2 text-sm leading-6 text-secondary">
             Set separate Our App wordmarks for light and dark themes. The
-            bundled Smartfit logos are used when a field is empty. Public
-            analytics contain aggregate check-in counts only and are hidden by
-            default.
+            bundled Smartfit logos are used when a field is empty. Public link
+            toggles control the Our App quick links; Telegram also appears on
+            Contact when enabled. Public analytics contain aggregate check-in
+            counts only and are hidden by default.
           </p>
           <div className="mt-5 grid gap-5 md:grid-cols-2">
             <ImageInput

@@ -5,7 +5,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CoachPhoto } from "./coach-photo";
 
+type CoachShowcaseCategory = {
+  name: string;
+  slug: string;
+};
+
 export type CoachShowcaseItem = {
+  categories: CoachShowcaseCategory[];
   description: string | null;
   firstName: string;
   id: string;
@@ -15,6 +21,29 @@ export type CoachShowcaseItem = {
 };
 
 const COACH_ROTATION_INTERVAL_MS = 7200;
+
+function CoachCategoryPills({
+  categories,
+}: {
+  categories: CoachShowcaseCategory[];
+}) {
+  if (!categories.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {categories.map((category) => (
+        <span
+          className="rounded-full border border-brand/20 bg-soft-blue px-3 py-1 text-xs font-bold text-brand"
+          key={category.slug}
+        >
+          {category.name}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function ArrowIcon({ direction }: { direction: "left" | "right" }) {
   return (
@@ -308,6 +337,7 @@ export function CoachShowcaseCarousel({
                   <h3 className="mt-2 text-xl font-bold text-foreground">
                     {coachName}
                   </h3>
+                  <CoachCategoryPills categories={coach.categories} />
                   {coach.description ? (
                     <p className="mt-3 line-clamp-3 text-sm leading-6 text-secondary">
                       {coach.description}
@@ -375,6 +405,7 @@ export function CoachShowcaseCarousel({
                   <h3 className="mt-2 text-2xl font-bold text-foreground sm:text-3xl">
                     {coachName}
                   </h3>
+                  <CoachCategoryPills categories={coach.categories} />
                   {coach.description ? (
                     <p className="mt-4 line-clamp-3 text-sm leading-6 text-secondary">
                       {coach.description}

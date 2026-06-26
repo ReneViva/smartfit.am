@@ -15,9 +15,15 @@ import {
   validateFreezeDays,
   validateFreezePolicy,
 } from "../../lib/package-freezes";
-import { packageUsability } from "../../lib/registration/package-usability";
+import {
+  packageTimeRestrictionReason,
+  packageUsability,
+} from "../../lib/registration/package-usability";
 
 const REGISTRATION_PATH = "/registration";
+const REGISTRATION_GENERAL_PATH = "/registration/general";
+const SERVICE_DEDUCTION_REASON_PREFIX = "Service check-in deduction:";
+const YEREVAN_UTC_OFFSET_MINUTES = 4 * 60;
 
 class CheckInError extends Error {
   code: string;
@@ -116,6 +122,14 @@ function validatedUpdatedAt(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function revalidateCustomerNoteViews(customerId: string) {
+  revalidatePath(`/admin/customers/${encodeURIComponent(customerId)}`);
+  revalidatePath("/admin/logs");
+  revalidatePath("/admin/notes");
+  revalidatePath("/registration");
+  revalidatePath("/registration/notes");
+}
+
 export async function createCustomerNoteAction(
   input: CreateNoteInput,
 ): Promise<NoteMutationResult> {
@@ -164,10 +178,7 @@ export async function createCustomerNoteAction(
     return noteErrorResult(error);
   }
 
-  revalidatePath(`/admin/customers/${encodeURIComponent(customerId)}`);
-  revalidatePath("/admin/notes");
-  revalidatePath("/registration");
-  revalidatePath("/registration/notes");
+  revalidateCustomerNoteViews(customerId);
   return { message: "Note created.", ok: true };
 }
 
@@ -239,6 +250,7 @@ export async function updateCustomerNoteAction(
     return noteErrorResult(error);
   }
 
+  revalidateCustomerNoteViews(customerId);
   return { message: "Note updated.", ok: true };
 }
 
@@ -310,6 +322,7 @@ export async function deleteCustomerNoteAction(
     return noteErrorResult(error);
   }
 
+  revalidateCustomerNoteViews(customerId);
   return { message: "Note deleted.", ok: true };
 }
 
@@ -330,6 +343,22 @@ function nonNegativeInteger(formData: FormData, name: string) {
   return Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+function nonNegativeIntegerValue(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmedValue = value.trim();
+
+  if (!/^\d+$/.test(trimmedValue)) {
+    return null;
+  }
+
+  const parsedValue = Number(trimmedValue);
+
+  return Number.isSafeInteger(parsedValue) ? parsedValue : null;
+}
+
 function positiveInteger(formData: FormData, name: string) {
   const rawValue = optionalText(formData, name, 20);
 
@@ -341,14 +370,185 @@ function positiveInteger(formData: FormData, name: string) {
   return Number.isSafeInteger(value) ? value : null;
 }
 
+function serviceDeductionsFromForm(formData: FormData) {
+  const rawServiceIds = formData.getAll("customerPackageServiceId");
+  const serviceIds = [];
+
+  for (const rawServiceId of rawServiceIds) {
+    if (typeof rawServiceId !== "string") {
+      return null;
+    }
+
+    const serviceId = rawServiceId.trim();
+
+    if (!serviceId || serviceId.length > 100) {
+      return null;
+    }
+
+    serviceIds.push(serviceId);
+  }
+
+  const deductions = new Map<string, number>();
+
+  for (const serviceId of new Set(serviceIds)) {
+    const deduction = nonNegativeIntegerValue(
+      formData.get(`serviceDeduction-${serviceId}`),
+    );
+
+    if (deduction === null) {
+      return null;
+    }
+
+    deductions.set(serviceId, deduction);
+  }
+
+  return deductions;
+}
+
+function startOfUtcDay(value: Date) {
+  const date = new Date(value);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+}
+
 function startOfTodayUtc() {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   return today;
 }
 
+function addDays(value: Date, days: number) {
+  const date = new Date(value);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date;
+}
+
+function startOfYerevanDayUtc(now: Date) {
+  const localTime = new Date(
+    now.getTime() + YEREVAN_UTC_OFFSET_MINUTES * 60_000,
+  );
+  localTime.setUTCHours(0, 0, 0, 0);
+
+  return new Date(
+    localTime.getTime() - YEREVAN_UTC_OFFSET_MINUTES * 60_000,
+  );
+}
+
 function activeStatusForExpiration(expirationDate: Date) {
   return expirationDate < startOfTodayUtc() ? "EXPIRED" : "ACTIVE";
+}
+
+async function recalculateMembershipSessionTotals(
+  transaction: Prisma.TransactionClient,
+  customerPackageId: string,
+) {
+  const totals = await transaction.customerPackageService.aggregate({
+    _sum: {
+      initialSessions: true,
+      remainingSessions: true,
+    },
+    where: {
+      customerPackageId,
+      deletedAt: null,
+      isActive: true,
+    },
+  });
+
+  return transaction.customerPackage.update({
+    data: {
+      initialSessions: totals._sum.initialSessions ?? 0,
+      remainingSessions: totals._sum.remainingSessions ?? 0,
+    },
+    where: { id: customerPackageId },
+  });
+}
+
+async function membershipCheckInCount(
+  transaction: Prisma.TransactionClient,
+  input: {
+    checkedInFrom: Date;
+    checkedInTo: Date;
+    customerId: string;
+    customerPackageId: string;
+  },
+) {
+  const visits = await transaction.visitPackageUsage.findMany({
+    distinct: ["visitId"],
+    select: { visitId: true },
+    where: {
+      customerPackageId: input.customerPackageId,
+      visit: {
+        checkedInAt: {
+          gte: input.checkedInFrom,
+          lt: input.checkedInTo,
+        },
+        customerId: input.customerId,
+      },
+    },
+  });
+
+  return visits.length;
+}
+
+async function assertMembershipCheckInLimits(
+  transaction: Prisma.TransactionClient,
+  membership: {
+    activationDate: Date;
+    dailyCheckInLimit: number | null;
+    expirationDate: Date;
+    hasUnlimitedDailyCheckIns: boolean;
+    hasUnlimitedIntervalCheckIns: boolean;
+    id: string;
+    intervalCheckInLimit: number | null;
+  },
+  customerId: string,
+  now: Date,
+) {
+  if (!membership.hasUnlimitedDailyCheckIns) {
+    const dailyLimit = membership.dailyCheckInLimit;
+
+    if (!dailyLimit || dailyLimit <= 0) {
+      throw new CheckInError("daily-limit-reached");
+    }
+
+    const checkedInFrom = startOfYerevanDayUtc(now);
+    const checkedInTo = addDays(checkedInFrom, 1);
+    const checkInCount = await membershipCheckInCount(transaction, {
+      checkedInFrom,
+      checkedInTo,
+      customerId,
+      customerPackageId: membership.id,
+    });
+
+    if (checkInCount >= dailyLimit) {
+      throw new CheckInError("daily-limit-reached");
+    }
+  }
+
+  if (!membership.hasUnlimitedIntervalCheckIns) {
+    const intervalLimit = membership.intervalCheckInLimit;
+
+    if (!intervalLimit || intervalLimit <= 0) {
+      throw new CheckInError("interval-limit-reached");
+    }
+
+    const checkedInFrom = membership.activationDate;
+    const checkedInTo = addDays(startOfUtcDay(membership.expirationDate), 1);
+    const checkInCount = await membershipCheckInCount(transaction, {
+      checkedInFrom,
+      checkedInTo,
+      customerId,
+      customerPackageId: membership.id,
+    });
+
+    if (checkInCount >= intervalLimit) {
+      throw new CheckInError("interval-limit-reached");
+    }
+  }
+}
+
+function serviceDeductionReason(serviceName: string, serviceId: string) {
+  return `${SERVICE_DEDUCTION_REASON_PREFIX} ${serviceName} [service:${serviceId}]`;
 }
 
 function freezeErrorCode(error: unknown, fallback: string) {
@@ -407,12 +607,37 @@ function customerPath(
   return `${REGISTRATION_PATH}?customer=${encodeURIComponent(customerCode)}${showAllPackages ? "&showAll=1" : ""}${compact ? "&view=compact" : ""}&${suffix}`;
 }
 
+function safeRegistrationReturnPath(formData: FormData) {
+  return formData.get("returnPath") === REGISTRATION_GENERAL_PATH
+    ? REGISTRATION_GENERAL_PATH
+    : null;
+}
+
 function checkInPath(
   customerCode: string,
   suffix: string,
   showAllPackages: boolean,
   compact: boolean,
+  returnPath: string | null = null,
 ) {
+  if (returnPath === REGISTRATION_GENERAL_PATH) {
+    return `${REGISTRATION_GENERAL_PATH}?customer=${encodeURIComponent(customerCode)}&${suffix}`;
+  }
+
+  return customerPath(customerCode, suffix, showAllPackages, compact);
+}
+
+function checkOutPath(
+  customerCode: string,
+  suffix: string,
+  showAllPackages: boolean,
+  compact: boolean,
+  returnPath: string | null = null,
+) {
+  if (returnPath === REGISTRATION_GENERAL_PATH) {
+    return `${REGISTRATION_GENERAL_PATH}?customer=${encodeURIComponent(customerCode)}&${suffix}`;
+  }
+
   return customerPath(customerCode, suffix, showAllPackages, compact);
 }
 
@@ -439,27 +664,27 @@ export async function checkInAction(formData: FormData) {
   );
   const compact = formData.get("view") === "compact";
   const showAllPackages = formData.get("showAllPackages") === "1";
-  const selectedPackageIds = [
-    ...new Set(
-      formData
-        .getAll("customerPackageId")
-        .filter((value): value is string => typeof value === "string")
-        .map((value) => value.trim())
-        .filter(Boolean),
-    ),
-  ];
+  const returnPath = safeRegistrationReturnPath(formData);
+  const serviceDeductions = serviceDeductionsFromForm(formData);
 
   if (!customerId || !customerCode) {
-    redirect(`${REGISTRATION_PATH}?error=invalid-check-in`);
+    redirect(
+      returnPath
+        ? `${returnPath}?error=invalid-check-in`
+        : `${REGISTRATION_PATH}?error=invalid-check-in`,
+    );
   }
 
-  if (guestCount === null) {
+  if (guestCount === null || serviceDeductions === null) {
     redirect(
       checkInPath(
         customerCode,
-        "error=invalid-guest-count",
+        guestCount === null
+          ? "error=invalid-guest-count"
+          : "error=invalid-service-deduction",
         showAllPackages,
         compact,
+        returnPath,
       ),
     );
   }
@@ -512,6 +737,18 @@ export async function checkInAction(formData: FormData) {
               name: true,
             },
           },
+          services: {
+            orderBy: [{ sortOrder: "asc" }, { serviceName: "asc" }],
+            select: {
+              deletedAt: true,
+              id: true,
+              initialSessions: true,
+              isActive: true,
+              remainingSessions: true,
+              serviceName: true,
+            },
+            where: { deletedAt: null },
+          },
         },
         where: {
           customerId: customer.id,
@@ -519,58 +756,109 @@ export async function checkInAction(formData: FormData) {
         },
       });
       const now = new Date();
-      const usablePackages = customerPackages.filter(
-        (customerPackage) => packageUsability(customerPackage, now).usable,
+      const today = startOfUtcDay(now);
+      const submittedServiceIds = [...serviceDeductions.keys()];
+      const totalServiceDeductions = [...serviceDeductions.values()].reduce(
+        (total, deduction) => total + deduction,
+        0,
+      );
+      const activeMemberships = customerPackages.filter(
+        (customerPackage) => customerPackage.status === "ACTIVE",
+      );
+      const frozenMembership = customerPackages.find(
+        (customerPackage) => customerPackage.status === "FROZEN",
       );
 
-      if (!selectedPackageIds.length && usablePackages.length) {
-        throw new CheckInError("package-selection-required");
+      if (activeMemberships.length > 1) {
+        throw new CheckInError("membership-conflict");
       }
 
-      const selectedPackages = customerPackages.filter((customerPackage) =>
-        selectedPackageIds.includes(customerPackage.id),
+      const activeMembership = activeMemberships[0] ?? null;
+
+      if (!activeMembership) {
+        if (frozenMembership) {
+          throw new CheckInError("frozen-package");
+        }
+
+        if (submittedServiceIds.length || totalServiceDeductions > 0) {
+          throw new CheckInError("invalid-service");
+        }
+
+        if (guestCount > 0 || guestSourcePackageId) {
+          throw new CheckInError("invalid-guest-source");
+        }
+      }
+
+      const activeServices = activeMembership
+        ? activeMembership.services.filter(
+            (service) => service.isActive && !service.deletedAt,
+          )
+        : [];
+      const servicesById = new Map(
+        activeServices.map((service) => [service.id, service]),
       );
 
-      if (
-        selectedPackages.some(
-          (customerPackage) => customerPackage.status === "FROZEN",
-        )
-      ) {
-        throw new CheckInError("frozen-package");
+      for (const serviceId of submittedServiceIds) {
+        if (!servicesById.has(serviceId)) {
+          throw new CheckInError("invalid-service");
+        }
       }
 
-      if (
-        selectedPackages.length !== selectedPackageIds.length ||
-        selectedPackages.some(
-          (customerPackage) => !packageUsability(customerPackage, now).usable,
-        )
-      ) {
-        throw new CheckInError("invalid-package");
+      const membershipExpired = activeMembership
+        ? activeMembership.expirationDate < today
+        : false;
+
+      if (activeMembership) {
+        await assertMembershipCheckInLimits(
+          transaction,
+          activeMembership,
+          customer.id,
+          now,
+        );
+
+        if (membershipExpired && (totalServiceDeductions > 0 || guestCount > 0)) {
+          throw new CheckInError("expired-membership");
+        }
+
+        if (!membershipExpired) {
+          const timeRestrictionError = packageTimeRestrictionReason(
+            activeMembership,
+            now,
+          );
+
+          if (timeRestrictionError) {
+            throw new CheckInError("time-restriction-violation");
+          }
+        }
       }
 
-      const guestSourcePackage =
-        guestCount > 0
-          ? selectedPackages.find(
-              (customerPackage) =>
-                customerPackage.id === guestSourcePackageId,
-            )
-          : null;
+      const selectedServiceDeductions = [...serviceDeductions.entries()]
+        .filter(([, deduction]) => deduction > 0)
+        .map(([serviceId, deduction]) => {
+          const service = servicesById.get(serviceId);
+
+          if (!service) {
+            throw new CheckInError("invalid-service");
+          }
+
+          if (deduction > service.remainingSessions) {
+            throw new CheckInError("service-sessions-insufficient");
+          }
+
+          return { deduction, service };
+        });
 
       if (guestCount > 0 && !guestSourcePackageId) {
         throw new CheckInError("guest-source-required");
       }
 
-      if (
-        guestCount > 0 &&
-        (!guestSourcePackage ||
-          !packageUsability(guestSourcePackage, now).usable)
-      ) {
+      if (guestCount > 0 && guestSourcePackageId !== activeMembership?.id) {
         throw new CheckInError("invalid-guest-source");
       }
 
       if (
-        guestSourcePackage &&
-        guestCount > guestSourcePackage.remainingGuestPasses
+        activeMembership &&
+        guestCount > activeMembership.remainingGuestPasses
       ) {
         throw new CheckInError("guest-passes-insufficient");
       }
@@ -602,58 +890,89 @@ export async function checkInAction(formData: FormData) {
         },
       });
 
-      for (const customerPackage of selectedPackages) {
-        const previousRemainingSessions = customerPackage.remainingSessions;
-        const newRemainingSessions = previousRemainingSessions - 1;
-        const guestPassesDeducted =
-          customerPackage.id === guestSourcePackage?.id ? guestCount : 0;
-        const previousRemainingGuestPasses =
-          customerPackage.remainingGuestPasses;
+      let guestPassesRecorded = false;
+
+      if (activeMembership && guestCount > 0) {
+        const previousRemainingGuestPasses = activeMembership.remainingGuestPasses;
         const newRemainingGuestPasses =
-          previousRemainingGuestPasses - guestPassesDeducted;
-        const deduction = await transaction.customerPackage.updateMany({
-          data: {
-            ...(guestPassesDeducted
-              ? { remainingGuestPasses: newRemainingGuestPasses }
-              : {}),
-            remainingSessions: newRemainingSessions,
-          },
+          previousRemainingGuestPasses - guestCount;
+        const guestDeduction = await transaction.customerPackage.updateMany({
+          data: { remainingGuestPasses: newRemainingGuestPasses },
           where: {
             deletedAt: null,
-            id: customerPackage.id,
-            ...(guestPassesDeducted
-              ? { remainingGuestPasses: previousRemainingGuestPasses }
-              : {}),
-            remainingSessions: previousRemainingSessions,
+            id: activeMembership.id,
+            remainingGuestPasses: previousRemainingGuestPasses,
             status: "ACTIVE",
           },
         });
 
-        if (
-          deduction.count !== 1 ||
-          newRemainingSessions < 0 ||
-          newRemainingGuestPasses < 0
-        ) {
+        if (guestDeduction.count !== 1 || newRemainingGuestPasses < 0) {
           throw new CheckInError("package-stale");
         }
 
+        await writeAuditLog(transaction, {
+          actionType: "CUSTOMER_CHECK_IN",
+          actorId: user.id,
+          customerId: customer.id,
+          description: `Deducted ${guestCount} guest pass${guestCount === 1 ? "" : "es"} from ${activeMembership.package.name} for ${customer.customerCode}: ${customer.fullName}.`,
+          newValue: {
+            guestPassesDeducted: guestCount,
+            remainingGuestPasses: newRemainingGuestPasses,
+            visitId: visit.id,
+          },
+          oldValue: {
+            remainingGuestPasses: previousRemainingGuestPasses,
+          },
+          targetId: activeMembership.id,
+          targetType: "CustomerPackage",
+        });
+      }
+
+      for (const { deduction, service } of selectedServiceDeductions) {
+        if (!activeMembership) {
+          throw new CheckInError("invalid-service");
+        }
+
+        const previousRemainingSessions = service.remainingSessions;
+        const newRemainingSessions = previousRemainingSessions - deduction;
+        const serviceUpdate =
+          await transaction.customerPackageService.updateMany({
+            data: { remainingSessions: newRemainingSessions },
+            where: {
+              customerPackageId: activeMembership.id,
+              deletedAt: null,
+              id: service.id,
+              isActive: true,
+              remainingSessions: previousRemainingSessions,
+            },
+          });
+
+        if (serviceUpdate.count !== 1 || newRemainingSessions < 0) {
+          throw new CheckInError("service-stale");
+        }
+
+        const guestPassesDeducted: number = guestPassesRecorded
+          ? 0
+          : guestCount;
         const usage = await transaction.visitPackageUsage.create({
           data: {
-            customerPackageId: customerPackage.id,
+            customerPackageId: activeMembership.id,
             guestPassesDeducted,
-            sessionsDeducted: 1,
+            sessionsDeducted: deduction,
             visitId: visit.id,
           },
         });
+        guestPassesRecorded ||= guestPassesDeducted > 0;
+
         const sessionChange = await transaction.packageSessionChange.create({
           data: {
             changeType: "CHECK_IN_DEDUCTION",
             changedById: user.id,
-            customerPackageId: customerPackage.id,
-            delta: -1,
+            customerPackageId: activeMembership.id,
+            delta: -deduction,
             newRemainingSessions,
             previousRemainingSessions,
-            reason: "Check-in deduction",
+            reason: serviceDeductionReason(service.serviceName, service.id),
             visitId: visit.id,
             visitPackageUsageId: usage.id,
           },
@@ -663,42 +982,57 @@ export async function checkInAction(formData: FormData) {
           actionType: "SESSION_DEDUCTION",
           actorId: user.id,
           customerId: customer.id,
-          description: `Deducted 1 session from ${customerPackage.package.name} for ${customer.customerCode}: ${customer.fullName}.`,
+          description: `Deducted ${deduction} session${deduction === 1 ? "" : "s"} from ${service.serviceName} for ${customer.customerCode}: ${customer.fullName}.`,
           newValue: {
+            customerPackageId: activeMembership.id,
+            customerPackageServiceId: service.id,
             remainingSessions: newRemainingSessions,
+            sessionsDeducted: deduction,
             sessionChangeId: sessionChange.id,
+            visitId: visit.id,
+            visitPackageUsageId: usage.id,
           },
           oldValue: {
             remainingSessions: previousRemainingSessions,
           },
-          targetId: customerPackage.id,
-          targetType: "CustomerPackage",
+          targetId: service.id,
+          targetType: "CustomerPackageService",
         });
+      }
 
-        if (guestPassesDeducted) {
-          await writeAuditLog(transaction, {
-            actionType: "CUSTOMER_CHECK_IN",
-            actorId: user.id,
-            customerId: customer.id,
-            description: `Deducted ${guestPassesDeducted} guest pass${guestPassesDeducted === 1 ? "" : "es"} from ${customerPackage.package.name} for ${customer.customerCode}: ${customer.fullName}.`,
-            newValue: {
-              guestPassesDeducted,
-              remainingGuestPasses: newRemainingGuestPasses,
-              visitPackageUsageId: usage.id,
+      if (activeMembership) {
+        if (
+          !selectedServiceDeductions.length ||
+          (guestCount > 0 && !guestPassesRecorded)
+        ) {
+          await transaction.visitPackageUsage.create({
+            data: {
+              customerPackageId: activeMembership.id,
+              guestPassesDeducted: guestPassesRecorded ? 0 : guestCount,
+              sessionsDeducted: 0,
+              visitId: visit.id,
             },
-            oldValue: {
-              remainingGuestPasses: previousRemainingGuestPasses,
-            },
-            targetId: customerPackage.id,
-            targetType: "CustomerPackage",
           });
+          guestPassesRecorded ||= guestCount > 0;
+        }
+
+        if (selectedServiceDeductions.length) {
+          await recalculateMembershipSessionTotals(
+            transaction,
+            activeMembership.id,
+          );
         }
       }
 
       const existingOccupancy = await transaction.occupancyState.findFirst({
         orderBy: { updatedAt: "desc" },
-        select: { id: true },
+        select: { currentCount: true, id: true },
       });
+
+      if (existingOccupancy && existingOccupancy.currentCount < 0) {
+        throw new CheckInError("invalid-occupancy");
+      }
+
       const occupancy = existingOccupancy
         ? await transaction.occupancyState.update({
             data: {
@@ -741,15 +1075,21 @@ export async function checkInAction(formData: FormData) {
         actionType: "CUSTOMER_CHECK_IN",
         actorId: user.id,
         customerId: customer.id,
-        description: `${selectedPackages.length ? `Checked in ${customer.customerCode}: ${customer.fullName} using ${selectedPackages.length} package${selectedPackages.length === 1 ? "" : "s"}` : `Checked in ${customer.customerCode}: ${customer.fullName} without package deduction`}${guestCount ? ` with ${guestCount} guest${guestCount === 1 ? "" : "s"}` : ""}.`,
+        description: `${selectedServiceDeductions.length ? `Checked in ${customer.customerCode}: ${customer.fullName} with ${selectedServiceDeductions.length} service deduction${selectedServiceDeductions.length === 1 ? "" : "s"}` : `Checked in ${customer.customerCode}: ${customer.fullName} without service deduction`}${guestCount ? ` with ${guestCount} guest${guestCount === 1 ? "" : "s"}` : ""}.`,
         newValue: {
+          activeCustomerPackageId: activeMembership?.id ?? null,
           guestCountUsed: guestCount,
-          guestSourceCustomerPackageId: guestSourcePackage?.id ?? null,
+          guestSourceCustomerPackageId:
+            guestCount > 0 ? activeMembership?.id ?? null : null,
           gymPresenceStatus: "IN_GYM",
           occupancyDelta,
           occupancyAfterCheckIn: occupancy.currentCount,
-          selectedCustomerPackageIds: selectedPackages.map(
-            (customerPackage) => customerPackage.id,
+          selectedServiceDeductions: selectedServiceDeductions.map(
+            ({ deduction, service }) => ({
+              customerPackageServiceId: service.id,
+              serviceName: service.serviceName,
+              sessionsDeducted: deduction,
+            }),
           ),
         },
         oldValue: {
@@ -764,16 +1104,31 @@ export async function checkInAction(formData: FormData) {
     const errorCode =
       error instanceof CheckInError ? error.code : "check-in-unavailable";
     redirect(
-      checkInPath(customerCode, `error=${errorCode}`, showAllPackages, compact),
+      checkInPath(
+        customerCode,
+        `error=${errorCode}`,
+        showAllPackages,
+        compact,
+        returnPath,
+      ),
     );
   }
 
   revalidatePath(REGISTRATION_PATH);
+  revalidatePath(REGISTRATION_GENERAL_PATH);
   revalidatePath("/registration/in-gym");
   revalidatePath("/admin");
+  revalidatePath("/admin/customers");
+  revalidatePath(`/admin/customers/${encodeURIComponent(customerId)}`);
   revalidatePath("/our-app");
   redirect(
-    checkInPath(customerCode, "status=checked-in", showAllPackages, compact),
+    checkInPath(
+      customerCode,
+      "status=checked-in",
+      showAllPackages,
+      compact,
+      returnPath,
+    ),
   );
 }
 
@@ -783,9 +1138,14 @@ export async function checkOutAction(formData: FormData) {
   const customerCode = optionalText(formData, "customerCode", 100);
   const compact = formData.get("view") === "compact";
   const showAllPackages = formData.get("showAllPackages") === "1";
+  const returnPath = safeRegistrationReturnPath(formData);
 
   if (!customerId || !customerCode) {
-    redirect(`${REGISTRATION_PATH}?error=invalid-check-out`);
+    redirect(
+      returnPath
+        ? `${returnPath}?error=invalid-check-out`
+        : `${REGISTRATION_PATH}?error=invalid-check-out`,
+    );
   }
 
   try {
@@ -927,16 +1287,29 @@ export async function checkOutAction(formData: FormData) {
     const errorCode =
       error instanceof Phase11Error ? error.code : "check-out-unavailable";
     redirect(
-      customerPath(customerCode, `error=${errorCode}`, showAllPackages, compact),
+      checkOutPath(
+        customerCode,
+        `error=${errorCode}`,
+        showAllPackages,
+        compact,
+        returnPath,
+      ),
     );
   }
 
   revalidatePath(REGISTRATION_PATH);
+  revalidatePath(REGISTRATION_GENERAL_PATH);
   revalidatePath("/registration/in-gym");
   revalidatePath("/admin");
   revalidatePath("/our-app");
   redirect(
-    customerPath(customerCode, "status=checked-out", showAllPackages, compact),
+    checkOutPath(
+      customerCode,
+      "status=checked-out",
+      showAllPackages,
+      compact,
+      returnPath,
+    ),
   );
 }
 

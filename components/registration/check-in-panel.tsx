@@ -5,51 +5,98 @@ import { useState } from "react";
 import { checkInAction } from "../../app/registration/actions";
 import { Button } from "../ui/button";
 
-type CheckInPackageOption = {
+type CheckInServiceOption = {
+  categoryName: string | null;
+  coachName: string | null;
+  id: string;
+  initialSessions: number;
+  remainingSessions: number;
+  serviceName: string;
+};
+
+type CheckInMembershipOption = {
   coachName: string | null;
   expirationLabel: string;
   id: string;
+  isExpired: boolean;
   name: string;
   packageType: string;
-  reason: string | null;
   remainingGuestPasses: number;
-  remainingSessions: number;
+  services: CheckInServiceOption[];
+  timeRestrictionReason: string | null;
   timeRule: string;
-  usable: boolean;
 };
 
+function parsedDraft(value: string) {
+  if (!/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const parsedValue = Number(value);
+  return Number.isSafeInteger(parsedValue) ? parsedValue : null;
+}
+
 export function CheckInPanel({
+  activeMembershipCount,
   compact,
   customerCode,
   customerId,
-  packages,
+  frozenMembershipCount,
+  membership,
+  returnPath,
   showAllPackages,
 }: {
+  activeMembershipCount: number;
   compact: boolean;
   customerCode: string;
   customerId: string;
-  packages: CheckInPackageOption[];
+  frozenMembershipCount: number;
+  membership: CheckInMembershipOption | null;
+  returnPath?: string;
   showAllPackages: boolean;
 }) {
-  const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
+  const [serviceDeductions, setServiceDeductions] = useState<
+    Record<string, string>
+  >({});
   const [guestCount, setGuestCount] = useState("0");
-  const [guestSourcePackageId, setGuestSourcePackageId] = useState("");
-  const usablePackages = packages.filter((gymPackage) => gymPackage.usable);
-  const allowsNoPackageCheckIn = usablePackages.length === 0;
-  const guestSourcePackages = packages.filter(
-    (gymPackage) =>
-      gymPackage.usable &&
-      gymPackage.remainingGuestPasses > 0 &&
-      selectedPackages.includes(gymPackage.id),
+  const services = membership?.services ?? [];
+  const hardBlockMessage =
+    activeMembershipCount > 1
+      ? "This customer has multiple active memberships from older data. Admin must resolve before fast check-in."
+      : !membership && frozenMembershipCount > 0
+        ? "This membership is frozen and cannot be used for fast check-in."
+        : membership?.timeRestrictionReason ?? null;
+  const canUseMembership = Boolean(
+    membership && !membership.isExpired && !hardBlockMessage,
   );
-  const guestSourcePackage = guestSourcePackages.find(
-    (gymPackage) => gymPackage.id === guestSourcePackageId,
+  const totalServiceDeductions = services.reduce((total, service) => {
+    const draft = parsedDraft(serviceDeductions[service.id] ?? "0");
+
+    return total + (draft ?? 0);
+  }, 0);
+  const hasInvalidServiceDraft = services.some((service) => {
+    const draft = parsedDraft(serviceDeductions[service.id] ?? "0");
+
+    return draft === null || draft > service.remainingSessions;
+  });
+  const parsedGuestCount = parsedDraft(guestCount);
+  const occupancyDelta = parsedGuestCount !== null ? 1 + parsedGuestCount : 1;
+  const guestControlsAvailable = Boolean(
+    membership && canUseMembership && membership.remainingGuestPasses > 0,
   );
-  const parsedGuestCount = Number(guestCount);
-  const occupancyDelta =
-    Number.isInteger(parsedGuestCount) && parsedGuestCount >= 0
-      ? 1 + parsedGuestCount
-      : 1;
+  const warningMessage =
+    hardBlockMessage ??
+    (!membership
+      ? "No active membership is available. This check-in will not deduct service sessions."
+      : membership.isExpired
+        ? "This membership is expired. Check-in is allowed without service or guest-pass deductions."
+        : !services.length
+          ? "No active service lines are available. This check-in will not deduct service sessions."
+          : services.every((service) => service.remainingSessions === 0)
+            ? "Active service lines have zero remaining sessions. This check-in will not deduct service sessions."
+            : totalServiceDeductions === 0
+              ? "No service deduction selected. Check-in is allowed without reducing service sessions."
+              : null);
 
   return (
     <section className="mt-4 rounded-2xl border border-brand bg-card p-5 shadow-sm sm:p-6">
@@ -68,131 +115,142 @@ export function CheckInPanel({
           type="hidden"
           value={showAllPackages ? "1" : "0"}
         />
+        {returnPath ? (
+          <input name="returnPath" type="hidden" value={returnPath} />
+        ) : null}
         {compact ? <input name="view" type="hidden" value="compact" /> : null}
 
-        {packages.length ? (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {packages.map((gymPackage) => (
-              <label
-                className={`rounded-xl border p-4 transition-colors ${gymPackage.usable ? selectedPackages.includes(gymPackage.id) ? "cursor-pointer border-brand bg-soft-blue" : "cursor-pointer border-border bg-page hover:border-brand" : "cursor-not-allowed border-status-high bg-page opacity-75"}`}
-                key={gymPackage.id}
-              >
-                <div className="flex items-start gap-3">
-                  <input
-                    checked={selectedPackages.includes(gymPackage.id)}
-                    disabled={!gymPackage.usable}
-                    name="customerPackageId"
-                    onChange={(event) => {
-                      const nextSelectedPackages = event.target.checked
-                        ? [...selectedPackages, gymPackage.id]
-                        : selectedPackages.filter(
-                            (packageId) => packageId !== gymPackage.id,
-                          );
-                      const nextGuestSources = packages.filter(
-                        (candidate) =>
-                          candidate.usable &&
-                          candidate.remainingGuestPasses > 0 &&
-                          nextSelectedPackages.includes(candidate.id),
-                      );
-                      const guestSourcesChanged =
-                        guestSourcePackages.map(({ id }) => id).join(",") !==
-                        nextGuestSources.map(({ id }) => id).join(",");
-
-                      setSelectedPackages(nextSelectedPackages);
-
-                      if (nextGuestSources.length > 1 && guestSourcesChanged) {
-                        setGuestSourcePackageId("");
-                        setGuestCount("0");
-                      } else if (
-                        !nextGuestSources.some(
-                          (candidate) =>
-                            candidate.id === guestSourcePackageId,
-                        )
-                      ) {
-                        setGuestSourcePackageId(
-                          nextGuestSources.length === 1
-                            ? nextGuestSources[0].id
-                            : "",
-                        );
-                        setGuestCount("0");
-                      }
-                    }}
-                    type="checkbox"
-                    value={gymPackage.id}
-                  />
-                  <span className="min-w-0">
-                    <span className="block font-bold text-foreground">
-                      {gymPackage.name}
-                    </span>
-                    <span className="mt-1 inline-flex rounded-full bg-card px-2.5 py-1 text-xs font-semibold text-primary-active">
-                      {gymPackage.packageType}
-                    </span>
-                    <span className="mt-1 block text-sm text-secondary">
-                      {gymPackage.remainingSessions} sessions · Expires{" "}
-                      {gymPackage.expirationLabel}
-                    </span>
-                    <span className="mt-1 block text-sm text-secondary">
-                      {gymPackage.timeRule} ·{" "}
-                      {gymPackage.coachName ?? "No coach"}
-                    </span>
-                    <span className="mt-1 block text-sm font-semibold text-secondary">
-                      {gymPackage.remainingGuestPasses} guest pass
-                      {gymPackage.remainingGuestPasses === 1 ? "" : "es"}{" "}
-                      remaining
-                    </span>
-                    {gymPackage.reason ? (
-                      <span className="mt-2 block text-sm font-semibold text-button-danger">
-                        {gymPackage.reason}
-                      </span>
-                    ) : null}
-                  </span>
-                </div>
-              </label>
-            ))}
+        {membership ? (
+          <div className="rounded-xl border border-border bg-page p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="break-words font-bold text-foreground">
+                  {membership.name}
+                </p>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-primary-active">
+                  {membership.packageType}
+                </p>
+              </div>
+              <p className="rounded-full bg-card px-3 py-1 text-xs font-semibold text-secondary">
+                {membership.isExpired ? "expired" : "active"}
+              </p>
+            </div>
+            <div className="mt-3 grid gap-2 text-sm text-secondary sm:grid-cols-2">
+              <p>Expires {membership.expirationLabel}</p>
+              <p>{membership.timeRule}</p>
+              <p>{membership.coachName ?? "No membership coach"}</p>
+              <p>{membership.remainingGuestPasses} guest passes remaining</p>
+            </div>
           </div>
         ) : null}
 
-        {allowsNoPackageCheckIn ? (
-          <p className="mt-5 rounded-xl border border-status-medium bg-card px-4 py-3 text-sm font-semibold text-foreground">
-            No usable package is available. This check-in will not deduct
-            sessions.
+        {warningMessage ? (
+          <p
+            className={`mt-5 rounded-xl border px-4 py-3 text-sm font-semibold leading-6 ${
+              hardBlockMessage
+                ? "border-status-high bg-page text-button-danger"
+                : "border-status-medium bg-card text-foreground"
+            }`}
+          >
+            {warningMessage}
           </p>
-        ) : (
-          <p className="mt-5 text-sm leading-6 text-secondary">
-            Select one or more usable packages. Exactly one session will be
-            deducted from each selected package.
-          </p>
-        )}
+        ) : null}
 
-        {guestSourcePackages.length ? (
+        {membership && canUseMembership && services.length ? (
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            {services.map((service) => {
+              const value = serviceDeductions[service.id] ?? "0";
+              const draft = parsedDraft(value);
+              const isInvalid =
+                draft === null || draft > service.remainingSessions;
+              const hasRemainingSessions = service.remainingSessions > 0;
+
+              return (
+                <div
+                  className={`rounded-xl border bg-page p-4 ${isInvalid ? "border-status-high" : "border-border"}`}
+                  key={service.id}
+                >
+                  <input
+                    name="customerPackageServiceId"
+                    type="hidden"
+                    value={service.id}
+                  />
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words font-bold text-foreground">
+                        {service.serviceName}
+                      </p>
+                      <p className="mt-1 text-sm text-secondary">
+                        {service.categoryName ?? "No category"} -{" "}
+                        {service.coachName ?? "no coach"}
+                      </p>
+                    </div>
+                    <p
+                      className={`text-sm font-bold ${hasRemainingSessions ? "text-foreground" : "text-button-danger"}`}
+                    >
+                      {service.remainingSessions} / {service.initialSessions}
+                    </p>
+                  </div>
+                  <label className="mt-4 block text-sm font-semibold text-foreground">
+                    Sessions to deduct
+                    {hasRemainingSessions ? (
+                      <input
+                        className="mt-2 min-h-11 w-full rounded-lg border border-input-border bg-card px-3 py-2 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue"
+                        max={service.remainingSessions}
+                        min="0"
+                        name={`serviceDeduction-${service.id}`}
+                        onChange={(event) =>
+                          setServiceDeductions((current) => ({
+                            ...current,
+                            [service.id]: event.target.value,
+                          }))
+                        }
+                        required
+                        step="1"
+                        type="number"
+                        value={value}
+                      />
+                    ) : (
+                      <>
+                        <input
+                          name={`serviceDeduction-${service.id}`}
+                          type="hidden"
+                          value="0"
+                        />
+                        <span className="mt-2 flex min-h-11 items-center rounded-lg border border-input-border bg-card px-3 py-2 text-secondary">
+                          0
+                        </span>
+                      </>
+                    )}
+                  </label>
+                  {isInvalid ? (
+                    <p className="mt-2 text-sm font-semibold text-button-danger">
+                      Enter 0 to {service.remainingSessions}.
+                    </p>
+                  ) : null}
+                  {!hasRemainingSessions ? (
+                    <p className="mt-2 text-sm font-semibold text-secondary">
+                      Zero remaining; no deduction will be applied.
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {guestControlsAvailable && membership ? (
           <div className="mt-5 grid gap-4 rounded-xl border border-border bg-page p-4 sm:grid-cols-2">
-            <label className="text-sm font-semibold text-foreground">
-              Guest-pass source package
-              <select
-                className="mt-2 min-h-11 w-full rounded-lg border border-input-border bg-card px-3 py-2 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue"
-                name="guestSourcePackageId"
-                onChange={(event) => {
-                  setGuestSourcePackageId(event.target.value);
-                  setGuestCount("0");
-                }}
-                required={Number(guestCount) > 0}
-                value={guestSourcePackageId}
-              >
-                <option value="">Choose package</option>
-                {guestSourcePackages.map((gymPackage) => (
-                  <option key={gymPackage.id} value={gymPackage.id}>
-                    {gymPackage.name} · {gymPackage.packageType} (
-                    {gymPackage.remainingGuestPasses} remaining)
-                  </option>
-                ))}
-              </select>
-            </label>
+            <input
+              name="guestSourcePackageId"
+              type="hidden"
+              value={membership.id}
+            />
             <label className="text-sm font-semibold text-foreground">
               Guests entering now
               <input
-                className="mt-2 min-h-11 w-full rounded-lg border border-input-border bg-card px-3 py-2 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={!guestSourcePackage}
-                max={guestSourcePackage?.remainingGuestPasses}
+                className="mt-2 min-h-11 w-full rounded-lg border border-input-border bg-card px-3 py-2 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue"
+                max={membership.remainingGuestPasses}
                 min="0"
                 name="guestCount"
                 onChange={(event) => setGuestCount(event.target.value)}
@@ -201,22 +259,18 @@ export function CheckInPanel({
                 type="number"
                 value={guestCount}
               />
-              {!guestSourcePackage ? (
-                <input name="guestCount" type="hidden" value="0" />
-              ) : null}
             </label>
             <div className="text-sm leading-6 text-secondary sm:col-span-2">
               <p>
                 Guest passes before check-in:{" "}
                 <strong className="text-foreground">
-                  {guestSourcePackage?.remainingGuestPasses ??
-                    "Choose a package"}
+                  {membership.remainingGuestPasses}
                 </strong>
               </p>
               <p>
                 Guest count used:{" "}
                 <strong className="text-foreground">{guestCount || "0"}</strong>{" "}
-                · Occupancy{" "}
+                - Occupancy{" "}
                 <strong className="text-foreground">+{occupancyDelta}</strong>
               </p>
             </div>
@@ -227,13 +281,15 @@ export function CheckInPanel({
 
         <Button
           className="mt-5 w-full sm:w-auto"
-          disabled={!allowsNoPackageCheckIn && selectedPackages.length === 0}
+          disabled={Boolean(hardBlockMessage) || hasInvalidServiceDraft}
           type="submit"
           variant="success"
         >
-          {allowsNoPackageCheckIn
-            ? "Check in without package deduction"
-            : "Check in with selected packages"}
+          {hardBlockMessage
+            ? "Check-in blocked"
+            : totalServiceDeductions > 0
+              ? "Check in and deduct services"
+              : "Check in without service deduction"}
         </Button>
       </form>
     </section>

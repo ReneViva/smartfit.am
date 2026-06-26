@@ -38,6 +38,19 @@ function optionalPublicUrl(formData: FormData, name: string) {
   }
 }
 
+function selectedCategoryIds(formData: FormData) {
+  return Array.from(
+    new Set(
+      formData
+        .getAll("categoryIds")
+        .filter(
+          (value): value is string =>
+            typeof value === "string" && value.length > 0 && value.length <= 100,
+        ),
+    ),
+  );
+}
+
 export async function saveCoachAction(formData: FormData) {
   const user = await requireStaffRole("ADMIN");
   const id = optionalText(formData, "id", 100);
@@ -46,9 +59,27 @@ export async function saveCoachAction(formData: FormData) {
   const specialty = optionalText(formData, "specialty", 200);
   const rawPhotoUrl = optionalText(formData, "photoUrl", 1000);
   const photoUrl = optionalPublicUrl(formData, "photoUrl");
+  const categoryIds = selectedCategoryIds(formData);
 
   if (!firstName || !lastName || !specialty) {
     redirect(`${COACHES_PATH}?error=invalid-required`);
+  }
+
+  if (categoryIds.length) {
+    const assignableCategories = await db.category.findMany({
+      select: { id: true },
+      where: {
+        id: { in: categoryIds },
+        isArchived: false,
+      },
+    });
+    const assignableCategoryIds = new Set(
+      assignableCategories.map((category) => category.id),
+    );
+
+    if (categoryIds.some((categoryId) => !assignableCategoryIds.has(categoryId))) {
+      redirect(`${COACHES_PATH}?error=invalid-categories`);
+    }
   }
 
   const uploadedPhotoUrl = await uploadImageFromForm(
@@ -77,6 +108,13 @@ export async function saveCoachAction(formData: FormData) {
     await db.$transaction(async (transaction) => {
       if (id) {
         const existing = await transaction.coach.findFirst({
+          include: {
+            categories: {
+              include: {
+                category: true,
+              },
+            },
+          },
           where: {
             deletedAt: null,
             id,
@@ -87,8 +125,29 @@ export async function saveCoachAction(formData: FormData) {
           throw new Error("Coach not found.");
         }
 
-        const saved = await transaction.coach.update({
+        await transaction.coach.update({
           data,
+          where: { id },
+        });
+        await transaction.coachCategory.deleteMany({
+          where: { coachId: id },
+        });
+        if (categoryIds.length) {
+          await transaction.coachCategory.createMany({
+            data: categoryIds.map((categoryId) => ({
+              categoryId,
+              coachId: id,
+            })),
+          });
+        }
+        const saved = await transaction.coach.findUniqueOrThrow({
+          include: {
+            categories: {
+              include: {
+                category: true,
+              },
+            },
+          },
           where: { id },
         });
 
@@ -104,7 +163,21 @@ export async function saveCoachAction(formData: FormData) {
         return;
       }
 
-      const saved = await transaction.coach.create({ data });
+      const saved = await transaction.coach.create({
+        data: {
+          ...data,
+          categories: {
+            create: categoryIds.map((categoryId) => ({ categoryId })),
+          },
+        },
+        include: {
+          categories: {
+            include: {
+              category: true,
+            },
+          },
+        },
+      });
 
       await writeAuditLog(transaction, {
         actionType: "COACH_EDIT",

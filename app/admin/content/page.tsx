@@ -6,7 +6,10 @@ import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { db } from "../../../lib/db";
-import { savePublicContentAction } from "./actions";
+import {
+  movePublicContentAction,
+  savePublicContentAction,
+} from "./actions";
 
 type ContentPageProps = {
   searchParams: Promise<{
@@ -22,8 +25,10 @@ const labelClass = "block text-sm font-semibold text-foreground";
 const errorMessages: Record<string, string> = {
   "invalid-date": "Start and end dates must be valid.",
   "invalid-date-order": "End date cannot be earlier than start date.",
+  "invalid-order": "Content order could not be changed.",
   "invalid-required": "A valid content type and title are required.",
-  "invalid-url": "Image URL must use a valid http or https URL.",
+  "invalid-url":
+    "Image URLs must use http or https. CTA URLs may use http, https, or an internal path like /packages.",
   "upload-configuration":
     "Image upload storage is not configured. Add storage values to .env or use an image URL.",
   "upload-failed": "Image upload failed. Try again or use an image URL.",
@@ -72,6 +77,8 @@ function ContentFields({
 }: {
   content?: {
     body: string | null;
+    ctaLabel: string | null;
+    ctaUrl: string | null;
     endsAt: Date | null;
     id: string;
     imageUrl: string | null;
@@ -79,6 +86,7 @@ function ContentFields({
     startsAt: Date | null;
     title: string;
     type: PublicContentType;
+    visibleOnApp: boolean;
   };
 }) {
   return (
@@ -120,6 +128,34 @@ function ContentFields({
           />
         </label>
         <label className={labelClass}>
+          CTA URL
+          <input
+            className={inputClass}
+            defaultValue={content?.ctaUrl ?? ""}
+            maxLength={1000}
+            name="ctaUrl"
+            placeholder="https://... or /packages"
+          />
+          <span className="mt-2 block text-sm font-normal leading-6 text-secondary">
+            Optional destination link for this promotion, offer, news, or
+            announcement.
+          </span>
+        </label>
+        <label className={labelClass}>
+          CTA label
+          <input
+            className={inputClass}
+            defaultValue={content?.ctaLabel ?? ""}
+            maxLength={80}
+            name="ctaLabel"
+            placeholder="Learn more"
+          />
+          <span className="mt-2 block text-sm font-normal leading-6 text-secondary">
+            Optional button text. If this is empty, the homepage card becomes
+            clickable and Our App uses a default label.
+          </span>
+        </label>
+        <label className={labelClass}>
           Start date
           <input
             className={inputClass}
@@ -149,23 +185,91 @@ function ContentFields({
         <input defaultChecked={content?.isActive ?? true} name="isActive" type="checkbox" />
         Active and visible during its date range
       </label>
+      <label className="mt-3 flex items-start gap-3 rounded-lg bg-neutral px-4 py-3 text-sm font-semibold text-foreground">
+        <input
+          className="mt-1"
+          defaultChecked={content?.visibleOnApp ?? false}
+          name="visibleOnApp"
+          type="checkbox"
+        />
+        <span>
+          Visible on Our App
+          <span className="mt-1 block text-sm font-normal leading-6 text-secondary">
+            Marks this content for the Our App announcement display.
+          </span>
+        </span>
+      </label>
     </>
+  );
+}
+
+function MoveContentControls({
+  id,
+  isFirst,
+  isLast,
+  orderPosition,
+}: {
+  id: string;
+  isFirst: boolean;
+  isLast: boolean;
+  orderPosition: number;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+      <span className="text-sm font-semibold text-secondary">
+        Order position {orderPosition}
+      </span>
+      <div className="flex flex-wrap gap-2">
+        <form action={movePublicContentAction}>
+          <input name="id" type="hidden" value={id} />
+          <input name="direction" type="hidden" value="up" />
+          <Button
+            className="min-h-9 px-3 py-2"
+            disabled={isFirst}
+            type="submit"
+            variant="neutral"
+          >
+            Move Up
+          </Button>
+        </form>
+        <form action={movePublicContentAction}>
+          <input name="id" type="hidden" value={id} />
+          <input name="direction" type="hidden" value="down" />
+          <Button
+            className="min-h-9 px-3 py-2"
+            disabled={isLast}
+            type="submit"
+            variant="neutral"
+          >
+            Move Down
+          </Button>
+        </form>
+      </div>
+    </div>
   );
 }
 
 export default async function ContentPage({ searchParams }: ContentPageProps) {
   const [content, params] = await Promise.all([
     db.publicContent.findMany({
-      orderBy: { updatedAt: "desc" },
+      orderBy: [
+        { sortOrder: "asc" },
+        { createdAt: "asc" },
+        { id: "asc" },
+      ],
       select: {
         body: true,
+        ctaLabel: true,
+        ctaUrl: true,
         endsAt: true,
         id: true,
         imageUrl: true,
         isActive: true,
+        sortOrder: true,
         startsAt: true,
         title: true,
         type: true,
+        visibleOnApp: true,
       },
       where: { deletedAt: null },
     }),
@@ -219,64 +323,92 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
         <h3 className="text-2xl font-bold text-foreground">Existing content</h3>
         {content.length ? (
           <div className="mt-5 grid gap-4 xl:grid-cols-2">
-            {content.map((item) => (
-              <AdminExpandableCard
-                key={item.id}
-                summary={
-                  <div className="grid min-w-0 gap-4 p-5 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
-                    <div className="overflow-hidden rounded-xl border border-border bg-soft-blue">
-                      {item.imageUrl ? (
-                        <img
-                          alt=""
-                          className="aspect-[4/3] h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transform-none"
-                          src={item.imageUrl}
-                        />
-                      ) : (
-                        <div className="flex aspect-[4/3] items-center justify-center px-3 text-center text-xs font-semibold text-secondary">
-                          No image
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-soft-blue px-2.5 py-1 text-xs font-bold capitalize text-primary-active">
-                          {contentTypeLabel(item.type)}
-                        </span>
-                        <StatusBadge
-                          className="px-2.5 py-1 text-xs"
-                          status={item.isActive ? "active" : "notInGym"}
-                        >
-                          {item.isActive ? "Active" : "Inactive"}
-                        </StatusBadge>
+            {content.map((item, index) => (
+              <div className="space-y-2" key={item.id}>
+                <AdminExpandableCard
+                  summary={
+                    <div className="grid min-w-0 gap-4 p-5 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
+                      <div className="overflow-hidden rounded-xl border border-border bg-soft-blue">
+                        {item.imageUrl ? (
+                          <img
+                            alt=""
+                            className="aspect-[4/3] h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transform-none"
+                            src={item.imageUrl}
+                          />
+                        ) : (
+                          <div className="flex aspect-[4/3] items-center justify-center px-3 text-center text-xs font-semibold text-secondary">
+                            No image
+                          </div>
+                        )}
                       </div>
-                      <h4 className="mt-3 line-clamp-2 text-lg font-bold text-foreground">
-                        {item.title}
-                      </h4>
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-secondary">
-                        {item.body || "No description provided."}
-                      </p>
-                      <p className="mt-3 text-xs font-semibold text-muted">
-                        {contentDateRange(item.startsAt, item.endsAt)}
-                      </p>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-neutral px-2.5 py-1 text-xs font-bold text-secondary">
+                            Order {index + 1}
+                          </span>
+                          <span className="rounded-full bg-soft-blue px-2.5 py-1 text-xs font-bold capitalize text-primary-active">
+                            {contentTypeLabel(item.type)}
+                          </span>
+                          <StatusBadge
+                            className="px-2.5 py-1 text-xs"
+                            status={item.isActive ? "active" : "notInGym"}
+                          >
+                            {item.isActive ? "Active" : "Inactive"}
+                          </StatusBadge>
+                          {item.visibleOnApp ? (
+                            <StatusBadge
+                              className="px-2.5 py-1 text-xs"
+                              status="active"
+                            >
+                              Our App
+                            </StatusBadge>
+                          ) : null}
+                        </div>
+                        <h4 className="mt-3 line-clamp-2 text-lg font-bold text-foreground">
+                          {item.title}
+                        </h4>
+                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-secondary">
+                          {item.body || "No description provided."}
+                        </p>
+                        <p className="mt-3 text-xs font-semibold text-muted">
+                          {contentDateRange(item.startsAt, item.endsAt)}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-secondary">
+                          <span className="rounded-full border border-border bg-page px-2.5 py-1">
+                            {item.ctaUrl ? "CTA URL set" : "No CTA URL"}
+                          </span>
+                          {item.ctaLabel ? (
+                            <span className="rounded-full border border-border bg-page px-2.5 py-1">
+                              CTA: {item.ctaLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
+                  }
+                >
+                  <div className="mb-5">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
+                      Editing content
+                    </p>
+                    <h4 className="mt-1 text-lg font-bold text-foreground">
+                      {item.title}
+                    </h4>
                   </div>
-                }
-              >
-                <div className="mb-5">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
-                    Editing content
-                  </p>
-                  <h4 className="mt-1 text-lg font-bold text-foreground">
-                    {item.title}
-                  </h4>
-                </div>
-                <form action={savePublicContentAction}>
-                  <ContentFields content={item} />
-                  <Button className="mt-5" type="submit">
-                    Save changes
-                  </Button>
-                </form>
-              </AdminExpandableCard>
+                  <form action={savePublicContentAction}>
+                    <ContentFields content={item} />
+                    <Button className="mt-5" type="submit">
+                      Save changes
+                    </Button>
+                  </form>
+                </AdminExpandableCard>
+                <MoveContentControls
+                  id={item.id}
+                  isFirst={index === 0}
+                  isLast={index === content.length - 1}
+                  orderPosition={index + 1}
+                />
+              </div>
             ))}
           </div>
         ) : (

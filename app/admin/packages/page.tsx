@@ -15,13 +15,16 @@ const errorMessages: Record<string, string> = {
   "invalid-coach": "The selected coach is not available.",
   "invalid-categories":
     "Select at least one available category. Archived or unknown categories cannot be assigned.",
+  "invalid-discount-price":
+    "Discount price must be a positive number lower than the original price.",
   "invalid-freeze-chances":
     "Default freeze chances must be a whole number from 0 to 3.",
   "invalid-guest-passes":
     "Default guest passes must be a non-negative whole number.",
   "invalid-price":
     "Price must be a non-negative number with no more than two decimal places.",
-  "invalid-required": "Name, price, and package/service type are required.",
+  "invalid-required":
+    "Name, original price, and package/service type are required.",
   "invalid-sessions": "Session count must be a non-negative whole number.",
   "invalid-time": "Time values must use a valid 24-hour time.",
   "invalid-time-order": "Start time must be earlier than end time.",
@@ -59,7 +62,9 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
         defaultFreezeChances: true,
         defaultGuestPasses: true,
         description: true,
+        discountPrice: true,
         hasTimeRestriction: true,
+        highlightOnPublicPackages: true,
         id: true,
         isActive: true,
         name: true,
@@ -97,6 +102,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
     ...gymPackage,
     categories: gymPackage.categories.map(({ category }) => category),
     createdAt: gymPackage.createdAt.toISOString(),
+    discountPrice: gymPackage.discountPrice?.toString() ?? null,
     price: gymPackage.price.toString(),
   }));
 

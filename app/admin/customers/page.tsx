@@ -37,6 +37,12 @@ const errorMessages: Record<string, string> = {
   "invalid-coach": "The selected coach is not available.",
   "invalid-customer":
     "Member code, full name, birth date, and a valid status are required.",
+  "invalid-email": "Enter a valid email address or leave it empty.",
+};
+
+const statusMessages: Record<string, string> = {
+  "customer-archived": "Customer profile archived.",
+  "customer-saved": "Customer created successfully.",
 };
 
 function selectedEnum<T extends string>(
@@ -213,6 +219,7 @@ export default async function CustomersPage({
     db.customer.count({ where: { birthDate: null, deletedAt: null } }),
   ]);
   const errorMessage = params.error ? errorMessages[params.error] : null;
+  const statusMessage = params.status ? statusMessages[params.status] : null;
   const stats = [
     { label: "Total customers", value: totalCustomers },
     { label: "Active customers", value: activeCustomers },
@@ -236,9 +243,9 @@ export default async function CustomersPage({
         </p>
       </header>
 
-      {params.status === "customer-saved" ? (
+      {statusMessage ? (
         <p className="mt-6 rounded-xl border border-status-low bg-card px-4 py-3 text-sm font-semibold text-foreground">
-          Customer created successfully.
+          {statusMessage}
         </p>
       ) : null}
       {errorMessage ? (

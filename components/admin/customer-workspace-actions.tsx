@@ -26,15 +26,9 @@ export function CustomerWorkspaceActions() {
       </Button>
       <Button
         onClick={() => openPanel("customer-packages")}
-        variant="neutral"
-      >
-        Manage packages
-      </Button>
-      <Button
-        onClick={() => openPanel("assign-customer-package")}
         variant="success"
       >
-        Assign / Renew package
+        Membership & Services
       </Button>
       <Button
         onClick={() => openPanel("customer-documents")}

@@ -45,7 +45,9 @@ export type AdminPackageValue = {
   defaultFreezeChances: number;
   defaultGuestPasses: number;
   description: string | null;
+  discountPrice: string | null;
   hasTimeRestriction: boolean;
+  highlightOnPublicPackages: boolean;
   id: string;
   isActive: boolean;
   name: string;
@@ -97,6 +99,10 @@ function packageText(gymPackage: AdminPackageValue) {
     gymPackage.defaultGuestPasses > 0
       ? `${gymPackage.defaultGuestPasses} guest passes`
       : "no guest passes",
+    gymPackage.discountPrice
+      ? `discount price ${gymPackage.discountPrice}`
+      : "no discount",
+    gymPackage.highlightOnPublicPackages ? "featured highlighted public" : null,
     `${gymPackage.defaultFreezeChances} freeze chances`,
     gymPackage.timeRestrictionLabel,
     gymPackage.assignedCoach
@@ -244,7 +250,7 @@ function PackageFormFields({
           />
         </label>
         <label className={labelClass}>
-          Price
+          Original price
           <input
             className={inputClass}
             defaultValue={gymPackage?.price ?? ""}
@@ -254,6 +260,20 @@ function PackageFormFields({
             step="0.01"
             type="number"
           />
+        </label>
+        <label className={labelClass}>
+          Discount price
+          <input
+            className={inputClass}
+            defaultValue={gymPackage?.discountPrice ?? ""}
+            min={0.01}
+            name="discountPrice"
+            step="0.01"
+            type="number"
+          />
+          <span className="mt-1 block text-xs font-normal text-secondary">
+            Final discounted price shown publicly. Leave empty for no discount.
+          </span>
         </label>
         <label className={labelClass}>
           Session count
@@ -425,7 +445,7 @@ function PackageFormFields({
         </label>
       </details>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
         <label className="flex min-h-11 items-center gap-3 rounded-lg bg-neutral px-4 py-3 text-sm font-semibold text-foreground">
           <input
             defaultChecked={gymPackage?.isActive ?? true}
@@ -433,6 +453,20 @@ function PackageFormFields({
             type="checkbox"
           />
           Active and visible on the public packages page
+        </label>
+        <label className="flex min-h-11 items-start gap-3 rounded-lg bg-neutral px-4 py-3 text-sm font-semibold text-foreground">
+          <input
+            className="mt-1"
+            defaultChecked={gymPackage?.highlightOnPublicPackages ?? false}
+            name="highlightOnPublicPackages"
+            type="checkbox"
+          />
+          <span>
+            Highlight on public packages
+            <span className="mt-1 block text-sm font-normal leading-6 text-secondary">
+              Makes this package visually stand out on the public packages page.
+            </span>
+          </span>
         </label>
         <label className="flex min-h-11 items-center gap-3 rounded-lg bg-neutral px-4 py-3 text-sm font-semibold text-foreground">
           <input
@@ -696,11 +730,22 @@ export function AdminPackageManager({
                     </div>
                     <p className="text-sm text-secondary">
                       <span className="block text-xs font-bold uppercase tracking-wide">
-                        Price
+                        Original price
                       </span>
-                      <span className="mt-1 block font-semibold text-foreground">
+                      <span
+                        className={`mt-1 block font-semibold ${
+                          gymPackage.discountPrice
+                            ? "text-secondary line-through"
+                            : "text-foreground"
+                        }`}
+                      >
                         {displayPrice(gymPackage.price)}
                       </span>
+                      {gymPackage.discountPrice ? (
+                        <span className="mt-1 block font-bold text-brand">
+                          {displayPrice(gymPackage.discountPrice)} discounted
+                        </span>
+                      ) : null}
                     </p>
                     <p className="text-sm text-secondary">
                       <span className="block text-xs font-bold uppercase tracking-wide">
@@ -731,6 +776,16 @@ export function AdminPackageManager({
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                    {gymPackage.highlightOnPublicPackages ? (
+                      <span className="rounded-full border border-brand bg-soft-blue px-3 py-1 text-xs font-bold text-primary-active">
+                        Featured publicly
+                      </span>
+                    ) : null}
+                    {gymPackage.discountPrice ? (
+                      <span className="rounded-full border border-status-low bg-card px-3 py-1 text-xs font-bold text-foreground">
+                        Discount price: {displayPrice(gymPackage.discountPrice)}
+                      </span>
+                    ) : null}
                     {gymPackage.categories.length ? (
                       gymPackage.categories.map((category) => (
                         <span

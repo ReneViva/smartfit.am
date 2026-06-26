@@ -5,11 +5,13 @@ export function CheckOutPanel({
   compact,
   customerCode,
   customerId,
+  returnPath,
   showAllPackages,
 }: {
   compact: boolean;
   customerCode: string;
   customerId: string;
+  returnPath?: string;
   showAllPackages: boolean;
 }) {
   return (
@@ -33,6 +35,9 @@ export function CheckOutPanel({
           type="hidden"
           value={showAllPackages ? "1" : "0"}
         />
+        {returnPath ? (
+          <input name="returnPath" type="hidden" value={returnPath} />
+        ) : null}
         {compact ? <input name="view" type="hidden" value="compact" /> : null}
         <Button className="w-full sm:w-auto" type="submit" variant="warning">
           Check out customer

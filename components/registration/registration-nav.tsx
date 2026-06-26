@@ -9,6 +9,7 @@ import {
 } from "../layout/private-nav-badge";
 
 const registrationLinks = [
+  { href: "/registration/general", label: "General" },
   { href: "/registration", label: "Customer Lookup" },
   { href: "/registration/in-gym", label: "Currently In Gym" },
   { href: "/registration/notes", label: "Notes" },

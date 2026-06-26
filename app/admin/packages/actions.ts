@@ -85,6 +85,7 @@ export async function savePackageAction(formData: FormData) {
   const name = optionalText(formData, "name", 200);
   const packageType = optionalText(formData, "packageType", 200);
   const price = optionalText(formData, "price", 30);
+  const discountPrice = optionalText(formData, "discountPrice", 30);
   const sessionCount = nonNegativeInteger(formData, "sessionCount");
   const defaultGuestPasses = nonNegativeIntegerOrZero(
     formData,
@@ -121,6 +122,15 @@ export async function savePackageAction(formData: FormData) {
 
   if (!PRICE_PATTERN.test(price)) {
     redirectPackageError("invalid-price", id);
+  }
+
+  if (
+    discountPrice &&
+    (!PRICE_PATTERN.test(discountPrice) ||
+      Number(discountPrice) <= 0 ||
+      Number(discountPrice) >= Number(price))
+  ) {
+    redirectPackageError("invalid-discount-price", id);
   }
 
   if (sessionCount === null) {
@@ -201,7 +211,10 @@ export async function savePackageAction(formData: FormData) {
     defaultFreezeChances,
     defaultGuestPasses,
     description: optionalText(formData, "description", 2000),
+    discountPrice,
     hasTimeRestriction,
+    highlightOnPublicPackages:
+      formData.get("highlightOnPublicPackages") === "on",
     isActive: formData.get("isActive") === "on",
     name,
     packageType,

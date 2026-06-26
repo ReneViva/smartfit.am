@@ -20,19 +20,27 @@ export function PrivateLayout({
 }: PrivateLayoutProps) {
   return (
     <div className="min-h-screen bg-page lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
-      <aside className="border-b border-border bg-card px-5 py-5 lg:sticky lg:top-0 lg:h-screen lg:border-r lg:border-b-0 lg:px-6 lg:py-6">
-        <Link aria-label="Smartfit.am home" className="block w-fit" href="/">
+      <aside className="border-b border-border bg-card px-5 py-5 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:overflow-hidden lg:border-r lg:border-b-0 lg:px-6 lg:py-6">
+        <Link
+          aria-label="Smartfit.am home"
+          className="block w-fit lg:shrink-0"
+          href="/"
+        >
           <SmartfitLogo className="h-12 w-auto max-w-44 object-contain" />
         </Link>
 
-        <div className="mt-6 rounded-xl bg-soft-blue px-4 py-3">
+        <div className="mt-6 rounded-xl bg-soft-blue px-4 py-3 lg:shrink-0">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-active">
             Private workspace
           </p>
           <p className="mt-1 text-sm font-semibold text-foreground">{title}</p>
         </div>
 
-        {navigation ? <div className="mt-6">{navigation}</div> : null}
+        {navigation ? (
+          <div className="mt-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+            {navigation}
+          </div>
+        ) : null}
       </aside>
 
       <div className="min-w-0">

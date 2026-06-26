@@ -16,8 +16,10 @@ const labelClass = "block text-sm font-semibold text-foreground";
 const initialCreateState: CustomerCreateState = {
   submissionId: 0,
   values: {
+    address: "",
     birthDate: "",
     customerCode: "",
+    email: "",
     emergencyPhone: "",
     firstName: "",
     fullName: "",
@@ -35,9 +37,11 @@ type CoachOption = {
 };
 
 type CustomerFormValue = {
+  address: string | null;
   assignedCoachId: string | null;
   birthDate: Date | null;
   customerCode: string;
+  email: string | null;
   emergencyPhone: string | null;
   firstName: string | null;
   fullName: string;
@@ -214,6 +218,35 @@ export function CustomerForm({
           </legend>
           <div className="grid gap-5 sm:grid-cols-2">
             <label className={labelClass}>
+              Email
+              <input
+                aria-describedby={
+                  createState.fieldErrors?.email && !isEditing
+                    ? "create-email-error"
+                    : undefined
+                }
+                aria-invalid={
+                  createState.fieldErrors?.email && !isEditing
+                    ? true
+                    : undefined
+                }
+                className={inputClass}
+                defaultValue={customer?.email ?? createValues.email}
+                maxLength={254}
+                name="email"
+                type="email"
+              />
+              {createState.fieldErrors?.email && !isEditing ? (
+                <span
+                  className="mt-2 block text-sm font-semibold text-button-danger"
+                  id="create-email-error"
+                  role="alert"
+                >
+                  {createState.fieldErrors.email}
+                </span>
+              ) : null}
+            </label>
+            <label className={labelClass}>
               Phone
               <input
                 className={inputClass}
@@ -232,6 +265,16 @@ export function CustomerForm({
                 maxLength={120}
                 name="emergencyPhone"
                 type="tel"
+              />
+            </label>
+            <label className={`${labelClass} sm:col-span-2`}>
+              Address
+              <textarea
+                className={`${inputClass} min-h-24 resize-y`}
+                defaultValue={customer?.address ?? createValues.address}
+                maxLength={500}
+                name="address"
+                rows={3}
               />
             </label>
             <label className={labelClass}>

@@ -20,7 +20,7 @@ type CategoriesPageProps = {
 };
 
 type CategoryValue = {
-  _count: { packages: number };
+  _count: { coaches: number; packages: number };
   description: string | null;
   id: string;
   isArchived: boolean;
@@ -37,7 +37,7 @@ const labelClass = "block text-sm font-semibold text-foreground";
 const errorMessages: Record<string, string> = {
   "archive-unavailable": "The category could not be archived or restored.",
   "delete-unavailable":
-    "Only archived categories with no package assignments can be deleted.",
+    "Only archived categories with no package or coach assignments can be deleted.",
   "duplicate-category": "A category with that name or slug already exists.",
   "duplicate-name": "A category with that name already exists.",
   "duplicate-slug": "A category with that slug already exists.",
@@ -164,7 +164,7 @@ export default async function CategoriesPage({
   const [categories, params] = await Promise.all([
     db.category.findMany({
       include: {
-        _count: { select: { packages: true } },
+        _count: { select: { coaches: true, packages: true } },
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     }),
@@ -264,6 +264,10 @@ export default async function CategoriesPage({
                               {category._count.packages === 1 ? "" : "s"}
                             </span>
                             <span className="rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
+                              {category._count.coaches} coach
+                              {category._count.coaches === 1 ? "" : "es"}
+                            </span>
+                            <span className="rounded-full border border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
                               {category.isPublic ? "Public" : "Hidden"}
                             </span>
                             {category.isArchived ? (
@@ -356,7 +360,10 @@ export default async function CategoriesPage({
                           <input name="id" type="hidden" value={category.id} />
                           <input name="operation" type="hidden" value="delete" />
                           <Button
-                            disabled={category._count.packages > 0}
+                            disabled={
+                              category._count.packages + category._count.coaches >
+                              0
+                            }
                             type="submit"
                             variant="danger"
                           >
@@ -365,10 +372,11 @@ export default async function CategoriesPage({
                         </form>
                       ) : null}
                     </div>
-                    {category.isArchived && category._count.packages > 0 ? (
+                    {category.isArchived &&
+                    category._count.packages + category._count.coaches > 0 ? (
                       <p className="mt-3 text-sm font-semibold text-secondary">
-                        This category has package assignments and cannot be
-                        permanently deleted.
+                        This category has package or coach assignments and
+                        cannot be permanently deleted.
                       </p>
                     ) : null}
                   </AdminExpandableCard>

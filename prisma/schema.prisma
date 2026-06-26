@@ -130,12 +130,15 @@ model GymSettings {
   mapEmbedUrl                           String?
   workingDays                           String?
   workingHours                          String?
+  workingScheduleText                   String?
+  telegramLink                          String?
   occupancyGreenMax                     Int?
   occupancyYellowMax                    Int?
   showPhoneInPublicApp                  Boolean  @default(true)
   showWhatsappInPublicApp               Boolean  @default(true)
   showInstagramInPublicApp              Boolean  @default(true)
   showLocationInPublicApp               Boolean  @default(true)
+  showTelegramInPublicLinks             Boolean  @default(false)
   showMotivationalTextInPublicApp       Boolean  @default(true)
   showPublicAnalyticsOnOurApp           Boolean  @default(false)
   allowRegistrationPackageFreeze        Boolean  @default(false)
@@ -146,22 +149,27 @@ model GymSettings {
 }
 
 model PublicContent {
-  id          String            @id @default(cuid())
-  type        PublicContentType
-  title       String
-  body        String?
-  imageUrl    String?
-  startsAt    DateTime?
-  endsAt      DateTime?
-  isActive    Boolean           @default(true)
-  deletedAt   DateTime?
-  createdById String?
-  createdBy   StaffUser?        @relation(fields: [createdById], references: [id])
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id           String            @id @default(cuid())
+  type         PublicContentType
+  title        String
+  body         String?
+  imageUrl     String?
+  ctaUrl       String?
+  ctaLabel     String?
+  sortOrder    Int               @default(0)
+  visibleOnApp Boolean           @default(false)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  isActive     Boolean           @default(true)
+  deletedAt    DateTime?
+  createdById  String?
+  createdBy    StaffUser?        @relation(fields: [createdById], references: [id])
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   @@index([type, isActive])
   @@index([createdById])
+  @@index([sortOrder])
 }
 
 model Customer {
@@ -171,8 +179,11 @@ model Customer {
   lastName          String?
   fullName          String
   birthDate         DateTime?
+  email             String?
+  address           String?
   phone             String?
   emergencyPhone    String?
+  profileImageUrl   String?
   status            CustomerStatus    @default(ACTIVE)
   gymPresenceStatus GymPresenceStatus @default(NOT_IN_GYM)
   assignedCoachId   String?
@@ -211,32 +222,41 @@ model Coach {
   assignedCustomers Customer[]
   packages          Package[]
   customerPackages  CustomerPackage[]
+  categories        CoachCategory[]
+  packageServices   CustomerPackageService[]
 
   @@index([isActive])
 }
 
 model Package {
-  id                   String    @id @default(cuid())
-  name                 String
-  description          String?
-  price                Decimal   @db.Decimal(10, 2)
-  sessionCount         Int
-  defaultGuestPasses   Int       @default(0)
-  defaultFreezeChances Int       @default(3)
-  packageType          String
-  assignedCoachId      String?
-  assignedCoach        Coach?    @relation(fields: [assignedCoachId], references: [id])
-  isActive             Boolean   @default(true)
-  hasTimeRestriction   Boolean   @default(false)
-  allowedStartTime     String?
-  allowedEndTime       String?
-  timeRestrictionLabel String?
-  deletedAt            DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id                           String    @id @default(cuid())
+  name                         String
+  description                  String?
+  price                        Decimal   @db.Decimal(10, 2)
+  discountPrice                Decimal?  @db.Decimal(10, 2)
+  highlightOnPublicPackages    Boolean   @default(false)
+  sessionCount                 Int
+  defaultGuestPasses           Int       @default(0)
+  defaultFreezeChances         Int       @default(3)
+  hasUnlimitedIntervalCheckIns Boolean   @default(true)
+  intervalCheckInLimit         Int?
+  hasUnlimitedDailyCheckIns    Boolean   @default(true)
+  dailyCheckInLimit            Int?
+  packageType                  String
+  assignedCoachId              String?
+  assignedCoach                Coach?    @relation(fields: [assignedCoachId], references: [id])
+  isActive                     Boolean   @default(true)
+  hasTimeRestriction           Boolean   @default(false)
+  allowedStartTime             String?
+  allowedEndTime               String?
+  timeRestrictionLabel         String?
+  deletedAt                    DateTime?
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
 
   customerPackages CustomerPackage[]
   categories       PackageCategory[]
+  packageServices  CustomerPackageService[]
 
   @@index([name])
   @@index([packageType])
@@ -256,7 +276,9 @@ model Category {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  packages PackageCategory[]
+  packages        PackageCategory[]
+  coaches         CoachCategory[]
+  packageServices CustomerPackageService[]
 
   @@index([name])
   @@index([sortOrder])
@@ -276,31 +298,48 @@ model PackageCategory {
   @@index([categoryId])
 }
 
+model CoachCategory {
+  coachId    String
+  coach      Coach    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+
+  @@id([coachId, categoryId])
+  @@index([coachId])
+  @@index([categoryId])
+}
+
 model CustomerPackage {
-  id                     String                @id @default(cuid())
-  customerId             String
-  customer               Customer              @relation(fields: [customerId], references: [id])
-  packageId              String
-  package                Package               @relation(fields: [packageId], references: [id])
-  coachId                String?
-  coach                  Coach?                @relation(fields: [coachId], references: [id])
-  activationDate         DateTime
-  expirationDate         DateTime
-  initialSessions        Int
-  remainingSessions      Int
-  initialGuestPasses     Int                   @default(0)
-  remainingGuestPasses   Int                   @default(0)
-  remainingFreezeChances Int                   @default(3)
-  status                 CustomerPackageStatus @default(ACTIVE)
-  frozenAt               DateTime?
-  reactivatedAt          DateTime?
-  deletedAt              DateTime?
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
+  id                           String                @id @default(cuid())
+  customerId                   String
+  customer                     Customer              @relation(fields: [customerId], references: [id])
+  packageId                    String
+  package                      Package               @relation(fields: [packageId], references: [id])
+  coachId                      String?
+  coach                        Coach?                @relation(fields: [coachId], references: [id])
+  activationDate               DateTime
+  expirationDate               DateTime
+  initialSessions              Int
+  remainingSessions            Int
+  initialGuestPasses           Int                   @default(0)
+  remainingGuestPasses         Int                   @default(0)
+  remainingFreezeChances       Int                   @default(3)
+  hasUnlimitedIntervalCheckIns Boolean               @default(true)
+  intervalCheckInLimit         Int?
+  hasUnlimitedDailyCheckIns    Boolean               @default(true)
+  dailyCheckInLimit            Int?
+  status                       CustomerPackageStatus @default(ACTIVE)
+  frozenAt                     DateTime?
+  reactivatedAt                DateTime?
+  deletedAt                    DateTime?
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
 
   visitUsages    VisitPackageUsage[]
   sessionChanges PackageSessionChange[]
   freezes        PackageFreeze[]
+  services       CustomerPackageService[]
 
   @@index([customerId])
   @@index([packageId])
@@ -308,6 +347,34 @@ model CustomerPackage {
   @@index([status])
   @@index([expirationDate])
   @@index([remainingSessions])
+}
+
+model CustomerPackageService {
+  id                String          @id @default(cuid())
+  customerPackageId String
+  customerPackage   CustomerPackage @relation(fields: [customerPackageId], references: [id], onDelete: Cascade)
+  packageId         String?
+  package           Package?        @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  serviceName       String
+  categoryId        String?
+  category          Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  coachId           String?
+  coach             Coach?          @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  initialSessions   Int
+  remainingSessions Int
+  notes             String?
+  isActive          Boolean         @default(true)
+  sortOrder         Int             @default(0)
+  deletedAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([customerPackageId])
+  @@index([packageId])
+  @@index([categoryId])
+  @@index([coachId])
+  @@index([isActive])
+  @@index([sortOrder])
 }
 
 model PackageFreeze {

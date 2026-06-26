@@ -14,9 +14,9 @@ import {
 export const dynamic = "force-dynamic";
 export const metadata = createPublicMetadata({
   description:
-    "Find Smartfit.am contact details, address, working hours, phone, WhatsApp, Instagram, and map directions when available.",
+    "Find Smartfit.am contact details, address, working schedule, phone, WhatsApp, Telegram, Instagram, and map directions when available.",
   path: "/contact",
-  title: "Contact Smartfit.am - Address, Working Hours, Phone & WhatsApp",
+  title: "Contact Smartfit.am - Address, Schedule, Phone & Telegram",
 });
 
 const CONTACT_HERO_IMAGE =
@@ -99,9 +99,9 @@ export default async function ContactPage() {
   const hasAnyPublicContact =
     Boolean(settings?.contactNumber) ||
     Boolean(settings?.address) ||
-    Boolean(settings?.workingDays) ||
-    Boolean(settings?.workingHours) ||
+    Boolean(settings?.workingSchedule) ||
     Boolean(settings?.whatsappLink) ||
+    Boolean(settings?.telegramLink) ||
     Boolean(settings?.instagramLink) ||
     Boolean(settings?.mapLink);
 
@@ -158,7 +158,7 @@ export default async function ContactPage() {
           ) : null}
         </div>
 
-        <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <ContactAction
             description={settings?.contactNumber ?? "Not available yet"}
             href={callHref}
@@ -183,6 +183,13 @@ export default async function ContactPage() {
             href={settings?.instagramLink}
             label="Instagram"
           />
+          {settings?.telegramLink ? (
+            <ContactAction
+              description="Open Telegram"
+              href={settings.telegramLink}
+              label="Telegram"
+            />
+          ) : null}
           <ContactAction
             description={
               settings?.mapLink ? "Open directions" : "Map link is not available yet"
@@ -211,18 +218,10 @@ export default async function ContactPage() {
               </div>
               <div>
                 <dt className="font-bold uppercase tracking-[0.12em] text-white/55">
-                  Working days
+                  Working schedule
                 </dt>
-                <dd className="mt-1 text-base font-semibold leading-7 text-white">
-                  {settings?.workingDays ?? "Not available yet"}
-                </dd>
-              </div>
-              <div>
-                <dt className="font-bold uppercase tracking-[0.12em] text-white/55">
-                  Working hours
-                </dt>
-                <dd className="mt-1 text-base font-semibold leading-7 text-white">
-                  {settings?.workingHours ?? "Not available yet"}
+                <dd className="mt-1 whitespace-pre-line text-base font-semibold leading-7 text-white">
+                  {settings?.workingSchedule ?? "Not available yet"}
                 </dd>
               </div>
             </dl>

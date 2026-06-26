@@ -18,6 +18,12 @@ function staffName(staff: { name: string | null; username: string | null }) {
   return staff.name ?? staff.username ?? "Staff user";
 }
 
+function serviceNameFromReason(reason: string | null) {
+  const match = reason?.match(/^Service check-in deduction: (.*?) \[service:/);
+
+  return match?.[1] ?? null;
+}
+
 export async function getCustomerRecentActivity(customerId: string) {
   const [visits, sessionChanges, notes] = await Promise.all([
     db.gymVisit.findMany({
@@ -38,8 +44,10 @@ export async function getCustomerRecentActivity(customerId: string) {
         changedBy: { select: { name: true, username: true } },
         changeType: true,
         createdAt: true,
+        delta: true,
         newRemainingSessions: true,
         previousRemainingSessions: true,
+        reason: true,
         customerPackage: {
           select: {
             package: { select: { name: true } },
@@ -93,12 +101,16 @@ export async function getCustomerRecentActivity(customerId: string) {
 
   for (const change of sessionChanges) {
     const packageName = change.customerPackage.package.name;
+    const serviceName = serviceNameFromReason(change.reason);
+    const sessionsDeducted = Math.abs(change.delta);
 
     activity.push(
       change.changeType === "CHECK_IN_DEDUCTION"
         ? {
             actorName: staffName(change.changedBy),
-            description: `${packageName}: one session deducted at check-in.`,
+            description: serviceName
+              ? `${serviceName}: ${sessionsDeducted} service session${sessionsDeducted === 1 ? "" : "s"} deducted at check-in.`
+              : `${packageName}: one session deducted at check-in.`,
             occurredAt: change.createdAt,
             type: "SESSION_DEDUCTED",
           }

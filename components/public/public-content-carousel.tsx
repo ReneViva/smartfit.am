@@ -7,6 +7,8 @@ import { PublicContentImage } from "./public-content-image";
 
 type PublicContentItem = {
   body: string | null;
+  ctaLabel: string | null;
+  ctaUrl: string | null;
   id: string;
   imageUrl: string | null;
   title: string;
@@ -35,6 +37,8 @@ function fallbackSlides(gymName: string): PublicContentItem[] {
   return [
     {
       body: "Fresh offers and announcements will appear here as soon as they are active.",
+      ctaLabel: null,
+      ctaUrl: null,
       id: "smartfit-fallback-offers",
       imageUrl: null,
       title: `${gymName} training starts here`,
@@ -42,6 +46,8 @@ function fallbackSlides(gymName: string): PublicContentItem[] {
     },
     {
       body: "Explore active packages, services, and training options built for steady progress.",
+      ctaLabel: null,
+      ctaUrl: null,
       id: "smartfit-fallback-packages",
       imageUrl: null,
       title: "Find the package that fits your routine",
@@ -49,6 +55,8 @@ function fallbackSlides(gymName: string): PublicContentItem[] {
     },
     {
       body: "Check live occupancy before visiting and keep the gym close from your phone.",
+      ctaLabel: null,
+      ctaUrl: null,
       id: "smartfit-fallback-occupancy",
       imageUrl: null,
       title: "Know the crowd before you go",
@@ -59,6 +67,39 @@ function fallbackSlides(gymName: string): PublicContentItem[] {
 
 function displayType(type: string) {
   return type.toLowerCase().replaceAll("_", " ");
+}
+
+function linkTargetProps(href: string) {
+  return /^https?:\/\//i.test(href)
+    ? { rel: "noopener noreferrer", target: "_blank" }
+    : {};
+}
+
+function PromotionCta({
+  compact = false,
+  item,
+  tabIndex,
+}: {
+  compact?: boolean;
+  item: PublicContentItem;
+  tabIndex?: number;
+}) {
+  if (!item.ctaUrl || !item.ctaLabel) {
+    return null;
+  }
+
+  return (
+    <a
+      className={`mt-5 inline-flex min-h-11 max-w-full items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-center text-sm font-bold leading-5 text-white [overflow-wrap:anywhere] transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-primary-hover hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+        compact ? "" : "sm:mt-7 sm:px-5 sm:text-base"
+      }`}
+      href={item.ctaUrl}
+      tabIndex={tabIndex}
+      {...linkTargetProps(item.ctaUrl)}
+    >
+      {item.ctaLabel}
+    </a>
+  );
 }
 
 function normalizedOffset(index: number, activeIndex: number, length: number) {
@@ -137,6 +178,101 @@ function FallbackVisual({
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SlideVisual({
+  compact = false,
+  eager,
+  item,
+}: {
+  compact?: boolean;
+  eager: boolean;
+  item: PublicContentItem;
+}) {
+  if (!item.imageUrl) {
+    return <FallbackVisual compact={compact} title={item.title} />;
+  }
+
+  return compact ? (
+    <div className="h-44 overflow-hidden border-b border-border bg-soft-blue">
+      <PublicContentImage
+        alt={item.title}
+        className="h-full w-full"
+        eager={eager}
+        src={item.imageUrl}
+      />
+    </div>
+  ) : (
+    <div className="min-h-64 overflow-hidden border-t border-border bg-soft-blue lg:min-h-full lg:border-l lg:border-t-0">
+      <PublicContentImage
+        alt={item.title}
+        className="h-full min-h-[32rem] w-full lg:min-h-[36rem]"
+        eager={eager}
+        src={item.imageUrl}
+      />
+    </div>
+  );
+}
+
+function SlideText({
+  compact = false,
+  ctaTabIndex,
+  item,
+}: {
+  compact?: boolean;
+  ctaTabIndex?: number;
+  item: PublicContentItem;
+}) {
+  return (
+    <div
+      className={
+        compact
+          ? "flex min-h-56 flex-col justify-center px-4 py-5"
+          : "flex min-h-[32rem] flex-col justify-center px-8 py-10 lg:min-h-[36rem] lg:px-16"
+      }
+    >
+      <p
+        className={`w-fit rounded-full bg-brand font-bold uppercase text-white ${
+          compact
+            ? "px-3 py-1.5 text-[0.68rem] tracking-[0.12em]"
+            : "px-4 py-2 text-xs tracking-[0.14em]"
+        }`}
+      >
+        {displayType(item.type)}
+      </p>
+      <h3
+        className={
+          compact
+            ? "mt-4 line-clamp-3 text-xl font-bold leading-tight text-foreground"
+            : "mt-5 line-clamp-3 text-4xl font-bold leading-tight text-foreground lg:text-6xl"
+        }
+      >
+        {item.title}
+      </h3>
+      {item.body ? (
+        <p
+          className={
+            compact
+              ? "mt-3 line-clamp-4 text-sm leading-6 text-secondary"
+              : "mt-5 line-clamp-5 text-base leading-7 text-secondary sm:text-lg"
+          }
+        >
+          {item.body}
+        </p>
+      ) : (
+        <p
+          className={
+            compact
+              ? "mt-3 text-sm leading-6 text-secondary"
+              : "mt-5 text-base leading-7 text-secondary sm:text-lg"
+          }
+        >
+          More details will be available soon.
+        </p>
+      )}
+      <PromotionCta compact={compact} item={item} tabIndex={ctaTabIndex} />
     </div>
   );
 }
@@ -336,48 +472,48 @@ export function PublicContentCarousel({
         >
           {slides.map((item, index) => {
             const isActive = index === activeIndex;
+            const isCardLink = Boolean(item.ctaUrl && !item.ctaLabel);
+            const mobileSlideClassName = `grid w-[86vw] max-w-[23rem] shrink-0 snap-center overflow-hidden rounded-lg border border-white/15 bg-card text-left shadow-xl shadow-black/30 ${
+              isCardLink
+                ? "cursor-pointer no-underline transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-brand hover:shadow-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                : ""
+            }`;
+            const slideContent = (
+              <>
+                <SlideVisual compact eager={isActive} item={item} />
+                <SlideText compact item={item} />
+              </>
+            );
+
+            if (isCardLink && item.ctaUrl) {
+              return (
+                <a
+                  aria-label={`Open offer ${index + 1} of ${slides.length}: ${item.title}`}
+                  className={mobileSlideClassName}
+                  href={item.ctaUrl}
+                  key={item.id}
+                  ref={(element) => {
+                    mobileSlideRefs.current[index] = element;
+                  }}
+                  {...linkTargetProps(item.ctaUrl)}
+                >
+                  {slideContent}
+                </a>
+              );
+            }
 
             return (
               <article
                 aria-label={`Offer ${index + 1} of ${slides.length}`}
                 aria-roledescription="slide"
-                className="grid w-[86vw] max-w-[23rem] shrink-0 snap-center overflow-hidden rounded-lg border border-white/15 bg-card text-left shadow-xl shadow-black/30"
+                className={mobileSlideClassName}
                 key={item.id}
                 ref={(element) => {
                   mobileSlideRefs.current[index] = element;
                 }}
                 role="group"
               >
-                {item.imageUrl ? (
-                  <div className="h-44 overflow-hidden border-b border-border bg-soft-blue">
-                    <PublicContentImage
-                      alt={item.title}
-                      className="h-full w-full"
-                      eager={isActive}
-                      src={item.imageUrl}
-                    />
-                  </div>
-                ) : (
-                  <FallbackVisual compact title={item.title} />
-                )}
-
-                <div className="flex min-h-56 flex-col justify-center px-4 py-5">
-                  <p className="w-fit rounded-full bg-brand px-3 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-white">
-                    {displayType(item.type)}
-                  </p>
-                  <h3 className="mt-4 line-clamp-3 text-xl font-bold leading-tight text-foreground">
-                    {item.title}
-                  </h3>
-                  {item.body ? (
-                    <p className="mt-3 line-clamp-4 text-sm leading-6 text-secondary">
-                      {item.body}
-                    </p>
-                  ) : (
-                    <p className="mt-3 text-sm leading-6 text-secondary">
-                      More details will be available soon.
-                    </p>
-                  )}
-                </div>
+                {slideContent}
               </article>
             );
           })}
@@ -395,51 +531,52 @@ export function PublicContentCarousel({
           {slides.map((item, index) => {
             const offset = normalizedOffset(index, activeIndex, slides.length);
             const isActive = offset === 0;
-            const visible =
-              Math.abs(offset) <= 1 && (!prefersReducedMotion || isActive);
+            const isCardLink = Boolean(item.ctaUrl && !item.ctaLabel);
+            const desktopSlideClassName = `absolute left-1/2 top-0 grid w-[min(86vw,82rem)] overflow-hidden rounded-lg border border-white/15 bg-card text-left shadow-2xl shadow-black/45 transition-[border-color,box-shadow,opacity,transform,filter] duration-500 ease-out [backface-visibility:hidden] [transform-style:preserve-3d] md:min-h-[34rem] md:grid-cols-[minmax(0,1fr)_minmax(23rem,0.78fr)] lg:grid-cols-[minmax(0,1fr)_minmax(31rem,0.82fr)] ${
+              isActive ? "" : "pointer-events-none"
+            } ${
+              isCardLink
+                ? "cursor-pointer no-underline hover:border-brand hover:shadow-brand/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                : ""
+            }`;
+            const slideContent = (
+              <>
+                <SlideText
+                  ctaTabIndex={isActive ? undefined : -1}
+                  item={item}
+                />
+                <SlideVisual eager={isActive} item={item} />
+              </>
+            );
+
+            if (isCardLink && item.ctaUrl) {
+              return (
+                <a
+                  aria-hidden={!isActive}
+                  aria-label={`Open offer ${index + 1} of ${slides.length}: ${item.title}`}
+                  className={desktopSlideClassName}
+                  href={item.ctaUrl}
+                  key={item.id}
+                  style={slideStyle(offset, prefersReducedMotion)}
+                  tabIndex={isActive ? undefined : -1}
+                  {...linkTargetProps(item.ctaUrl)}
+                >
+                  {slideContent}
+                </a>
+              );
+            }
 
             return (
               <article
                 aria-hidden={!isActive}
                 aria-label={`Offer ${index + 1} of ${slides.length}`}
                 aria-roledescription="slide"
-                className={`absolute left-1/2 top-0 grid w-[min(86vw,82rem)] overflow-hidden rounded-lg border border-white/15 bg-card text-left shadow-2xl shadow-black/45 transition-[opacity,transform,filter] duration-500 ease-out [backface-visibility:hidden] [transform-style:preserve-3d] md:min-h-[34rem] md:grid-cols-[minmax(0,1fr)_minmax(23rem,0.78fr)] lg:grid-cols-[minmax(0,1fr)_minmax(31rem,0.82fr)] ${
-                  visible ? "" : "pointer-events-none"
-                }`}
+                className={desktopSlideClassName}
                 key={item.id}
                 role="group"
                 style={slideStyle(offset, prefersReducedMotion)}
               >
-                <div className="flex min-h-[32rem] flex-col justify-center px-8 py-10 lg:min-h-[36rem] lg:px-16">
-                  <p className="w-fit rounded-full bg-brand px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-white">
-                    {displayType(item.type)}
-                  </p>
-                  <h3 className="mt-5 line-clamp-3 text-4xl font-bold leading-tight text-foreground lg:text-6xl">
-                    {item.title}
-                  </h3>
-                  {item.body ? (
-                    <p className="mt-5 line-clamp-5 text-base leading-7 text-secondary sm:text-lg">
-                      {item.body}
-                    </p>
-                  ) : (
-                    <p className="mt-5 text-base leading-7 text-secondary sm:text-lg">
-                      More details will be available soon.
-                    </p>
-                  )}
-                </div>
-
-                {item.imageUrl ? (
-                  <div className="min-h-64 overflow-hidden border-t border-border bg-soft-blue lg:min-h-full lg:border-l lg:border-t-0">
-                    <PublicContentImage
-                      alt={item.title}
-                      className="h-full min-h-[32rem] w-full lg:min-h-[36rem]"
-                      eager={isActive}
-                      src={item.imageUrl}
-                    />
-                  </div>
-                ) : (
-                  <FallbackVisual title={item.title} />
-                )}
+                {slideContent}
               </article>
             );
           })}

@@ -428,7 +428,7 @@ export async function deleteOrArchivePackageCategoryAction(
     await db.$transaction(async (transaction) => {
       const existing = await transaction.category.findUnique({
         include: {
-          _count: { select: { packages: true } },
+          _count: { select: { coaches: true, packages: true } },
         },
         where: { id },
       });
@@ -438,7 +438,10 @@ export async function deleteOrArchivePackageCategoryAction(
       }
 
       if (operation === "delete") {
-        if (!existing.isArchived || existing._count.packages > 0) {
+        if (
+          !existing.isArchived ||
+          existing._count.packages + existing._count.coaches > 0
+        ) {
           throw new Error("Category cannot be deleted.");
         }
 

@@ -102,14 +102,28 @@ const errorMessages: Record<string, string> = {
   "invalid-check-out": "The selected customer is unavailable for check-out.",
   "invalid-occupancy-correction":
     "Enter a valid non-negative whole number for occupancy.",
+  "invalid-occupancy":
+    "Live occupancy has an invalid count. Correct occupancy before checking in.",
   "invalid-package":
     "One or more selected packages are not usable for check-in.",
+  "invalid-service":
+    "One or more selected service lines are unavailable for this membership.",
+  "invalid-service-deduction":
+    "Service deductions must be non-negative whole numbers.",
   "guest-passes-insufficient":
     "The selected package does not have enough remaining guest passes.",
   "guest-source-required":
     "Choose which selected package provides the guest passes.",
   "frozen-package":
     "Frozen packages cannot be selected or used for check-in.",
+  "expired-membership":
+    "Expired memberships can be checked in only without deductions.",
+  "membership-conflict":
+    "This customer has multiple active memberships from older data. Admin must resolve before fast check-in.",
+  "daily-limit-reached":
+    "This membership has reached its check-in limit for the current local day.",
+  "interval-limit-reached":
+    "This membership has reached its check-in limit for the membership interval.",
   "invalid-freeze-days":
     "Freeze duration must be a positive whole number of days.",
   "invalid-package-action":
@@ -149,10 +163,16 @@ const errorMessages: Record<string, string> = {
     "The package status changed before the action completed. Review and try again.",
   "package-stale":
     "A selected package changed before check-in. Review it and try again.",
+  "service-sessions-insufficient":
+    "A selected service line does not have enough remaining sessions.",
+  "service-stale":
+    "A selected service line changed before check-in. Review it and try again.",
   "stale-correction":
     "Sessions changed after this card loaded. Review the updated value and try again.",
   "stale-occupancy":
     "Occupancy changed after this page loaded. Review the current count and try again.",
+  "time-restriction-violation":
+    "This membership is outside its allowed check-in time window.",
 };
 
 function freezeDaysExceededMessage(value: string | undefined) {
@@ -274,6 +294,25 @@ export default async function RegistrationPage({
             },
             packages: {
               include: {
+                services: {
+                  orderBy: [{ sortOrder: "asc" }, { serviceName: "asc" }],
+                  select: {
+                    category: {
+                      select: { name: true },
+                    },
+                    coach: {
+                      select: { firstName: true, lastName: true },
+                    },
+                    deletedAt: true,
+                    id: true,
+                    initialSessions: true,
+                    isActive: true,
+                    remainingSessions: true,
+                    serviceName: true,
+                    sortOrder: true,
+                  },
+                  where: { deletedAt: null },
+                },
                 coach: {
                   select: { firstName: true, lastName: true },
                 },

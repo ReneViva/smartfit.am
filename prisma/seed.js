@@ -87,8 +87,11 @@ async function main() {
       showWhatsappInPublicApp: true,
       showInstagramInPublicApp: true,
       showLocationInPublicApp: true,
+      showTelegramInPublicLinks: false,
       showMotivationalTextInPublicApp: true,
       motivationalText: "Train well. Feel strong.",
+      workingScheduleText:
+        "Mon-Fri | 07:00-23:00\nSaturday | 09:00-22:00\nSunday | 10:00-20:00",
       hideInactiveCustomersFromRegistration: false,
     },
   });

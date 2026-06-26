@@ -62,6 +62,7 @@ export default async function AdminPage() {
           showLocationInPublicApp: true,
           showMotivationalTextInPublicApp: true,
           showPhoneInPublicApp: true,
+          showTelegramInPublicLinks: true,
           showWhatsappInPublicApp: true,
         },
       }),
@@ -73,6 +74,7 @@ export default async function AdminPage() {
         settings.showWhatsappInPublicApp,
         settings.showInstagramInPublicApp,
         settings.showLocationInPublicApp,
+        settings.showTelegramInPublicLinks,
         settings.showMotivationalTextInPublicApp,
       ].filter(Boolean).length
     : 0;
@@ -182,7 +184,7 @@ export default async function AdminPage() {
             <div className="flex items-center justify-between gap-4">
               <dt className="text-secondary">Public features enabled</dt>
               <dd className="font-bold text-foreground">
-                {publicAppFeatures} / 5
+                {publicAppFeatures} / 6
               </dd>
             </div>
             <div className="flex items-center justify-between gap-4">

@@ -32,6 +32,59 @@ function displayJson(value: Prisma.JsonValue | null) {
   return value === null ? null : JSON.stringify(value, null, 2);
 }
 
+function targetTypeLabel(value: string | null) {
+  if (!value) {
+    return "Not recorded";
+  }
+
+  const labels: Record<string, string> = {
+    Category: "Category",
+    Coach: "Coach",
+    Customer: "Customer",
+    CustomerDocument: "Customer document",
+    CustomerPackage: "Customer membership",
+    CustomerPackageService: "Membership service line",
+    GalleryImage: "Gallery image",
+    GymSettings: "Gym settings",
+    GymVisit: "Gym visit",
+    Note: "Note",
+    OccupancyState: "Occupancy state",
+    Package: "Package template",
+    PackageFreeze: "Package freeze",
+    PublicContent: "Public content",
+  };
+
+  return (
+    labels[value] ??
+    value
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/^./, (first) => first.toUpperCase())
+  );
+}
+
+function targetKey(type: string | null, id: string | null) {
+  return type && id ? `${type}:${id}` : null;
+}
+
+function targetIds(logs: { targetId: string | null; targetType: string | null }[], type: string) {
+  return [
+    ...new Set(
+      logs
+        .filter((log) => log.targetType === type && log.targetId)
+        .map((log) => log.targetId as string),
+    ),
+  ];
+}
+
+function setTargetLabel(
+  labels: Map<string, string>,
+  type: string,
+  id: string,
+  label: string,
+) {
+  labels.set(`${type}:${id}`, label);
+}
+
 export default async function LogsPage({ searchParams }: LogsPageProps) {
   const params = await searchParams;
   const action = selectedAction(params.action);
@@ -68,6 +121,209 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
     take: 100,
     where: conditions.length ? { AND: conditions } : undefined,
   });
+  const [
+    targetCustomers,
+    targetPackages,
+    targetMemberships,
+    targetServices,
+    targetCoaches,
+    targetCategories,
+    targetPublicContent,
+    targetDocuments,
+    targetVisits,
+    targetNotes,
+    targetFreezes,
+    targetGalleryImages,
+  ] = await Promise.all([
+    db.customer.findMany({
+      select: { customerCode: true, fullName: true, id: true },
+      where: { id: { in: targetIds(logs, "Customer") } },
+    }),
+    db.package.findMany({
+      select: { id: true, name: true, packageType: true },
+      where: { id: { in: targetIds(logs, "Package") } },
+    }),
+    db.customerPackage.findMany({
+      select: {
+        customer: { select: { customerCode: true, fullName: true } },
+        id: true,
+        package: { select: { name: true } },
+        status: true,
+      },
+      where: { id: { in: targetIds(logs, "CustomerPackage") } },
+    }),
+    db.customerPackageService.findMany({
+      select: {
+        customerPackage: {
+          select: {
+            customer: { select: { customerCode: true, fullName: true } },
+            package: { select: { name: true } },
+          },
+        },
+        id: true,
+        serviceName: true,
+      },
+      where: { id: { in: targetIds(logs, "CustomerPackageService") } },
+    }),
+    db.coach.findMany({
+      select: { firstName: true, id: true, lastName: true },
+      where: { id: { in: targetIds(logs, "Coach") } },
+    }),
+    db.category.findMany({
+      select: { id: true, name: true },
+      where: { id: { in: targetIds(logs, "Category") } },
+    }),
+    db.publicContent.findMany({
+      select: { id: true, title: true, type: true },
+      where: { id: { in: targetIds(logs, "PublicContent") } },
+    }),
+    db.customerDocument.findMany({
+      select: {
+        customer: { select: { customerCode: true, fullName: true } },
+        id: true,
+        originalFileName: true,
+      },
+      where: { id: { in: targetIds(logs, "CustomerDocument") } },
+    }),
+    db.gymVisit.findMany({
+      select: {
+        checkedInAt: true,
+        customer: { select: { customerCode: true, fullName: true } },
+        id: true,
+      },
+      where: { id: { in: targetIds(logs, "GymVisit") } },
+    }),
+    db.note.findMany({
+      select: {
+        content: true,
+        customer: { select: { customerCode: true, fullName: true } },
+        id: true,
+      },
+      where: { id: { in: targetIds(logs, "Note") } },
+    }),
+    db.packageFreeze.findMany({
+      select: {
+        customerPackage: {
+          select: {
+            customer: { select: { customerCode: true, fullName: true } },
+            package: { select: { name: true } },
+          },
+        },
+        id: true,
+        mode: true,
+        status: true,
+      },
+      where: { id: { in: targetIds(logs, "PackageFreeze") } },
+    }),
+    db.galleryImage.findMany({
+      select: { altText: true, id: true, title: true },
+      where: { id: { in: targetIds(logs, "GalleryImage") } },
+    }),
+  ]);
+  const targetLabels = new Map<string, string>();
+
+  for (const customer of targetCustomers) {
+    setTargetLabel(
+      targetLabels,
+      "Customer",
+      customer.id,
+      `${customer.customerCode}: ${customer.fullName}`,
+    );
+  }
+
+  for (const gymPackage of targetPackages) {
+    setTargetLabel(
+      targetLabels,
+      "Package",
+      gymPackage.id,
+      `${gymPackage.name} (${gymPackage.packageType})`,
+    );
+  }
+
+  for (const membership of targetMemberships) {
+    setTargetLabel(
+      targetLabels,
+      "CustomerPackage",
+      membership.id,
+      `${membership.customer.customerCode}: ${membership.customer.fullName} / ${membership.package.name} (${membership.status})`,
+    );
+  }
+
+  for (const service of targetServices) {
+    setTargetLabel(
+      targetLabels,
+      "CustomerPackageService",
+      service.id,
+      `${service.serviceName} for ${service.customerPackage.customer.customerCode}: ${service.customerPackage.customer.fullName}`,
+    );
+  }
+
+  for (const coach of targetCoaches) {
+    setTargetLabel(
+      targetLabels,
+      "Coach",
+      coach.id,
+      `${coach.firstName} ${coach.lastName}`,
+    );
+  }
+
+  for (const category of targetCategories) {
+    setTargetLabel(targetLabels, "Category", category.id, category.name);
+  }
+
+  for (const content of targetPublicContent) {
+    setTargetLabel(
+      targetLabels,
+      "PublicContent",
+      content.id,
+      `${content.title} (${content.type.toLowerCase()})`,
+    );
+  }
+
+  for (const document of targetDocuments) {
+    setTargetLabel(
+      targetLabels,
+      "CustomerDocument",
+      document.id,
+      `${document.originalFileName} for ${document.customer.customerCode}: ${document.customer.fullName}`,
+    );
+  }
+
+  for (const visit of targetVisits) {
+    setTargetLabel(
+      targetLabels,
+      "GymVisit",
+      visit.id,
+      `${visit.customer.customerCode}: ${visit.customer.fullName} checked in ${displayDateTime(visit.checkedInAt)}`,
+    );
+  }
+
+  for (const note of targetNotes) {
+    setTargetLabel(
+      targetLabels,
+      "Note",
+      note.id,
+      `${note.customer ? `${note.customer.customerCode}: ${note.customer.fullName} / ` : ""}${note.content.slice(0, 80)}`,
+    );
+  }
+
+  for (const freeze of targetFreezes) {
+    setTargetLabel(
+      targetLabels,
+      "PackageFreeze",
+      freeze.id,
+      `${freeze.customerPackage.package.name} for ${freeze.customerPackage.customer.customerCode}: ${freeze.customerPackage.customer.fullName} (${freeze.mode.toLowerCase()} ${freeze.status.toLowerCase()})`,
+    );
+  }
+
+  for (const image of targetGalleryImages) {
+    setTargetLabel(
+      targetLabels,
+      "GalleryImage",
+      image.id,
+      image.title ?? image.altText ?? "Gallery image",
+    );
+  }
 
   return (
     <>
@@ -148,6 +404,13 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
             {logs.map((log) => {
               const oldValue = displayJson(log.oldValue);
               const newValue = displayJson(log.newValue);
+              const targetLabel =
+                targetLabels.get(targetKey(log.targetType, log.targetId) ?? "") ??
+                (log.targetType === "GymSettings"
+                  ? "Gym settings"
+                  : log.targetType === "OccupancyState"
+                    ? "Occupancy state"
+                    : null);
 
               return (
                 <Card className="p-5" key={log.id}>
@@ -185,13 +448,13 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
                     <div>
                       <dt className="font-semibold text-secondary">Target type</dt>
                       <dd className="mt-1 break-words text-foreground">
-                        {log.targetType ?? "Not recorded"}
+                        {targetTypeLabel(log.targetType)}
                       </dd>
                     </div>
                     <div>
-                      <dt className="font-semibold text-secondary">Target ID</dt>
+                      <dt className="font-semibold text-secondary">Target</dt>
                       <dd className="mt-1 break-all text-foreground">
-                        {log.targetId ?? "Not recorded"}
+                        {targetLabel ?? log.targetId ?? "Not recorded"}
                       </dd>
                     </div>
                   </dl>

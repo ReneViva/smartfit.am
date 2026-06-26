@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { AdminExpandableCard } from "../../../components/admin/admin-expandable-card";
 import { ImageInput } from "../../../components/admin/image-input";
 import { Button } from "../../../components/ui/button";
@@ -18,6 +20,8 @@ const inputClass =
 const labelClass = "block text-sm font-semibold text-foreground";
 
 const errorMessages: Record<string, string> = {
+  "invalid-categories":
+    "Selected categories must be active existing categories.",
   "invalid-required": "First name, last name, and specialty are required.",
   "invalid-url": "Photo URL must use a valid http or https URL.",
   "upload-configuration":
@@ -29,6 +33,7 @@ const errorMessages: Record<string, string> = {
 };
 
 type CoachFormValue = {
+  categories: { category: CoachCategoryValue }[];
   contactInfo: string | null;
   description: string | null;
   firstName: string;
@@ -39,7 +44,62 @@ type CoachFormValue = {
   specialty: string;
 };
 
-function CoachFields({ coach }: { coach?: CoachFormValue }) {
+type CoachCategoryValue = {
+  id: string;
+  isArchived: boolean;
+  isPublic: boolean;
+  name: string;
+};
+
+function CoachCategoryBadges({
+  categories,
+}: {
+  categories: { category: CoachCategoryValue }[];
+}) {
+  if (!categories.length) {
+    return (
+      <span className="rounded-full border border-dashed border-border bg-page px-3 py-1 text-xs font-semibold text-secondary">
+        No categories
+      </span>
+    );
+  }
+
+  return categories.map(({ category }) => (
+    <span
+      className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+        category.isArchived || !category.isPublic
+          ? "border-border bg-page text-secondary"
+          : "border-brand/25 bg-soft-blue text-brand"
+      }`}
+      key={category.id}
+    >
+      {category.name}
+      {category.isArchived
+        ? " (archived)"
+        : !category.isPublic
+          ? " (hidden)"
+          : ""}
+    </span>
+  ));
+}
+
+function CoachFields({
+  categories,
+  coach,
+}: {
+  categories: CoachCategoryValue[];
+  coach?: CoachFormValue;
+}) {
+  const assignedCategoryIds = new Set(
+    coach?.categories
+      .filter(({ category }) => !category.isArchived)
+      .map(({ category }) => category.id) ?? [],
+  );
+  const archivedCategories =
+    coach?.categories
+      .filter(({ category }) => category.isArchived)
+      .map(({ category }) => category) ?? [];
+
   return (
     <>
       {coach ? <input name="id" type="hidden" value={coach.id} /> : null}
@@ -103,15 +163,87 @@ function CoachFields({ coach }: { coach?: CoachFormValue }) {
         <input defaultChecked={coach?.isActive ?? true} name="isActive" type="checkbox" />
         Active and visible on the public coaches page
       </label>
+      <fieldset className="mt-5 rounded-xl border border-border bg-page p-4">
+        <legend className="px-2 text-sm font-bold text-foreground">
+          Coach categories
+        </legend>
+        {categories.length ? (
+          <>
+            <p className="text-sm text-secondary">
+              Assign categories such as Gym, Swimming, Cardio, or Bodybuilding
+              to help organize coaches.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {categories.map((category) => (
+                <label
+                  className="flex min-h-11 items-center gap-3 rounded-lg bg-card px-4 py-3 text-sm font-semibold text-foreground"
+                  key={category.id}
+                >
+                  <input
+                    defaultChecked={assignedCategoryIds.has(category.id)}
+                    name="categoryIds"
+                    type="checkbox"
+                    value={category.id}
+                  />
+                  <span>
+                    {category.name}
+                    {!category.isPublic ? (
+                      <span className="ml-2 text-xs text-secondary">
+                        Hidden publicly
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm font-semibold text-secondary">
+            No categories yet. Create categories from the Categories section
+            first.{" "}
+            <Link
+              className="text-brand hover:text-primary-hover"
+              href="/admin/categories"
+            >
+              Manage categories
+            </Link>
+          </p>
+        )}
+        {archivedCategories.length ? (
+          <p className="mt-3 text-sm font-semibold text-secondary">
+            Archived assignment
+            {archivedCategories.length === 1 ? "" : "s"}:{" "}
+            {archivedCategories.map((category) => category.name).join(", ")}.
+            Select active replacements before saving.
+          </p>
+        ) : null}
+      </fieldset>
     </>
   );
 }
 
 export default async function CoachesPage({ searchParams }: CoachesPageProps) {
-  const [coaches, params] = await Promise.all([
+  const [coaches, categories, params] = await Promise.all([
     db.coach.findMany({
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       select: {
+        categories: {
+          orderBy: {
+            category: {
+              sortOrder: "asc",
+            },
+          },
+          select: {
+            category: {
+              select: {
+                id: true,
+                isArchived: true,
+                isPublic: true,
+                name: true,
+              },
+            },
+          },
+        },
         contactInfo: true,
         description: true,
         firstName: true,
@@ -122,6 +254,16 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
         specialty: true,
       },
       where: { deletedAt: null },
+    }),
+    db.category.findMany({
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: {
+        id: true,
+        isArchived: true,
+        isPublic: true,
+        name: true,
+      },
+      where: { isArchived: false },
     }),
     searchParams,
   ]);
@@ -159,7 +301,7 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
       <Card className="mt-8">
         <h3 className="text-xl font-bold text-foreground">Create coach</h3>
         <form action={saveCoachAction} className="mt-5">
-          <CoachFields />
+          <CoachFields categories={categories} />
           <Button className="mt-5" type="submit">
             Create coach
           </Button>
@@ -209,6 +351,9 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
                       <p className="mt-3 line-clamp-2 text-sm leading-6 text-secondary">
                         {coach.description || "No coach description provided."}
                       </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <CoachCategoryBadges categories={coach.categories} />
+                      </div>
                     </div>
                   </div>
                 }
@@ -222,7 +367,7 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
                   </h4>
                 </div>
                 <form action={saveCoachAction}>
-                  <CoachFields coach={coach} />
+                  <CoachFields categories={categories} coach={coach} />
                   <Button className="mt-5" type="submit">
                     Save changes
                   </Button>

@@ -12,10 +12,14 @@ import {
   MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE,
   MAX_TOTAL_FREEZE_DAYS_PER_CUSTOMER_PACKAGE,
 } from "../../lib/package-freezes";
-import { packageUsability } from "../../lib/registration/package-usability";
+import {
+  packageTimeRestrictionReason,
+  packageUsability,
+} from "../../lib/registration/package-usability";
 import { packageTypeLabel } from "../../lib/package-types";
 import type { CustomerNoteView } from "../../lib/notes";
 import type { CustomerRecentActivityItem } from "../../lib/registration/recent-activity";
+import { CustomerProfileImagePanel } from "../customer-profile-image-panel";
 import { Card } from "../ui/card";
 import { StatusBadge } from "../ui/status-badge";
 import { CheckInPanel } from "./check-in-panel";
@@ -56,6 +60,22 @@ type PackageCardValue = {
   remainingFreezeChances: number;
   remainingSessions: number;
   reactivatedAt: Date | null;
+  services: {
+    category: {
+      name: string;
+    } | null;
+    coach: {
+      firstName: string;
+      lastName: string;
+    } | null;
+    deletedAt: Date | null;
+    id: string;
+    initialSessions: number;
+    isActive: boolean;
+    remainingSessions: number;
+    serviceName: string;
+    sortOrder: number;
+  }[];
   status: CustomerPackageStatus;
 };
 
@@ -66,6 +86,7 @@ type CustomerCardValue = {
   } | null;
   birthDate: Date | null;
   customerCode: string;
+  email: string | null;
   emergencyPhone: string | null;
   fullName: string;
   gymPresenceStatus: GymPresenceStatus;
@@ -75,7 +96,9 @@ type CustomerCardValue = {
   notes: CustomerNoteView[];
   packages: PackageCardValue[];
   phone: string | null;
+  profileImageUrl: string | null;
   status: CustomerStatus;
+  updatedAt: Date;
 };
 
 function displayDate(value: Date) {
@@ -157,32 +180,54 @@ export function RegistrationCustomerCard({
   const activePackages = customer.packages.filter(
     (customerPackage) =>
       customerPackage.status === "ACTIVE" &&
-      customerPackage.expirationDate >= today &&
-      customerPackage.remainingSessions > 0,
+      customerPackage.expirationDate >= today,
   );
   const visiblePackages = showAllPackages ? customer.packages : activePackages;
   const hiddenPackageCount = customer.packages.length - activePackages.length;
   const togglePath = `/registration?customer=${encodeURIComponent(customer.customerCode)}${showAllPackages ? "" : "&showAll=1"}${compact ? "&view=compact" : ""}`;
-  const checkInPackages = customer.packages.map((customerPackage) => {
-    const usability = packageUsability(customerPackage, now);
-    const packageCoach =
-      customerPackage.coach ?? customerPackage.package.assignedCoach;
+  const activeMemberships = customer.packages.filter(
+    (customerPackage) => customerPackage.status === "ACTIVE",
+  );
+  const frozenMemberships = customer.packages.filter(
+    (customerPackage) => customerPackage.status === "FROZEN",
+  );
+  const activeMembership =
+    activeMemberships.length === 1 ? activeMemberships[0] : null;
+  const checkInMembership = activeMembership
+    ? (() => {
+        const packageCoach =
+          activeMembership.coach ?? activeMembership.package.assignedCoach;
+        const isExpired = activeMembership.expirationDate < today;
 
-    return {
-      coachName: packageCoach
-        ? `${packageCoach.firstName} ${packageCoach.lastName}`
-        : null,
-      expirationLabel: displayDate(customerPackage.expirationDate),
-      id: customerPackage.id,
-      name: customerPackage.package.name,
-      packageType: packageTypeLabel(customerPackage.package.packageType),
-      reason: usability.reason,
-      remainingGuestPasses: customerPackage.remainingGuestPasses,
-      remainingSessions: customerPackage.remainingSessions,
-      timeRule: packageTimeRule(customerPackage),
-      usable: usability.usable,
-    };
-  });
+        return {
+          coachName: packageCoach
+            ? `${packageCoach.firstName} ${packageCoach.lastName}`
+            : null,
+          expirationLabel: displayDate(activeMembership.expirationDate),
+          id: activeMembership.id,
+          isExpired,
+          name: activeMembership.package.name,
+          packageType: packageTypeLabel(activeMembership.package.packageType),
+          remainingGuestPasses: activeMembership.remainingGuestPasses,
+          services: activeMembership.services
+            .filter((service) => service.isActive && !service.deletedAt)
+            .map((service) => ({
+              categoryName: service.category?.name ?? null,
+              coachName: service.coach
+                ? `${service.coach.firstName} ${service.coach.lastName}`
+                : null,
+              id: service.id,
+              initialSessions: service.initialSessions,
+              remainingSessions: service.remainingSessions,
+              serviceName: service.serviceName,
+            })),
+          timeRestrictionReason: isExpired
+            ? null
+            : packageTimeRestrictionReason(activeMembership, now),
+          timeRule: packageTimeRule(activeMembership),
+        };
+      })()
+    : null;
 
   return (
     <section
@@ -191,7 +236,7 @@ export function RegistrationCustomerCard({
     >
       <Card className="animate-panel-in smooth-card overflow-hidden p-0">
         <div className="border-b border-border bg-soft-blue px-5 py-5 sm:px-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)]">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-active">
                 Selected customer workspace
@@ -202,22 +247,55 @@ export function RegistrationCustomerCard({
               <p className="mt-2 text-sm font-semibold text-secondary">
                 Member ID: {customer.customerCode}
               </p>
+              {customer.email || customer.phone ? (
+                <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-foreground">
+                  {customer.email ? (
+                    <p className="break-all">Email: {customer.email}</p>
+                  ) : null}
+                  {customer.phone ? (
+                    <p className="break-words">Phone: {customer.phone}</p>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <a
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+                  href="#notes"
+                >
+                  Add / view notes ({customer.notes.length})
+                </a>
+                <a
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-neutral px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-neutral-hover"
+                  href="#packages-sessions"
+                >
+                  Packages
+                </a>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge
-                status={customer.status === "ACTIVE" ? "active" : "notInGym"}
-              >
-                Customer {customer.status.toLowerCase()}
-              </StatusBadge>
-              <StatusBadge
-                status={
-                  customer.gymPresenceStatus === "IN_GYM"
-                    ? "inGym"
-                    : "notInGym"
-                }
-              >
-                {customer.gymPresenceStatus.toLowerCase().replaceAll("_", " ")}
-              </StatusBadge>
+            <div className="grid gap-4">
+              <div className="flex flex-wrap gap-2 lg:justify-end">
+                <StatusBadge
+                  status={customer.status === "ACTIVE" ? "active" : "notInGym"}
+                >
+                  Customer {customer.status.toLowerCase()}
+                </StatusBadge>
+                <StatusBadge
+                  status={
+                    customer.gymPresenceStatus === "IN_GYM"
+                      ? "inGym"
+                      : "notInGym"
+                  }
+                >
+                  {customer.gymPresenceStatus.toLowerCase().replaceAll("_", " ")}
+                </StatusBadge>
+              </div>
+              <CustomerProfileImagePanel
+                customerId={customer.id}
+                customerName={customer.fullName}
+                hasProfileImage={Boolean(customer.profileImageUrl)}
+                mode="registration"
+                version={customer.updatedAt.toISOString()}
+              />
             </div>
           </div>
         </div>
@@ -294,10 +372,13 @@ export function RegistrationCustomerCard({
         </div>
         {customer.gymPresenceStatus === "NOT_IN_GYM" ? (
           <CheckInPanel
+            activeMembershipCount={activeMemberships.length}
             compact={compact}
             customerCode={customer.customerCode}
             customerId={customer.id}
-            packages={checkInPackages}
+            frozenMembershipCount={frozenMemberships.length}
+            key={customer.id}
+            membership={checkInMembership}
             showAllPackages={showAllPackages}
           />
         ) : (
@@ -325,7 +406,7 @@ export function RegistrationCustomerCard({
             <p className="mt-1 text-sm leading-6 text-secondary">
               {showAllPackages
                 ? "Showing full package history."
-                : "Showing active, unexpired packages with remaining sessions."}
+                : "Showing active, unexpired memberships and their service lines."}
             </p>
           </div>
           {customer.packages.length ? (
@@ -356,6 +437,9 @@ export function RegistrationCustomerCard({
               const isZero = customerPackage.remainingSessions === 0;
               const packageCoach =
                 customerPackage.coach ?? customerPackage.package.assignedCoach;
+              const activeServiceLines = customerPackage.services.filter(
+                (service) => service.isActive && !service.deletedAt,
+              );
               const freezeUsage = calculateFreezeUsage(
                 customerPackage.freezes,
               );
@@ -489,6 +573,50 @@ export function RegistrationCustomerCard({
                       </div>
                     ) : null}
                   </dl>
+                  <div className="mt-4 rounded-xl border border-border bg-page p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-foreground">
+                        Active service lines
+                      </p>
+                      <span className="rounded-full bg-card px-2.5 py-1 text-xs font-semibold text-primary-active">
+                        {activeServiceLines.length}
+                      </span>
+                    </div>
+                    {activeServiceLines.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {activeServiceLines.map((service) => (
+                          <li
+                            className="rounded-lg border border-border bg-card px-3 py-2"
+                            key={service.id}
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="break-words text-sm font-bold text-foreground">
+                                  {service.serviceName}
+                                </p>
+                                <p className="mt-1 text-xs font-semibold text-secondary">
+                                  {service.category?.name ?? "No category"}
+                                  {service.coach
+                                    ? ` - ${service.coach.firstName} ${service.coach.lastName}`
+                                    : " - no coach"}
+                                </p>
+                              </div>
+                              <p
+                                className={`text-sm font-bold ${service.remainingSessions === 0 ? "text-button-danger" : "text-foreground"}`}
+                              >
+                                {service.remainingSessions} /{" "}
+                                {service.initialSessions}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 rounded-lg border border-dashed border-border bg-card px-3 py-2 text-sm text-secondary">
+                        No active service lines in this membership.
+                      </p>
+                    )}
+                  </div>
                   {isFrozen ? (
                     <p className="mt-4 rounded-lg border border-status-medium bg-page px-3 py-2 text-sm font-semibold leading-5 text-foreground">
                       Cannot be used for check-in while frozen.
@@ -539,8 +667,8 @@ export function RegistrationCustomerCard({
               No active, usable packages are visible.
             </p>
             <p className="mt-2 text-sm leading-6 text-secondary">
-              Inactive, frozen, expired, or zero-session packages are hidden
-              from the active view.
+              Inactive, frozen, or expired memberships are hidden from the
+              active view.
             </p>
             <Link
               className="mt-4 inline-flex min-h-11 items-center font-semibold text-brand hover:text-primary-hover"
@@ -555,8 +683,8 @@ export function RegistrationCustomerCard({
               This customer has no packages.
             </p>
             <p className="mt-2 text-sm leading-6 text-secondary">
-              Check-in remains available without package deduction when no
-              usable package exists.
+              Check-in remains available without service deduction when no
+              active membership exists.
             </p>
           </div>
         )}
