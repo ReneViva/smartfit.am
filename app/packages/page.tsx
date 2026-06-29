@@ -261,27 +261,18 @@ export default async function PackagesPage({
                       {ribbonLabel ? (
                         <div
                           aria-label={`Discount ${ribbonLabel}`}
-                          className="absolute left-2 top-2 z-10 size-[clamp(3.625rem,15vw,4.5rem)] sm:left-3 sm:top-3"
+                          className="absolute left-2 top-2 z-10 size-[clamp(4.25rem,18vw,5.375rem)] sm:left-3 sm:top-3"
                           role="img"
                         >
-                          <span
+                          <img
+                            alt=""
                             aria-hidden="true"
-                            className="absolute left-[21%] top-[50%] h-[48%] w-[23%] rotate-[18deg] rounded-b-[0.35rem] bg-gradient-to-b from-brand to-[#03405f] shadow-[0_8px_14px_rgba(0,0,0,0.28)] [clip-path:polygon(0_0,100%_0,100%_100%,50%_78%,0_100%)]"
+                            className="h-full w-full rounded-full object-contain shadow-[0_10px_18px_rgba(0,0,0,0.34)]"
+                            src="/logo/Ribbon.png"
                           />
                           <span
                             aria-hidden="true"
-                            className="absolute right-[21%] top-[50%] h-[48%] w-[23%] -rotate-[18deg] rounded-b-[0.35rem] bg-gradient-to-b from-primary-active to-[#032a42] shadow-[0_8px_14px_rgba(0,0,0,0.28)] [clip-path:polygon(0_0,100%_0,100%_100%,50%_78%,0_100%)]"
-                          />
-                          <span
-                            aria-hidden="true"
-                            className="absolute inset-x-[6%] top-0 aspect-square rounded-full bg-[conic-gradient(from_25deg,#8a5a0a,#f9d36a,#fff0a3,#c98216,#f9d36a,#8a5a0a)] p-[3px] shadow-[0_10px_18px_rgba(0,0,0,0.34)]"
-                          >
-                            <span className="block h-full w-full rounded-full bg-[radial-gradient(circle_at_34%_26%,#fff6bc_0%,#ffd45c_38%,#c88716_74%,#80540b_100%)] ring-1 ring-[#fff1a8]/70" />
-                            <span className="absolute inset-[18%] rounded-full border border-[#8a5a0a]/45" />
-                          </span>
-                          <span
-                            aria-hidden="true"
-                            className="absolute left-1/2 top-[34%] z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-[clamp(0.8rem,2.4vw,1.05rem)] font-black leading-none text-[#102033] [text-shadow:0_1px_2px_rgb(255_255_255_/_0.72)]"
+                            className="absolute left-1/2 top-1/2 z-10 grid h-[42%] w-[58%] -translate-x-1/2 -translate-y-1/2 place-items-center text-center text-[clamp(0.75rem,2.6vw,1rem)] font-black leading-none text-[#102033] [text-shadow:0_1px_2px_rgb(255_255_255_/_0.76)]"
                           >
                             {ribbonLabel}
                           </span>
