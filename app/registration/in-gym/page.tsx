@@ -4,6 +4,7 @@ import { checkOutAction } from "../actions";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { StatusBadge } from "../../../components/ui/status-badge";
+import { membershipDisplayName } from "../../../lib/customer-memberships";
 import { db } from "../../../lib/db";
 
 type InGymPageProps = {
@@ -50,6 +51,7 @@ export default async function InGymPage({ searchParams }: InGymPageProps) {
         select: {
           customerPackage: {
             select: {
+              membershipName: true,
               package: { select: { name: true } },
             },
           },
@@ -101,7 +103,9 @@ export default async function InGymPage({ searchParams }: InGymPageProps) {
               placeholder="Name or member code..."
             />
           </label>
-          <Button type="submit">Search</Button>
+          <Button pendingLabel="Searching..." type="submit">
+            Search
+          </Button>
           {query ? (
             <Link
               className="inline-flex min-h-11 items-center justify-center px-3 text-sm font-semibold text-brand"
@@ -116,8 +120,8 @@ export default async function InGymPage({ searchParams }: InGymPageProps) {
       {visits.length ? (
         <div className="mt-6 max-h-[70vh] space-y-4 overflow-y-auto overscroll-contain pr-1">
           {visits.map((visit) => {
-            const packageNames = visit.packageUsages.map(
-              (usage) => usage.customerPackage.package.name,
+            const membershipNames = visit.packageUsages.map(
+              (usage) => membershipDisplayName(usage.customerPackage),
             );
 
             return (
@@ -151,8 +155,8 @@ export default async function InGymPage({ searchParams }: InGymPageProps) {
                       {timeInside(visit.checkedInAt)}
                     </p>
                     <p className="mt-2 text-sm leading-6 text-secondary">
-                      Used packages:{" "}
-                      {packageNames.length ? packageNames.join(", ") : "None"}
+                      Used memberships:{" "}
+                      {membershipNames.length ? membershipNames.join(", ") : "None"}
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
@@ -174,7 +178,12 @@ export default async function InGymPage({ searchParams }: InGymPageProps) {
                         value={visit.customer.id}
                       />
                       <input name="showAllPackages" type="hidden" value="0" />
-                      <Button className="w-full" type="submit" variant="warning">
+                      <Button
+                        className="w-full"
+                        pendingLabel="Checking out..."
+                        type="submit"
+                        variant="warning"
+                      >
                         Check out
                       </Button>
                     </form>

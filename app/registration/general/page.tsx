@@ -11,8 +11,17 @@ import { CheckInPanel } from "../../../components/registration/check-in-panel";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { StatusBadge } from "../../../components/ui/status-badge";
+import {
+  membershipCoachDisplayName,
+  membershipDisplayName,
+  membershipTimeRuleDisplay,
+  membershipTypeDisplayName,
+  serviceLineCoachDisplayName,
+  serviceLineDisplayName,
+  serviceValidityStatus,
+} from "../../../lib/customer-memberships";
 import { db } from "../../../lib/db";
-import { packageTypeLabel } from "../../../lib/package-types";
+import { hasBlockingFreeze } from "../../../lib/package-freezes";
 import { packageTimeRestrictionReason } from "../../../lib/registration/package-usability";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +30,7 @@ type GeneralPageProps = {
   searchParams: Promise<{
     customer?: string;
     error?: string;
+    inGymQ?: string;
     q?: string;
     status?: string;
   }>;
@@ -96,6 +106,12 @@ const errorMessages: Record<string, string> = {
     "A selected membership changed before check-in. Review it and try again.",
   "service-sessions-insufficient":
     "A selected service line does not have enough remaining sessions.",
+  "service-expired":
+    "That service line is expired and cannot be deducted.",
+  "service-frozen":
+    "That service line is frozen and cannot be deducted.",
+  "service-not-yet-active":
+    "That service line is not active yet and cannot be deducted.",
   "service-stale":
     "A selected service line changed before check-in. Review it and try again.",
   "time-restriction-violation":
@@ -112,6 +128,10 @@ function displayDate(value: Date) {
     dateStyle: "medium",
     timeZone: "UTC",
   }).format(value);
+}
+
+function displayOptionalDate(value: Date | null) {
+  return value ? displayDate(value) : "Missing date";
 }
 
 function displayDateTime(value: Date) {
@@ -183,14 +203,17 @@ function CustomerAvatar({
   );
 }
 
-function generalCustomerHref(customerCode: string, query: string) {
-  const params = new URLSearchParams({ customer: customerCode });
-
-  if (query) {
-    params.set("q", query);
-  }
-
-  return `${GENERAL_PATH}?${params.toString()}#general-check-in`;
+function generalCustomerHref(
+  customerCode: string,
+  query: string,
+  inGymQuery: string,
+) {
+  return generalHref({
+    customerCode,
+    inGymQuery,
+    query,
+    target: "#general-check-in",
+  });
 }
 
 function fullCustomerHref(customerCode: string) {
@@ -202,29 +225,34 @@ function fullCustomerHref(customerCode: string) {
   return `/registration?${params.toString()}#customer-workspace`;
 }
 
-function packageTimeRule(customerPackage: {
-  package: {
-    allowedEndTime: string | null;
-    allowedStartTime: string | null;
-    timeRestrictionLabel: string | null;
-  };
+function generalHref({
+  customerCode,
+  inGymQuery,
+  query,
+  target,
+}: {
+  customerCode?: string;
+  inGymQuery?: string;
+  query?: string;
+  target?: string;
 }) {
-  if (customerPackage.package.timeRestrictionLabel) {
-    return customerPackage.package.timeRestrictionLabel;
+  const params = new URLSearchParams();
+
+  if (query) {
+    params.set("q", query);
   }
 
-  if (
-    customerPackage.package.allowedStartTime &&
-    customerPackage.package.allowedEndTime
-  ) {
-    return `${customerPackage.package.allowedStartTime} - ${customerPackage.package.allowedEndTime}`;
+  if (customerCode) {
+    params.set("customer", customerCode);
   }
 
-  if (customerPackage.package.allowedEndTime) {
-    return `Before ${customerPackage.package.allowedEndTime}`;
+  if (inGymQuery) {
+    params.set("inGymQ", inGymQuery);
   }
 
-  return "No time restriction";
+  const search = params.toString();
+
+  return `${GENERAL_PATH}${search ? `?${search}` : ""}${target ?? ""}`;
 }
 
 function serviceNameFromReason(reason: string | null) {
@@ -278,11 +306,13 @@ function warningBadges(customer: SearchResultCustomer, today: Date) {
 
 function SearchResultCard({
   customer,
+  inGymQuery,
   query,
   selectedCustomerCode,
   today,
 }: {
   customer: SearchResultCustomer;
+  inGymQuery: string;
   query: string;
   selectedCustomerCode: string;
   today: Date;
@@ -291,10 +321,10 @@ function SearchResultCard({
 
   return (
     <div
-      className={`rounded-xl border p-4 ${
+      className={`rounded-2xl border p-4 shadow-sm transition-[background-color,border-color,box-shadow] ${
         selected
-          ? "border-brand bg-soft-blue"
-          : "border-border bg-page hover:border-brand"
+          ? "border-brand bg-soft-blue shadow-brand/10"
+          : "border-border bg-page hover:border-brand hover:shadow-md"
       }`}
     >
       <div className="flex gap-3">
@@ -319,12 +349,12 @@ function SearchResultCard({
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <Link
           className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
-          href={generalCustomerHref(customer.customerCode, query)}
+          href={generalCustomerHref(customer.customerCode, query, inGymQuery)}
         >
           {selected ? "Selected" : "Select for check-in"}
         </Link>
         <Link
-          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-neutral px-4 py-2 text-sm font-semibold text-foreground hover:bg-neutral-hover"
+          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-neutral-hover"
           href={fullCustomerHref(customer.customerCode)}
         >
           Open customer
@@ -339,6 +369,7 @@ export default async function RegistrationGeneralPage({
 }: GeneralPageProps) {
   const params = await searchParams;
   const query = params.q?.trim().slice(0, 200) ?? "";
+  const inGymQuery = params.inGymQ?.trim().slice(0, 200) ?? "";
   const selectedCustomerCode = params.customer?.trim().slice(0, 100) ?? "";
   const settings = await db.gymSettings.findFirst({
     select: { hideInactiveCustomersFromRegistration: true },
@@ -411,6 +442,15 @@ export default async function RegistrationGeneralPage({
                   coach: {
                     select: { firstName: true, lastName: true },
                   },
+                  freezes: {
+                    select: {
+                      customerPackageServiceId: true,
+                      plannedEndDate: true,
+                      startDate: true,
+                      status: true,
+                    },
+                    where: { status: "ACTIVE" },
+                  },
                   package: {
                     select: {
                       allowedEndTime: true,
@@ -435,13 +475,24 @@ export default async function RegistrationGeneralPage({
                       coach: {
                         select: { firstName: true, lastName: true },
                       },
+                      coachName: true,
                       deletedAt: true,
+                      endDate: true,
+                      freezes: {
+                        select: {
+                          plannedEndDate: true,
+                          startDate: true,
+                          status: true,
+                        },
+                        where: { status: "ACTIVE" },
+                      },
                       id: true,
                       initialSessions: true,
                       isActive: true,
                       remainingSessions: true,
                       serviceName: true,
                       sortOrder: true,
+                      startDate: true,
                     },
                     where: { deletedAt: null },
                   },
@@ -472,6 +523,7 @@ export default async function RegistrationGeneralPage({
               sessionsDeducted: true,
               customerPackage: {
                 select: {
+                  membershipName: true,
                   package: { select: { name: true } },
                 },
               },
@@ -482,6 +534,8 @@ export default async function RegistrationGeneralPage({
               customerCode: true,
               fullName: true,
               id: true,
+              profileImageUrl: true,
+              updatedAt: true,
             },
           },
         },
@@ -503,6 +557,15 @@ export default async function RegistrationGeneralPage({
     ]);
 
   const currentOccupancy = Math.max(0, occupancy?.currentCount ?? 0);
+  const normalizedInGymQuery = inGymQuery.toLowerCase();
+  const filteredCurrentVisits = normalizedInGymQuery
+    ? currentVisits.filter((visit) => {
+        const haystack =
+          `${visit.customer.fullName} ${visit.customer.customerCode}`.toLowerCase();
+
+        return haystack.includes(normalizedInGymQuery);
+      })
+    : currentVisits;
   const errorMessage = params.error ? errorMessages[params.error] : null;
   const statusMessage = params.status ? statusMessages[params.status] : null;
   const activeMemberships =
@@ -511,71 +574,93 @@ export default async function RegistrationGeneralPage({
     ) ?? [];
   const frozenMembershipCount =
     selectedCustomer?.packages.filter(
-      (membership) => membership.status === "FROZEN",
+      (membership) =>
+        membership.status === "FROZEN" ||
+        hasBlockingFreeze(
+          membership.freezes.filter(
+            (freeze) => !freeze.customerPackageServiceId,
+          ),
+        ),
     ).length ?? 0;
   const activeMembership =
     activeMemberships.length === 1 ? activeMemberships[0] : null;
-  const checkInMembership = activeMembership
+  const activeMembershipHasBlockingFreeze = activeMembership
+    ? hasBlockingFreeze(
+        activeMembership.freezes.filter(
+          (freeze) => !freeze.customerPackageServiceId,
+        ),
+      )
+    : false;
+  const checkInMembership = activeMembership && !activeMembershipHasBlockingFreeze
     ? (() => {
-        const packageCoach =
-          activeMembership.coach ?? activeMembership.package.assignedCoach;
+        const packageCoach = membershipCoachDisplayName(activeMembership);
         const isExpired = activeMembership.expirationDate < today;
 
         return {
-          coachName: packageCoach
-            ? `${packageCoach.firstName} ${packageCoach.lastName}`
-            : null,
+          coachName: packageCoach,
           expirationLabel: displayDate(activeMembership.expirationDate),
           id: activeMembership.id,
           isExpired,
-          name: activeMembership.package.name,
-          packageType: packageTypeLabel(activeMembership.package.packageType),
+          name: membershipDisplayName(activeMembership),
+          packageType: membershipTypeDisplayName(activeMembership),
           remainingGuestPasses: activeMembership.remainingGuestPasses,
           services: activeMembership.services
             .filter((service) => service.isActive && !service.deletedAt)
-            .map((service) => ({
-              categoryName: service.category?.name ?? null,
-              coachName: service.coach
-                ? `${service.coach.firstName} ${service.coach.lastName}`
-                : null,
-              id: service.id,
-              initialSessions: service.initialSessions,
-              remainingSessions: service.remainingSessions,
-              serviceName: service.serviceName,
-            })),
+            .map((service) => {
+              const serviceStatus = serviceValidityStatus(service, new Date());
+
+              return {
+                coachName: serviceLineCoachDisplayName(service),
+                dateRange: `${displayOptionalDate(service.startDate)} - ${displayOptionalDate(service.endDate)}`,
+                id: service.id,
+                initialSessions: service.initialSessions,
+                isUsable: serviceStatus.usable,
+                remainingSessions: service.remainingSessions,
+                serviceName: serviceLineDisplayName(service),
+                statusLabel: serviceStatus.label,
+              };
+            }),
           timeRestrictionReason: isExpired
             ? null
             : packageTimeRestrictionReason(activeMembership, new Date()),
-          timeRule: packageTimeRule(activeMembership),
+          timeRule: membershipTimeRuleDisplay(activeMembership),
         };
       })()
     : null;
 
   return (
     <>
-      <header className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+      <header className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6 lg:flex lg:items-center lg:justify-between">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,155,223,0.18),transparent_34%)]"
+        />
+        <div className="relative min-w-0">
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand">
             Registration
           </p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+          <h2 className="mt-2 break-words text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             General
           </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
+            Manage customer check-ins, open visits, and reception handoff from
+            one focused workspace.
+          </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-border bg-page px-4 py-3">
+        <div className="relative mt-5 grid gap-3 sm:grid-cols-2 lg:mt-0 lg:min-w-80">
+          <div className="rounded-xl border border-border bg-page/90 px-4 py-3 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-secondary">
               Live occupancy
             </p>
-            <p className="mt-1 text-2xl font-bold text-foreground">
+            <p className="mt-1 text-3xl font-bold text-foreground">
               {currentOccupancy}
             </p>
           </div>
-          <div className="rounded-xl border border-border bg-page px-4 py-3">
+          <div className="rounded-xl border border-border bg-page/90 px-4 py-3 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-secondary">
               Open visits
             </p>
-            <p className="mt-1 text-2xl font-bold text-foreground">
+            <p className="mt-1 text-3xl font-bold text-foreground">
               {currentVisits.length}
             </p>
           </div>
@@ -583,42 +668,58 @@ export default async function RegistrationGeneralPage({
       </header>
 
       {hideInactiveCustomers ? (
-        <p className="mt-6 rounded-xl border border-status-medium bg-card px-4 py-3 text-sm font-semibold text-foreground">
+        <p className="mt-6 rounded-xl border border-status-medium bg-card px-4 py-3 text-sm font-semibold text-foreground shadow-sm">
           Inactive customers are hidden by the current admin setting.
         </p>
       ) : null}
       {statusMessage ? (
-        <p className="mt-6 rounded-xl border border-status-low bg-card px-4 py-3 text-sm font-semibold text-foreground">
+        <p className="mt-6 rounded-xl border border-status-low bg-card px-4 py-3 text-sm font-semibold text-foreground shadow-sm">
           {statusMessage}
         </p>
       ) : null}
       {errorMessage ? (
         <p
-          className="mt-6 rounded-xl border border-status-high bg-card px-4 py-3 text-sm font-semibold text-foreground"
+          className="mt-6 rounded-xl border border-status-high bg-card px-4 py-3 text-sm font-semibold text-foreground shadow-sm"
           role="alert"
         >
           {errorMessage}
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(23rem,0.88fr)]">
         <div className="min-w-0 space-y-6">
-          <Card className="p-5 sm:p-6">
-            <form className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          <Card className="p-5 sm:p-6" id="check-in-search">
+            <form
+              action={`${GENERAL_PATH}#check-in-search`}
+              className="flex flex-col gap-4 lg:flex-row lg:items-end"
+              method="get"
+            >
+              {inGymQuery ? (
+                <input name="inGymQ" type="hidden" value={inGymQuery} />
+              ) : null}
               <label className="block min-w-0 flex-1 text-sm font-semibold text-foreground">
                 Search customers
                 <input
-                  className="mt-2 min-h-11 w-full rounded-lg border border-input-border bg-card px-3 py-2 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue"
+                  className="mt-2 min-h-12 w-full rounded-xl border border-input-border bg-page px-4 py-2 text-foreground outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-soft-blue"
                   defaultValue={query}
                   name="q"
                   placeholder="Name, phone, or member code"
                 />
               </label>
-              <Button type="submit">Search</Button>
+              <Button
+                className="min-h-12 px-6"
+                pendingLabel="Searching..."
+                type="submit"
+              >
+                Search
+              </Button>
               {query || selectedCustomerCode ? (
                 <Link
-                  className="inline-flex min-h-11 items-center justify-center px-3 text-sm font-semibold text-brand hover:text-primary-hover"
-                  href={GENERAL_PATH}
+                  className="inline-flex min-h-12 items-center justify-center px-3 text-sm font-semibold text-brand hover:text-primary-hover"
+                  href={generalHref({
+                    inGymQuery,
+                    target: "#check-in-search",
+                  })}
                 >
                   Clear
                 </Link>
@@ -646,6 +747,7 @@ export default async function RegistrationGeneralPage({
                 {searchResults.map((customer) => (
                   <SearchResultCard
                     customer={customer}
+                    inGymQuery={inGymQuery}
                     key={customer.id}
                     query={query}
                     selectedCustomerCode={selectedCustomerCode}
@@ -696,7 +798,7 @@ export default async function RegistrationGeneralPage({
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Link
-                        className="inline-flex min-h-11 items-center justify-center rounded-lg bg-neutral px-4 py-2 text-sm font-semibold text-foreground hover:bg-neutral-hover"
+                        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-neutral-hover"
                         href={fullCustomerHref(selectedCustomer.customerCode)}
                       >
                         Open customer
@@ -737,7 +839,10 @@ export default async function RegistrationGeneralPage({
           </div>
         </div>
 
-        <aside className="min-w-0 xl:sticky xl:top-6 xl:self-start">
+        <aside
+          className="min-w-0 xl:sticky xl:top-6 xl:self-start"
+          id="current-checkout"
+        >
           <Card className="p-5 sm:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
@@ -749,112 +854,170 @@ export default async function RegistrationGeneralPage({
                 </h3>
               </div>
               <StatusBadge status={currentVisits.length ? "inGym" : "notInGym"}>
-                {currentVisits.length} inside
+                {inGymQuery
+                  ? `${filteredCurrentVisits.length} / ${currentVisits.length} inside`
+                  : `${currentVisits.length} inside`}
               </StatusBadge>
             </div>
 
+            <form
+              action={`${GENERAL_PATH}#current-checkout`}
+              className="mt-5 flex flex-col gap-2 sm:flex-row"
+              method="get"
+            >
+              {query ? <input name="q" type="hidden" value={query} /> : null}
+              {selectedCustomerCode ? (
+                <input
+                  name="customer"
+                  type="hidden"
+                  value={selectedCustomerCode}
+                />
+              ) : null}
+              <label className="min-w-0 flex-1">
+                <span className="sr-only">Search checked-in customers</span>
+                <input
+                  className="min-h-12 w-full rounded-xl border border-input-border bg-page px-4 py-2 text-foreground outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-soft-blue"
+                  defaultValue={inGymQuery}
+                  name="inGymQ"
+                  placeholder="Search checked-in customers"
+                />
+              </label>
+              <Button
+                className="min-h-12 px-5"
+                pendingLabel="Searching..."
+                type="submit"
+              >
+                Search
+              </Button>
+              {inGymQuery ? (
+                <Link
+                  className="inline-flex min-h-12 items-center justify-center px-2 text-sm font-semibold text-brand hover:text-primary-hover"
+                  href={generalHref({
+                    customerCode: selectedCustomerCode,
+                    query,
+                    target: "#current-checkout",
+                  })}
+                >
+                  Clear
+                </Link>
+              ) : null}
+            </form>
+
             {currentVisits.length ? (
-              <div className="mt-5 max-h-[calc(100vh-16rem)] space-y-3 overflow-y-auto overscroll-contain pr-1">
-                {currentVisits.map((visit) => {
-                  const usageSummaries = visit.packageUsages.map((usage) => {
-                    const serviceName = serviceNameFromReason(
-                      usage.sessionChange?.reason ?? null,
-                    );
-                    const label =
-                      serviceName ?? usage.customerPackage.package.name;
-                    const parts = [];
-
-                    if (usage.sessionsDeducted > 0) {
-                      parts.push(
-                        `${usage.sessionsDeducted} session${
-                          usage.sessionsDeducted === 1 ? "" : "s"
-                        }`,
+              filteredCurrentVisits.length ? (
+                <div className="mt-5 max-h-[calc(100vh-19rem)] space-y-3 overflow-y-auto overscroll-contain pr-1">
+                  {filteredCurrentVisits.map((visit) => {
+                    const usageSummaries = visit.packageUsages.map((usage) => {
+                      const serviceName = serviceNameFromReason(
+                        usage.sessionChange?.reason ?? null,
                       );
-                    }
+                      const label =
+                        serviceName ??
+                        membershipDisplayName(usage.customerPackage);
+                      const parts = [];
 
-                    if (usage.guestPassesDeducted > 0) {
-                      parts.push(
-                        `${usage.guestPassesDeducted} guest pass${
-                          usage.guestPassesDeducted === 1 ? "" : "es"
-                        }`,
-                      );
-                    }
+                      if (usage.sessionsDeducted > 0) {
+                        parts.push(
+                          `${usage.sessionsDeducted} session${
+                            usage.sessionsDeducted === 1 ? "" : "s"
+                          }`,
+                        );
+                      }
 
-                    return `${label} (${parts.length ? parts.join(", ") : "no deduction"})`;
-                  });
+                      if (usage.guestPassesDeducted > 0) {
+                        parts.push(
+                          `${usage.guestPassesDeducted} guest pass${
+                            usage.guestPassesDeducted === 1 ? "" : "es"
+                          }`,
+                        );
+                      }
 
-                  return (
-                    <div
-                      className="rounded-xl border border-border bg-page p-4"
-                      key={visit.id}
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge status="inGym">in gym</StatusBadge>
-                        {visit.guestCountUsed > 0 ? (
-                          <StatusBadge status="active">
-                            +{visit.guestCountUsed} guest
-                            {visit.guestCountUsed === 1 ? "" : "s"} / party{" "}
-                            {visit.occupancyDelta}
-                          </StatusBadge>
-                        ) : null}
-                      </div>
-                      <h4 className="mt-3 break-words text-lg font-bold text-foreground">
-                        {visit.customer.fullName}
-                      </h4>
-                      <p className="mt-1 text-sm font-semibold text-secondary">
-                        Member ID: {visit.customer.customerCode}
-                      </p>
-                      <p className="mt-2 text-sm text-secondary">
-                        Checked in {displayDateTime(visit.checkedInAt)} / inside{" "}
-                        {timeInside(visit.checkedInAt)}
-                      </p>
-                      <p className="mt-3 text-sm leading-6 text-secondary">
-                        Used:{" "}
-                        {usageSummaries.length
-                          ? usageSummaries.join(", ")
-                          : "No service deduction"}
-                      </p>
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                        <Link
-                          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-neutral px-4 py-2 text-sm font-semibold text-foreground hover:bg-neutral-hover"
-                          href={fullCustomerHref(visit.customer.customerCode)}
-                        >
-                          Open customer
-                        </Link>
-                        <form action={checkOutAction}>
-                          <input
-                            name="customerCode"
-                            type="hidden"
-                            value={visit.customer.customerCode}
-                          />
-                          <input
-                            name="customerId"
-                            type="hidden"
-                            value={visit.customer.id}
-                          />
-                          <input
-                            name="showAllPackages"
-                            type="hidden"
-                            value="0"
-                          />
-                          <input
-                            name="returnPath"
-                            type="hidden"
-                            value={GENERAL_PATH}
-                          />
-                          <Button
-                            className="w-full"
-                            type="submit"
-                            variant="warning"
+                      return `${label} (${parts.length ? parts.join(", ") : "no deduction"})`;
+                    });
+
+                    return (
+                      <div
+                        className="rounded-2xl border border-border bg-page p-4 shadow-sm transition-[border-color,box-shadow] hover:border-brand hover:shadow-md"
+                        key={visit.id}
+                      >
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                          <CustomerAvatar customer={visit.customer} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <StatusBadge status="inGym">in gym</StatusBadge>
+                              {visit.guestCountUsed > 0 ? (
+                                <StatusBadge status="active">
+                                  +{visit.guestCountUsed} guest
+                                  {visit.guestCountUsed === 1 ? "" : "s"} / party{" "}
+                                  {visit.occupancyDelta}
+                                </StatusBadge>
+                              ) : null}
+                            </div>
+                            <h4 className="mt-3 break-words text-lg font-bold text-foreground">
+                              {visit.customer.fullName}
+                            </h4>
+                            <p className="mt-1 text-sm font-semibold text-secondary">
+                              Member ID: {visit.customer.customerCode}
+                            </p>
+                            <p className="mt-2 text-sm text-secondary">
+                              Checked in {displayDateTime(visit.checkedInAt)} /
+                              inside {timeInside(visit.checkedInAt)}
+                            </p>
+                            <p className="mt-3 text-sm leading-6 text-secondary">
+                              Used:{" "}
+                              {usageSummaries.length
+                                ? usageSummaries.join(", ")
+                                : "No service deduction"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                          <Link
+                            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-neutral-hover"
+                            href={fullCustomerHref(visit.customer.customerCode)}
                           >
-                            Check out
-                          </Button>
-                        </form>
+                            Open customer
+                          </Link>
+                          <form action={checkOutAction}>
+                            <input
+                              name="customerCode"
+                              type="hidden"
+                              value={visit.customer.customerCode}
+                            />
+                            <input
+                              name="customerId"
+                              type="hidden"
+                              value={visit.customer.id}
+                            />
+                            <input
+                              name="showAllPackages"
+                              type="hidden"
+                              value="0"
+                            />
+                            <input
+                              name="returnPath"
+                              type="hidden"
+                              value={GENERAL_PATH}
+                            />
+                            <Button
+                              className="w-full"
+                              pendingLabel="Checking out..."
+                              type="submit"
+                              variant="warning"
+                            >
+                              Check out
+                            </Button>
+                          </form>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-5 rounded-xl border border-dashed border-border bg-page px-5 py-8 text-center text-secondary">
+                  No checked-in customers match this search.
+                </p>
+              )
             ) : (
               <p className="mt-5 rounded-xl border border-dashed border-border bg-page px-5 py-8 text-center text-secondary">
                 No customers are currently inside.

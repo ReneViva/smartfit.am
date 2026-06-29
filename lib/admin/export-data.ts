@@ -1,3 +1,9 @@
+import {
+  membershipCoachDisplayName,
+  membershipDisplayName,
+  serviceLineCoachDisplayName,
+  serviceLineDisplayName,
+} from "../customer-memberships";
 import { db } from "../db";
 
 export const exportCategories = [
@@ -19,13 +25,13 @@ export const exportCategories = [
   },
   {
     description:
-      "Full customer package assignment, status, category, guest pass, and freeze balance history.",
-    label: "Customer package history",
+      "Full customer membership assignment, status, guest pass, service, and freeze balance history.",
+    label: "Customer membership history",
     type: "customer-package-history",
   },
   {
     description:
-      "Customer membership service lines, categories, coaches, balances, and notes.",
+      "Customer membership service lines, manual coach/person text, balances, dates, status, and notes.",
     label: "Membership services",
     type: "membership-services",
   },
@@ -142,7 +148,8 @@ function activeMembershipSummary(
     hasUnlimitedDailyCheckIns: boolean;
     hasUnlimitedIntervalCheckIns: boolean;
     intervalCheckInLimit: number | null;
-    package: { name: string };
+    membershipName: string | null;
+    package: { name: string } | null;
     remainingFreezeChances: number;
     remainingGuestPasses: number;
     services: Array<{
@@ -161,7 +168,7 @@ function activeMembershipSummary(
           .reduce((total, service) => total + service.remainingSessions, 0);
 
         return [
-          `${membership.package.name} (${membership.status})`,
+          `${membershipDisplayName(membership)} (${membership.status})`,
           `${formatDateOnly(membership.activationDate)} to ${formatDateOnly(
             membership.expirationDate,
           )}`,
@@ -250,6 +257,7 @@ async function customersExport(): Promise<ExportDefinition> {
           hasUnlimitedDailyCheckIns: true,
           hasUnlimitedIntervalCheckIns: true,
           intervalCheckInLimit: true,
+          membershipName: true,
           package: { select: { name: true } },
           remainingFreezeChances: true,
           remainingGuestPasses: true,
@@ -342,11 +350,13 @@ async function packagesExport(): Promise<ExportDefinition> {
       deletedAt: true,
       description: true,
       discountPrice: true,
+      discountRibbonPercent: true,
       dailyCheckInLimit: true,
       hasUnlimitedDailyCheckIns: true,
       hasUnlimitedIntervalCheckIns: true,
       hasTimeRestriction: true,
       highlightOnPublicPackages: true,
+      imageUrl: true,
       intervalCheckInLimit: true,
       isActive: true,
       name: true,
@@ -365,6 +375,12 @@ async function packagesExport(): Promise<ExportDefinition> {
       { header: "Description", key: "description", width: 42 },
       { header: "Original Price", key: "price", width: 16 },
       { header: "Discount Price", key: "discountPrice", width: 16 },
+      {
+        header: "Discount Ribbon Percent",
+        key: "discountRibbonPercent",
+        width: 24,
+      },
+      { header: "Package Image URL", key: "imageUrl", width: 42 },
       {
         header: "Public Highlight",
         key: "highlightOnPublicPackages",
@@ -412,8 +428,10 @@ async function packagesExport(): Promise<ExportDefinition> {
       deletedAt: formatDate(gymPackage.deletedAt),
       description: gymPackage.description,
       discountPrice: formatDecimal(gymPackage.discountPrice),
+      discountRibbonPercent: gymPackage.discountRibbonPercent,
       hasTimeRestriction: gymPackage.hasTimeRestriction,
       highlightOnPublicPackages: gymPackage.highlightOnPublicPackages,
+      imageUrl: gymPackage.imageUrl,
       intervalCheckInLimit: formatAccessLimit(
         gymPackage.hasUnlimitedIntervalCheckIns,
         gymPackage.intervalCheckInLimit,
@@ -501,6 +519,7 @@ async function customerPackageHistoryExport(): Promise<ExportDefinition> {
       initialSessions: true,
       initialGuestPasses: true,
       intervalCheckInLimit: true,
+      membershipName: true,
       package: {
         select: {
           assignedCoach: { select: { firstName: true, lastName: true } },
@@ -536,10 +555,11 @@ async function customerPackageHistoryExport(): Promise<ExportDefinition> {
     columns: [
       { header: "Member ID", key: "customerCode", width: 16 },
       { header: "Customer Full Name", key: "customerName", width: 28 },
-      { header: "Package Name", key: "packageName", width: 28 },
-      { header: "Package Categories", key: "packageCategories", width: 34 },
-      { header: "Package Type", key: "packageType", width: 20 },
-      { header: "Coach", key: "coach", width: 25 },
+      { header: "Membership Name", key: "membershipName", width: 28 },
+      { header: "Legacy Package Template", key: "packageName", width: 28 },
+      { header: "Legacy Package Categories", key: "packageCategories", width: 34 },
+      { header: "Legacy Package Type", key: "packageType", width: 20 },
+      { header: "Coach/Person", key: "coach", width: 25 },
       { header: "Activation Date", key: "activationDate", width: 24 },
       { header: "Expiration Date", key: "expirationDate", width: 24 },
       { header: "Initial Sessions", key: "initialSessions", width: 18 },
@@ -605,9 +625,7 @@ async function customerPackageHistoryExport(): Promise<ExportDefinition> {
           (total, service) => total + service.remainingSessions,
           0,
         ),
-        coach: personName(
-          customerPackage.coach ?? customerPackage.package.assignedCoach,
-        ),
+        coach: membershipCoachDisplayName(customerPackage),
         createdAt: formatDate(customerPackage.createdAt),
         customerCode: customerPackage.customer.customerCode,
         customerName: customerPackage.customer.fullName,
@@ -624,9 +642,12 @@ async function customerPackageHistoryExport(): Promise<ExportDefinition> {
           customerPackage.hasUnlimitedIntervalCheckIns,
           customerPackage.intervalCheckInLimit,
         ),
-        packageCategories: categoryNames(customerPackage.package.categories),
-        packageName: customerPackage.package.name,
-        packageType: customerPackage.package.packageType,
+        membershipName: membershipDisplayName(customerPackage),
+        packageCategories: customerPackage.package
+          ? categoryNames(customerPackage.package.categories)
+          : null,
+        packageName: customerPackage.package?.name ?? null,
+        packageType: customerPackage.package?.packageType ?? null,
         reactivatedAt: formatDate(customerPackage.reactivatedAt),
         remainingFreezeChances: customerPackage.remainingFreezeChances,
         remainingSessions: customerPackage.remainingSessions,
@@ -635,7 +656,7 @@ async function customerPackageHistoryExport(): Promise<ExportDefinition> {
           customerPackage.services
             .map(
               (service) =>
-                `${service.serviceName}: ${service.remainingSessions}/${service.initialSessions}${
+                `${serviceLineDisplayName(service)}: ${service.remainingSessions}/${service.initialSessions}${
                   service.isActive && !service.deletedAt ? "" : " inactive"
                 }`,
             )
@@ -644,7 +665,7 @@ async function customerPackageHistoryExport(): Promise<ExportDefinition> {
         updatedAt: formatDate(customerPackage.updatedAt),
       };
     }),
-    worksheetName: "Customer Package History",
+    worksheetName: "Customer Membership History",
   };
 }
 
@@ -654,17 +675,33 @@ async function membershipServicesExport(): Promise<ExportDefinition> {
     select: {
       category: { select: { name: true } },
       coach: { select: { firstName: true, lastName: true } },
+      coachName: true,
       createdAt: true,
       customerPackage: {
         select: {
           activationDate: true,
           customer: { select: { customerCode: true, fullName: true } },
           expirationDate: true,
+          membershipName: true,
           package: { select: { name: true, packageType: true } },
           status: true,
         },
       },
       deletedAt: true,
+      freezes: {
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: {
+          actualDays: true,
+          actualEndDate: true,
+          mode: true,
+          plannedDays: true,
+          plannedEndDate: true,
+          resultingServiceEndDate: true,
+          startDate: true,
+          status: true,
+        },
+        take: 1,
+      },
       initialSessions: true,
       isActive: true,
       notes: true,
@@ -680,16 +717,24 @@ async function membershipServicesExport(): Promise<ExportDefinition> {
     columns: [
       { header: "Member ID", key: "customerCode", width: 16 },
       { header: "Customer Full Name", key: "customerName", width: 28 },
-      { header: "Membership / Package", key: "membershipPackage", width: 30 },
+      { header: "Membership Name", key: "membershipName", width: 30 },
       { header: "Membership Status", key: "membershipStatus", width: 18 },
       { header: "Activation Date", key: "activationDate", width: 24 },
       { header: "Expiration Date", key: "expirationDate", width: 24 },
       { header: "Service Name", key: "serviceName", width: 30 },
-      { header: "Category", key: "categoryName", width: 24 },
-      { header: "Coach", key: "coachName", width: 25 },
-      { header: "Service Package Template", key: "servicePackage", width: 30 },
+      { header: "Coach/Person", key: "coachName", width: 25 },
+      { header: "Legacy Category", key: "categoryName", width: 24 },
+      { header: "Legacy Membership Package", key: "membershipPackage", width: 30 },
+      { header: "Legacy Service Package Template", key: "servicePackage", width: 30 },
       { header: "Initial Sessions", key: "initialSessions", width: 18 },
       { header: "Remaining Sessions", key: "remainingSessions", width: 20 },
+      { header: "Freeze State", key: "freezeState", width: 18 },
+      { header: "Latest Freeze", key: "latestFreeze", width: 45 },
+      {
+        header: "Latest Freeze Resulting End",
+        key: "latestFreezeResultingEnd",
+        width: 28,
+      },
       { header: "Active", key: "isActive", width: 12 },
       { header: "Deleted At", key: "deletedAt", width: 24 },
       { header: "Sort Order", key: "sortOrder", width: 14 },
@@ -701,19 +746,29 @@ async function membershipServicesExport(): Promise<ExportDefinition> {
     rows: services.map((service) => ({
       activationDate: formatDate(service.customerPackage.activationDate),
       categoryName: service.category?.name ?? null,
-      coachName: personName(service.coach),
+      coachName: serviceLineCoachDisplayName(service),
       createdAt: formatDate(service.createdAt),
       customerCode: service.customerPackage.customer.customerCode,
       customerName: service.customerPackage.customer.fullName,
       deletedAt: formatDate(service.deletedAt),
       expirationDate: formatDate(service.customerPackage.expirationDate),
+      freezeState: service.freezes[0]?.status ?? "NONE",
       initialSessions: service.initialSessions,
       isActive: service.isActive && !service.deletedAt,
-      membershipPackage: `${service.customerPackage.package.name} (${service.customerPackage.package.packageType})`,
+      latestFreeze: service.freezes[0]
+        ? `${service.freezes[0].mode} ${service.freezes[0].plannedDays} day(s), ${formatDate(service.freezes[0].startDate)} to ${formatDate(service.freezes[0].actualEndDate ?? service.freezes[0].plannedEndDate)}`
+        : null,
+      latestFreezeResultingEnd: formatDate(
+        service.freezes[0]?.resultingServiceEndDate ?? null,
+      ),
+      membershipName: membershipDisplayName(service.customerPackage),
+      membershipPackage: service.customerPackage.package
+        ? `${service.customerPackage.package.name} (${service.customerPackage.package.packageType})`
+        : null,
       membershipStatus: service.customerPackage.status,
       notes: service.notes,
       remainingSessions: service.remainingSessions,
-      serviceName: service.serviceName,
+      serviceName: serviceLineDisplayName(service),
       servicePackage: service.package?.name ?? null,
       sortOrder: service.sortOrder,
       updatedAt: formatDate(service.updatedAt),
@@ -739,6 +794,7 @@ async function visitsExport(): Promise<ExportDefinition> {
         select: {
           customerPackage: {
             select: {
+              membershipName: true,
               package: { select: { name: true } },
             },
           },
@@ -773,7 +829,7 @@ async function visitsExport(): Promise<ExportDefinition> {
       },
       { header: "Occupancy After Check-In", key: "occupancyAfterCheckIn", width: 25 },
       { header: "Occupancy After Check-Out", key: "occupancyAfterCheckOut", width: 26 },
-      { header: "Selected Packages", key: "selectedPackages", width: 36 },
+      { header: "Selected Memberships", key: "selectedPackages", width: 36 },
       { header: "Service Usage Summary", key: "serviceUsageSummary", width: 48 },
       { header: "Sessions Deducted", key: "sessionsDeducted", width: 36 },
       {
@@ -810,7 +866,7 @@ async function visitsExport(): Promise<ExportDefinition> {
         occupancyAfterCheckOut: visit.occupancyAfterCheckOut,
         selectedPackages:
           visit.packageUsages
-            .map((usage) => usage.customerPackage.package.name)
+            .map((usage) => membershipDisplayName(usage.customerPackage))
             .join(", ") || null,
         serviceUsageSummary:
           visit.packageUsages
@@ -821,14 +877,14 @@ async function visitsExport(): Promise<ExportDefinition> {
 
               return serviceName
                 ? `${serviceName}: ${usage.sessionsDeducted}`
-                : `${usage.customerPackage.package.name}: ${usage.sessionsDeducted}`;
+                : `${membershipDisplayName(usage.customerPackage)}: ${usage.sessionsDeducted}`;
             })
             .join(", ") || null,
         sessionsDeducted:
           visit.packageUsages
             .map(
               (usage) =>
-                `${usage.customerPackage.package.name}: ${usage.sessionsDeducted}`,
+                `${membershipDisplayName(usage.customerPackage)}: ${usage.sessionsDeducted}`,
             )
             .join(", ") || null,
         guestPassesDeducted:
@@ -836,7 +892,7 @@ async function visitsExport(): Promise<ExportDefinition> {
             .filter((usage) => usage.guestPassesDeducted > 0)
             .map(
               (usage) =>
-                `${usage.customerPackage.package.name}: ${usage.guestPassesDeducted}`,
+                `${membershipDisplayName(usage.customerPackage)}: ${usage.guestPassesDeducted}`,
             )
             .join(", ") || null,
         sessionChangeReferences:

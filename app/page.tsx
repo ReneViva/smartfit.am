@@ -530,12 +530,20 @@ export default async function Home() {
                 <h3 className="mt-4 text-xl font-bold text-foreground sm:mt-5 sm:text-2xl">
                   {gymPackage.name}
                 </h3>
-                <p className="mt-3 text-2xl font-bold text-brand sm:mt-4 sm:text-3xl">
-                  {formatAmd(gymPackage.price)}
-                </p>
-                <p className="mt-1 text-sm text-secondary">
-                  {gymPackage.sessionCount} sessions
-                </p>
+                {gymPackage.discountPrice ? (
+                  <div className="mt-3 sm:mt-4">
+                    <p className="text-sm font-bold text-secondary line-through">
+                      {formatAmd(gymPackage.price)}
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-brand sm:text-3xl">
+                      {formatAmd(gymPackage.discountPrice)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-2xl font-bold text-brand sm:mt-4 sm:text-3xl">
+                    {formatAmd(gymPackage.price)}
+                  </p>
+                )}
                 {gymPackage.description ? (
                   <p className="mt-3 line-clamp-3 text-sm leading-6 text-secondary sm:mt-4">
                     {gymPackage.description}

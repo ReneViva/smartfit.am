@@ -24,7 +24,7 @@ export function GalleryDeleteForm({
       }}
     >
       <input name="id" type="hidden" value={imageId} />
-      <Button type="submit" variant="danger">
+      <Button pendingLabel="Deleting..." type="submit" variant="danger">
         Delete
       </Button>
     </form>

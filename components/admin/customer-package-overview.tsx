@@ -7,7 +7,12 @@ import type {
 } from "@prisma/client";
 import { useMemo, useState } from "react";
 
-import { packageTypeLabel } from "../../lib/package-types";
+import {
+  membershipCoachDisplayName,
+  membershipDisplayName,
+  membershipTimeRuleDisplay,
+  membershipTypeDisplayName,
+} from "../../lib/customer-memberships";
 import { Button } from "../ui/button";
 import { StatusBadge } from "../ui/status-badge";
 import { CustomerPackageFreezeControls } from "./customer-package-freeze-controls";
@@ -17,6 +22,7 @@ type ActiveFreezeValue = {
   actualDays: number | null;
   actualEndDate: Date | null;
   createdAt: Date;
+  customerPackageServiceId: string | null;
   id: string;
   mode: PackageFreezeMode;
   notes: string | null;
@@ -30,6 +36,8 @@ type ActiveFreezeValue = {
 
 type CustomerPackageValue = {
   activationDate: Date;
+  allowedEndTime: string | null;
+  allowedStartTime: string | null;
   coach: {
     firstName: string;
     lastName: string;
@@ -38,9 +46,11 @@ type CustomerPackageValue = {
   customerId: string;
   expirationDate: Date;
   frozenAt: Date | null;
+  hasTimeRestriction: boolean;
   id: string;
   initialGuestPasses: number;
   initialSessions: number;
+  membershipName: string | null;
   package: {
     allowedEndTime: string | null;
     allowedStartTime: string | null;
@@ -54,13 +64,14 @@ type CustomerPackageValue = {
     name: string;
     packageType: string;
     timeRestrictionLabel: string | null;
-  };
+  } | null;
   freezes: ActiveFreezeValue[];
-  packageId: string;
+  packageId: string | null;
   remainingFreezeChances: number;
   remainingGuestPasses: number;
   remainingSessions: number;
   status: CustomerPackageStatus;
+  timeRestrictionLabel: string | null;
   updatedAt: Date;
 };
 
@@ -109,31 +120,11 @@ function displayDate(value: Date) {
 }
 
 function packageCoach(customerPackage: CustomerPackageValue) {
-  const coach =
-    customerPackage.coach ?? customerPackage.package.assignedCoach;
-
-  return coach ? `${coach.firstName} ${coach.lastName}` : "Not assigned";
+  return membershipCoachDisplayName(customerPackage) ?? "Not assigned";
 }
 
 function packageTimeRule(customerPackage: CustomerPackageValue) {
-  if (!customerPackage.package.hasTimeRestriction) {
-    return "All day";
-  }
-
-  if (customerPackage.package.timeRestrictionLabel) {
-    return customerPackage.package.timeRestrictionLabel;
-  }
-
-  if (
-    customerPackage.package.allowedStartTime &&
-    customerPackage.package.allowedEndTime
-  ) {
-    return `${customerPackage.package.allowedStartTime} - ${customerPackage.package.allowedEndTime}`;
-  }
-
-  return customerPackage.package.allowedEndTime
-    ? `Before ${customerPackage.package.allowedEndTime}`
-    : "Restricted";
+  return membershipTimeRuleDisplay(customerPackage);
 }
 
 function packageState(customerPackage: CustomerPackageValue, today: Date) {
@@ -325,8 +316,8 @@ export function CustomerPackageOverview({
   if (!packages.length) {
     return (
       <p className="rounded-xl border border-dashed border-border bg-page px-5 py-8 text-center text-sm text-secondary">
-        No packages or services are assigned yet. This customer remains valid
-        without an active package.
+        No memberships or services are assigned yet. This customer remains
+        valid without an active membership.
       </p>
     );
   }
@@ -342,10 +333,10 @@ export function CustomerPackageOverview({
               Operational access
             </p>
             <h3 className="mt-1 text-2xl font-bold text-foreground">
-              Current packages / services
+              Current memberships / services
             </h3>
             <p className="mt-2 text-sm leading-6 text-secondary">
-              Healthy active assignments and frozen packages that still need
+              Healthy active memberships and frozen memberships that still need
               operational attention.
             </p>
           </div>
@@ -359,7 +350,9 @@ export function CustomerPackageOverview({
             {currentPackages.map((customerPackage) => {
               const state = packageState(customerPackage, today);
               const hasActiveFreeze = customerPackage.freezes.some(
-                (freeze) => freeze.status === "ACTIVE",
+                (freeze) =>
+                  freeze.status === "ACTIVE" &&
+                  !freeze.customerPackageServiceId,
               );
 
               return (
@@ -370,12 +363,10 @@ export function CustomerPackageOverview({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <span className="inline-flex rounded-full bg-soft-blue px-3 py-1 text-xs font-semibold text-primary-active">
-                        {packageTypeLabel(
-                          customerPackage.package.packageType,
-                        )}
+                        {membershipTypeDisplayName(customerPackage)}
                       </span>
                       <h4 className="mt-2 break-words text-xl font-bold text-foreground">
-                        {customerPackage.package.name}
+                        {membershipDisplayName(customerPackage)}
                       </h4>
                     </div>
                     <StatusBadge status={state.badge}>
@@ -416,7 +407,7 @@ export function CustomerPackageOverview({
 
                   {customerPackage.status === "FROZEN" ? (
                     <p className="mt-4 rounded-lg border border-status-medium bg-card px-3 py-2 text-sm font-semibold text-foreground">
-                      Frozen packages remain in history and cannot be used for
+                      Frozen memberships remain in history and cannot be used for
                       check-in.
                     </p>
                   ) : null}
@@ -445,7 +436,7 @@ export function CustomerPackageOverview({
           </div>
         ) : (
           <p className="mt-5 rounded-xl border border-dashed border-border bg-page px-5 py-8 text-center text-sm text-secondary">
-            No active or frozen package currently needs prominent placement.
+            No active or frozen membership currently needs prominent placement.
           </p>
         )}
       </section>
@@ -455,15 +446,13 @@ export function CustomerPackageOverview({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-button-warning">
-                Latest package needing attention
+                Latest membership needing attention
               </p>
               <h3 className="mt-2 text-xl font-bold text-foreground">
-                {latestAttentionPackage.package.name}
+                {membershipDisplayName(latestAttentionPackage)}
               </h3>
               <p className="mt-1 text-sm font-semibold text-primary-active">
-                {packageTypeLabel(
-                  latestAttentionPackage.package.packageType,
-                )}
+                {membershipTypeDisplayName(latestAttentionPackage)}
               </p>
             </div>
             <StatusBadge
@@ -516,10 +505,10 @@ export function CustomerPackageOverview({
                 Manage selected assignment
               </p>
               <h3 className="mt-2 text-xl font-bold text-foreground">
-                {selectedPackage.package.name}
+                {membershipDisplayName(selectedPackage)}
               </h3>
               <p className="mt-1 text-sm text-secondary">
-                Only this package{" "}
+                Only this membership{" "}
                 {selectedPanel?.mode === "freeze" ? "freeze panel" : "edit form"}{" "}
                 is open.
               </p>
@@ -540,12 +529,22 @@ export function CustomerPackageOverview({
                 latestCompletedCheckoutAt={latestCompletedCheckoutAt}
               />
             ) : (
-              <CustomerPackageEditForm
-                coaches={coaches}
-                customerPackage={selectedPackage}
-                packages={packageDefinitions}
-                returnToDetail
-              />
+              selectedPackage.packageId ? (
+                <CustomerPackageEditForm
+                  coaches={coaches}
+                  customerPackage={{
+                    ...selectedPackage,
+                    packageId: selectedPackage.packageId,
+                  }}
+                  packages={packageDefinitions}
+                  returnToDetail
+                />
+              ) : (
+                <p className="rounded-lg border border-border bg-page px-4 py-3 text-sm font-semibold text-secondary">
+                  Manual memberships are edited in the Membership & Services
+                  editor above.
+                </p>
+              )
             )}
           </div>
         </section>
@@ -556,15 +555,15 @@ export function CustomerPackageOverview({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
-              Complete assignment record
+              Legacy package records
             </p>
             <h3 className="mt-1 text-2xl font-bold text-foreground">
-              {readOnly ? "Legacy package history" : "Package history"}
+              Legacy package / membership records
             </h3>
             <p className="mt-2 text-sm leading-6 text-secondary">
               {readOnly
-                ? "Earlier package records are preserved as read-only context. Membership and service edits happen above."
-                : "Every assignment is preserved. Newest records appear first."}
+                ? "Earlier package records and current membership containers are preserved as read-only context. Membership and service edits happen above."
+                : "Every membership is preserved. Newest records appear first."}
             </p>
           </div>
           <span className="text-sm font-semibold text-secondary">
@@ -598,7 +597,9 @@ export function CustomerPackageOverview({
               {visibleHistory.map((customerPackage) => {
                 const state = packageState(customerPackage, today);
                 const hasActiveFreeze = customerPackage.freezes.some(
-                  (freeze) => freeze.status === "ACTIVE",
+                  (freeze) =>
+                    freeze.status === "ACTIVE" &&
+                    !freeze.customerPackageServiceId,
                 );
 
                 return (
@@ -609,12 +610,10 @@ export function CustomerPackageOverview({
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h4 className="break-words font-bold text-foreground">
-                          {customerPackage.package.name}
+                          {membershipDisplayName(customerPackage)}
                         </h4>
                         <p className="mt-1 text-xs font-semibold text-primary-active">
-                          {packageTypeLabel(
-                            customerPackage.package.packageType,
-                          )}
+                          {membershipTypeDisplayName(customerPackage)}
                         </p>
                       </div>
                       <StatusBadge className="text-xs" status={state.badge}>
@@ -696,7 +695,7 @@ export function CustomerPackageOverview({
               <table className="w-full min-w-[76rem] border-collapse text-left text-sm">
                 <thead className="bg-page text-xs uppercase tracking-wide text-secondary">
                   <tr>
-                    <th className="px-4 py-3">Package / service</th>
+                    <th className="px-4 py-3">Membership / service</th>
                     <th className="px-4 py-3">Dates</th>
                     <th className="px-4 py-3">Sessions</th>
                     <th className="px-4 py-3">Guest passes</th>
@@ -710,7 +709,9 @@ export function CustomerPackageOverview({
                   {visibleHistory.map((customerPackage) => {
                     const state = packageState(customerPackage, today);
                     const hasActiveFreeze = customerPackage.freezes.some(
-                      (freeze) => freeze.status === "ACTIVE",
+                      (freeze) =>
+                        freeze.status === "ACTIVE" &&
+                        !freeze.customerPackageServiceId,
                     );
 
                     return (
@@ -720,12 +721,10 @@ export function CustomerPackageOverview({
                       >
                         <td className="px-4 py-4">
                           <p className="font-bold text-foreground">
-                            {customerPackage.package.name}
+                            {membershipDisplayName(customerPackage)}
                           </p>
                           <p className="mt-1 text-xs font-semibold text-primary-active">
-                            {packageTypeLabel(
-                              customerPackage.package.packageType,
-                            )}
+                            {membershipTypeDisplayName(customerPackage)}
                           </p>
                         </td>
                         <td className="px-4 py-4 text-secondary">
@@ -784,7 +783,7 @@ export function CustomerPackageOverview({
           </>
         ) : (
           <p className="mt-5 rounded-xl border border-dashed border-border bg-page px-5 py-8 text-center text-sm text-secondary">
-            No package history matches this filter.
+            No membership history matches this filter.
           </p>
         )}
 

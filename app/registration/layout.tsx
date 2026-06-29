@@ -17,18 +17,18 @@ export default async function RegistrationLayout({
 }: Readonly<{
   children: ReactNode;
 }>) {
-  const user = await requireStaffUser();
+  await requireStaffUser();
 
   return (
     <PrivateLayout
       actions={
         <form action={logoutAction}>
-          <Button type="submit" variant="neutral">
+          <Button pendingLabel="Logging out..." type="submit" variant="neutral">
             Log out
           </Button>
         </form>
       }
-      description={`Signed in as ${user.name ?? user.username ?? "registration staff"}`}
+      description="Registration"
       navigation={<RegistrationNav />}
       title="Registration"
     >

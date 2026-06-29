@@ -4,6 +4,7 @@ import {
   type FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -76,11 +77,29 @@ export function NotesSection({
     id: string;
     lastKnownUpdatedAt: string;
   } | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const pendingActionRef = useRef<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [isPending, startTransition] = useTransition();
   const currentMetadata = useMemo(() => noteMetadata(notes), [notes]);
   const latestUpdatedAt = useMemo(() => latestNoteUpdate(notes), [notes]);
   const hasDraft = Boolean(newNoteDraft.trim() || editingNote);
+
+  function beginPendingAction(action: string) {
+    if (pendingActionRef.current) {
+      return false;
+    }
+
+    pendingActionRef.current = action;
+    setPendingAction(action);
+
+    return true;
+  }
+
+  function clearPendingAction() {
+    pendingActionRef.current = null;
+    setPendingAction(null);
+  }
 
   async function refreshNotes() {
     const response = await fetch(
@@ -121,37 +140,58 @@ export function NotesSection({
 
   function createNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!newNoteDraft.trim() || !beginPendingAction("create")) {
+      return;
+    }
+
     setMessage(null);
 
     startTransition(async () => {
-      const result = await createCustomerNoteAction({
-        content: newNoteDraft,
-        customerId,
-      });
-      handleResult(result, () => setNewNoteDraft(""));
+      try {
+        const result = await createCustomerNoteAction({
+          content: newNoteDraft,
+          customerId,
+        });
+        handleResult(result, () => setNewNoteDraft(""));
+      } finally {
+        clearPendingAction();
+      }
     });
   }
 
   function updateNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!editingNote) {
+    if (!editingNote || !editingNote.content.trim()) {
+      return;
+    }
+
+    if (!beginPendingAction(`update:${editingNote.id}`)) {
       return;
     }
 
     setMessage(null);
     startTransition(async () => {
-      const result = await updateCustomerNoteAction({
-        content: editingNote.content,
-        customerId,
-        lastKnownUpdatedAt: editingNote.lastKnownUpdatedAt,
-        noteId: editingNote.id,
-      });
-      handleResult(result, () => setEditingNote(null));
+      try {
+        const result = await updateCustomerNoteAction({
+          content: editingNote.content,
+          customerId,
+          lastKnownUpdatedAt: editingNote.lastKnownUpdatedAt,
+          noteId: editingNote.id,
+        });
+        handleResult(result, () => setEditingNote(null));
+      } finally {
+        clearPendingAction();
+      }
     });
   }
 
   function deleteNote(note: CustomerNoteView) {
+    if (pendingActionRef.current) {
+      return;
+    }
+
     if (
       !window.confirm(
         "Delete this customer note? It will disappear from the workspace and the action will be logged.",
@@ -160,22 +200,34 @@ export function NotesSection({
       return;
     }
 
+    if (!beginPendingAction(`delete:${note.id}`)) {
+      return;
+    }
+
     setMessage(null);
     startTransition(async () => {
-      const result = await deleteCustomerNoteAction({
-        customerId,
-        lastKnownUpdatedAt: note.updatedAt,
-        noteId: note.id,
-      });
-      handleResult(result, () => {
-        if (editingNote?.id === note.id) {
-          setEditingNote(null);
-        }
-      });
+      try {
+        const result = await deleteCustomerNoteAction({
+          customerId,
+          lastKnownUpdatedAt: note.updatedAt,
+          noteId: note.id,
+        });
+        handleResult(result, () => {
+          if (editingNote?.id === note.id) {
+            setEditingNote(null);
+          }
+        });
+      } finally {
+        clearPendingAction();
+      }
     });
   }
 
   function manualRefresh() {
+    if (!beginPendingAction("refresh")) {
+      return;
+    }
+
     setMessage(null);
     startTransition(async () => {
       try {
@@ -183,6 +235,8 @@ export function NotesSection({
         setMessage("Notes refreshed.");
       } catch {
         setMessage("Notes could not be refreshed.");
+      } finally {
+        clearPendingAction();
       }
     });
   }
@@ -194,6 +248,7 @@ export function NotesSection({
     setMessage(null);
     setNewNoteDraft("");
     setNotes(initialNotes);
+    clearPendingAction();
     setUpdatedAt(null);
   }, [customerId, initialNotes]);
 
@@ -264,7 +319,9 @@ export function NotesSection({
           <Button
             className="flex-1 sm:flex-none"
             disabled={isPending}
+            isPending={pendingAction === "refresh"}
             onClick={manualRefresh}
+            pendingLabel="Refreshing..."
             variant="neutral"
           >
             Refresh notes
@@ -302,7 +359,9 @@ export function NotesSection({
               </p>
               <Button
                 disabled={isPending}
+                isPending={pendingAction === "refresh"}
                 onClick={manualRefresh}
+                pendingLabel="Refreshing..."
                 variant="warning"
               >
                 Refresh notes
@@ -339,6 +398,8 @@ export function NotesSection({
               <Button
                 className="w-full sm:w-auto"
                 disabled={isPending || !newNoteDraft.trim()}
+                isPending={pendingAction === "create"}
+                pendingLabel="Saving..."
                 type="submit"
               >
                 {isPending ? "Saving..." : "Add note"}
@@ -387,6 +448,10 @@ export function NotesSection({
                         </Button>
                         <Button
                           disabled={isPending || !editingNote.content.trim()}
+                          isPending={
+                            pendingAction === `update:${editingNote.id}`
+                          }
+                          pendingLabel="Saving..."
                           type="submit"
                         >
                           Save note
@@ -428,7 +493,9 @@ export function NotesSection({
                           </Button>
                           <Button
                             disabled={isPending}
+                            isPending={pendingAction === `delete:${note.id}`}
                             onClick={() => deleteNote(note)}
+                            pendingLabel="Deleting..."
                             variant="danger"
                           >
                             Delete note

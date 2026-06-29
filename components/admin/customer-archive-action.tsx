@@ -48,7 +48,7 @@ export function CustomerArchiveAction({
           }}
         >
           <input name="customerId" type="hidden" value={customerId} />
-          <Button type="submit" variant="danger">
+          <Button pendingLabel="Archiving..." type="submit" variant="danger">
             Archive customer
           </Button>
         </form>

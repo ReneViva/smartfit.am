@@ -2,12 +2,14 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { SmartfitLogo } from "../brand/smartfit-logo";
+import { ThemeToggle } from "../public/theme-toggle";
 
 type PrivateLayoutProps = {
   actions?: ReactNode;
   children: ReactNode;
   description?: string;
   navigation?: ReactNode;
+  sidebarFooter?: ReactNode;
   title: string;
 };
 
@@ -16,6 +18,7 @@ export function PrivateLayout({
   children,
   description,
   navigation,
+  sidebarFooter,
   title,
 }: PrivateLayoutProps) {
   return (
@@ -37,9 +40,13 @@ export function PrivateLayout({
         </div>
 
         {navigation ? (
-          <div className="mt-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+          <div className="-mx-1 mt-5 overflow-x-auto px-1 pb-1 lg:mx-0 lg:mt-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-0 lg:pb-0 lg:pr-1">
             {navigation}
           </div>
+        ) : null}
+
+        {sidebarFooter ? (
+          <div className="mt-4 lg:mt-5 lg:shrink-0">{sidebarFooter}</div>
         ) : null}
       </aside>
 
@@ -64,6 +71,7 @@ export function PrivateLayout({
                 </p>
               </div>
             ) : null}
+            <ThemeToggle />
             {actions}
           </div>
         </header>

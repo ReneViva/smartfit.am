@@ -338,7 +338,11 @@ export function CustomerForm({
       </div>
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <Button disabled={!isEditing && isCreating} type="submit">
+        <Button
+          disabled={!isEditing && isCreating}
+          pendingLabel={customer ? "Saving..." : "Creating..."}
+          type="submit"
+        >
           {customer ? "Save customer changes" : "Create customer"}
         </Button>
         <Button type="reset" variant="neutral">

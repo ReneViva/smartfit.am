@@ -302,7 +302,7 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
         <h3 className="text-xl font-bold text-foreground">Create coach</h3>
         <form action={saveCoachAction} className="mt-5">
           <CoachFields categories={categories} />
-          <Button className="mt-5" type="submit">
+          <Button className="mt-5" pendingLabel="Creating..." type="submit">
             Create coach
           </Button>
         </form>
@@ -368,7 +368,11 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
                 </div>
                 <form action={saveCoachAction}>
                   <CoachFields categories={categories} coach={coach} />
-                  <Button className="mt-5" type="submit">
+                  <Button
+                    className="mt-5"
+                    pendingLabel="Saving..."
+                    type="submit"
+                  >
                     Save changes
                   </Button>
                 </form>

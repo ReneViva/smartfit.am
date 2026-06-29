@@ -12,6 +12,7 @@ import {
 import { Card } from "../../components/ui/card";
 import { db } from "../../lib/db";
 import { noteWithStaffSelect, toCustomerNoteView } from "../../lib/notes";
+import { getRegistrationCurrentMembershipVisitSummary } from "../../lib/registration/current-membership-visits";
 import { getCustomerRecentActivity } from "../../lib/registration/recent-activity";
 
 export const dynamic = "force-dynamic";
@@ -94,7 +95,7 @@ const errorMessages: Record<string, string> = {
     "The session correction could not be saved. Please try again.",
   "invalid-check-in": "The selected customer is unavailable.",
   "invalid-guest-source":
-    "The guest-pass source must be a selected, usable customer package.",
+    "The guest-pass source must be the selected, usable membership.",
   "invalid-guest-count":
     "Guest count must be a non-negative whole number.",
   "invalid-correction":
@@ -105,17 +106,19 @@ const errorMessages: Record<string, string> = {
   "invalid-occupancy":
     "Live occupancy has an invalid count. Correct occupancy before checking in.",
   "invalid-package":
-    "One or more selected packages are not usable for check-in.",
+    "One or more selected memberships are not usable for check-in.",
   "invalid-service":
     "One or more selected service lines are unavailable for this membership.",
+  "invalid-service-correction":
+    "Choose an active service line and enter a valid remaining session count.",
   "invalid-service-deduction":
     "Service deductions must be non-negative whole numbers.",
   "guest-passes-insufficient":
-    "The selected package does not have enough remaining guest passes.",
+    "The selected membership does not have enough remaining guest passes.",
   "guest-source-required":
-    "Choose which selected package provides the guest passes.",
+    "Choose which selected membership provides the guest passes.",
   "frozen-package":
-    "Frozen packages cannot be selected or used for check-in.",
+    "Frozen memberships cannot be selected or used for check-in.",
   "expired-membership":
     "Expired memberships can be checked in only without deductions.",
   "membership-conflict":
@@ -127,7 +130,7 @@ const errorMessages: Record<string, string> = {
   "invalid-freeze-days":
     "Freeze duration must be a positive whole number of days.",
   "invalid-package-action":
-    "The selected package is unavailable for that action.",
+    "The selected membership is unavailable for that action.",
   "open-visit": "This customer already has an open gym visit.",
   "no-open-visit":
     "This customer has no open gym visit and cannot be checked out.",
@@ -137,34 +140,44 @@ const errorMessages: Record<string, string> = {
   "occupancy-zero":
     "Live occupancy is lower than this visit's recorded party size. Correct the live count before checking out.",
   "package-selection-required":
-    "Select at least one usable package before check-in.",
+    "Select at least one usable membership before check-in.",
   "package-freeze-unavailable":
-    "The package could not be frozen. Please review it and try again.",
+    "The membership could not be frozen. Please review it and try again.",
   "package-freeze-disabled":
-    "Package freeze access is disabled for Registration. Admin can enable it in Settings.",
+    "Membership freeze access is disabled for Registration. Admin can enable it in Settings.",
+  "package-freeze-admin-only":
+    "Membership and service freezing is Admin-only. Registration cannot freeze or reactivate.",
   "package-active-freeze":
-    "This package already has an active freeze.",
+    "This membership already has an active freeze.",
   "package-no-freeze-chances":
-    "This package has no remaining freeze chances.",
+    "This membership has no remaining freeze chances.",
   "package-freeze-counter-invalid":
-    "Remaining freeze chances are invalid for this package.",
+    "Remaining freeze chances are invalid for this membership.",
   "package-freeze-counter-mismatch":
     "Remaining freeze chances do not match the freeze record limit. Ask Admin to review the assignment counter.",
   "package-freeze-days-limit":
-    "This package already used the maximum 30 freeze days.",
+    "This membership already used the maximum 30 freeze days.",
   "package-freeze-limit": "Maximum 3 freezes already used.",
   "package-not-freezable":
-    "Only active, unexpired packages with remaining sessions can be frozen.",
+    "Only active, unexpired memberships with remaining sessions can be frozen.",
   "package-not-frozen":
-    "Only frozen packages can be reactivated.",
+    "Only frozen memberships can be reactivated.",
   "package-reactivation-unavailable":
-    "The package could not be reactivated. Please review it and try again.",
+    "The membership could not be reactivated. Please review it and try again.",
   "package-status-stale":
-    "The package status changed before the action completed. Review and try again.",
+    "The membership status changed before the action completed. Review and try again.",
   "package-stale":
-    "A selected package changed before check-in. Review it and try again.",
+    "A selected membership changed before check-in. Review it and try again.",
   "service-sessions-insufficient":
     "A selected service line does not have enough remaining sessions.",
+  "service-correction-balance-invalid":
+    "Remaining service sessions cannot exceed initial service sessions.",
+  "service-expired":
+    "That service line is expired and cannot be deducted.",
+  "service-frozen":
+    "That service line is frozen and cannot be deducted.",
+  "service-not-yet-active":
+    "That service line is not active yet and cannot be deducted.",
   "service-stale":
     "A selected service line changed before check-in. Review it and try again.",
   "stale-correction":
@@ -179,7 +192,7 @@ function freezeDaysExceededMessage(value: string | undefined) {
   const freezeDaysLeft = Number(value);
 
   if (Number.isInteger(freezeDaysLeft) && freezeDaysLeft >= 0) {
-    return `Only ${freezeDaysLeft} freeze day${freezeDaysLeft === 1 ? "" : "s"} remain for this package.`;
+    return `Only ${freezeDaysLeft} freeze day${freezeDaysLeft === 1 ? "" : "s"} remain for this membership.`;
   }
 
   return "The requested freeze would exceed the maximum 30 freeze days.";
@@ -197,14 +210,11 @@ export default async function RegistrationPage({
   const showAllPackages = params.showAll === "1";
   const settings = await db.gymSettings.findFirst({
     select: {
-      allowRegistrationPackageFreeze: true,
       hideInactiveCustomersFromRegistration: true,
     },
   });
   const hideInactiveCustomers =
     settings?.hideInactiveCustomersFromRegistration ?? false;
-  const allowPackageFreeze =
-    settings?.allowRegistrationPackageFreeze ?? false;
   const customerVisibility = {
     deletedAt: null,
     ...(hideInactiveCustomers ? { status: "ACTIVE" as const } : {}),
@@ -303,13 +313,24 @@ export default async function RegistrationPage({
                     coach: {
                       select: { firstName: true, lastName: true },
                     },
+                    coachName: true,
                     deletedAt: true,
+                    endDate: true,
+                    freezes: {
+                      select: {
+                        plannedEndDate: true,
+                        startDate: true,
+                        status: true,
+                      },
+                      where: { status: "ACTIVE" },
+                    },
                     id: true,
                     initialSessions: true,
                     isActive: true,
                     remainingSessions: true,
                     serviceName: true,
                     sortOrder: true,
+                    startDate: true,
                   },
                   where: { deletedAt: null },
                 },
@@ -320,7 +341,10 @@ export default async function RegistrationPage({
                   orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                   select: {
                     actualDays: true,
+                    customerPackageServiceId: true,
                     plannedDays: true,
+                    plannedEndDate: true,
+                    startDate: true,
                     status: true,
                   },
                 },
@@ -371,13 +395,15 @@ export default async function RegistrationPage({
       : params.status === "checked-out"
         ? "Customer checked out successfully."
         : params.status === "package-frozen"
-          ? "Package frozen. Its expiration date was extended by the selected duration."
+          ? "Membership frozen. Its expiration date was extended by the selected duration."
           : params.status === "package-reactivated"
-            ? "Package reactivated. Expiration was recalculated from the actual frozen days."
+            ? "Membership reactivated. Expiration was recalculated from the actual frozen days."
             : params.status === "package-reactivated-expired"
-              ? "Package reactivated as expired. Expiration was recalculated from the actual frozen days."
+              ? "Membership reactivated as expired. Expiration was recalculated from the actual frozen days."
         : params.status === "correction-saved"
         ? "Remaining sessions updated and logged."
+        : params.status === "service-correction-saved"
+          ? "Service sessions updated and logged."
         : params.status === "occupancy-corrected"
           ? "Live occupancy updated and logged."
           : params.status === "occupancy-no-change"
@@ -386,9 +412,12 @@ export default async function RegistrationPage({
           ? "No session change was needed."
           : null;
   const currentOccupancy = Math.max(0, occupancy?.currentCount ?? 0);
-  const recentActivity = selectedCustomer
-    ? await getCustomerRecentActivity(selectedCustomer.id)
-    : [];
+  const [recentActivity, currentMembershipVisitSummary] = selectedCustomer
+    ? await Promise.all([
+        getCustomerRecentActivity(selectedCustomer.id),
+        getRegistrationCurrentMembershipVisitSummary(selectedCustomer.id),
+      ])
+    : [[], null];
 
   return (
     <>
@@ -446,7 +475,7 @@ export default async function RegistrationPage({
             </h3>
             <p className="mt-2 text-sm leading-6 text-secondary">
               Browse all customers or narrow the visible list by name, member
-              ID, phone, status, or profile/package attention.
+              ID, phone, status, or membership attention.
             </p>
           </div>
           <CustomerLookupControls
@@ -479,12 +508,12 @@ export default async function RegistrationPage({
           >
             {selectedCustomer ? (
               <RegistrationCustomerCard
-                allowPackageFreeze={allowPackageFreeze}
                 compact={compact}
                 customer={{
                   ...selectedCustomer,
                   notes: selectedCustomer.notes.map(toCustomerNoteView),
                 }}
+                currentMembershipVisitSummary={currentMembershipVisitSummary}
                 recentActivity={recentActivity}
                 showAllPackages={showAllPackages}
               />
@@ -508,7 +537,7 @@ export default async function RegistrationPage({
                     Select a customer to begin
                   </h3>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
-                    Package sessions, check-in or check-out, customer notes,
+                    Membership services, check-in or check-out, customer notes,
                     and recent activity will appear here.
                   </p>
                 </div>

@@ -141,7 +141,7 @@ export default async function AdminGalleryPage({
         </p>
         <form action={saveGalleryImageAction} className="mt-5">
           <GalleryFields />
-          <Button className="mt-5" type="submit">
+          <Button className="mt-5" pendingLabel="Adding..." type="submit">
             Add to gallery
           </Button>
         </form>
@@ -208,7 +208,9 @@ export default async function AdminGalleryPage({
                 <div>
                   <form action={saveGalleryImageAction}>
                     <GalleryFields image={image} />
-                    <Button type="submit">Save changes</Button>
+                    <Button pendingLabel="Saving..." type="submit">
+                      Save changes
+                    </Button>
                   </form>
                   <div className="mt-3">
                     <GalleryDeleteForm

@@ -22,7 +22,7 @@ export default async function CustomerVisitsPage({
       },
       where: { deletedAt: null, id: customerId },
     }),
-    getCustomerVisitHistoryForAdmin(customerId),
+    getCustomerVisitHistoryForAdmin(customerId, { scope: "all" }),
   ]);
 
   if (!customer) {

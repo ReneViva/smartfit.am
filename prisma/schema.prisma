@@ -232,8 +232,10 @@ model Package {
   id                           String    @id @default(cuid())
   name                         String
   description                  String?
+  imageUrl                     String?
   price                        Decimal   @db.Decimal(10, 2)
   discountPrice                Decimal?  @db.Decimal(10, 2)
+  discountRibbonPercent        Int?
   highlightOnPublicPackages    Boolean   @default(false)
   sessionCount                 Int
   defaultGuestPasses           Int       @default(0)
@@ -314,8 +316,9 @@ model CustomerPackage {
   id                           String                @id @default(cuid())
   customerId                   String
   customer                     Customer              @relation(fields: [customerId], references: [id])
-  packageId                    String
-  package                      Package               @relation(fields: [packageId], references: [id])
+  packageId                    String?
+  package                      Package?              @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  membershipName               String?
   coachId                      String?
   coach                        Coach?                @relation(fields: [coachId], references: [id])
   activationDate               DateTime
@@ -329,6 +332,10 @@ model CustomerPackage {
   intervalCheckInLimit         Int?
   hasUnlimitedDailyCheckIns    Boolean               @default(true)
   dailyCheckInLimit            Int?
+  hasTimeRestriction           Boolean               @default(false)
+  allowedStartTime             String?
+  allowedEndTime               String?
+  timeRestrictionLabel         String?
   status                       CustomerPackageStatus @default(ACTIVE)
   frozenAt                     DateTime?
   reactivatedAt                DateTime?
@@ -360,6 +367,9 @@ model CustomerPackageService {
   category          Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   coachId           String?
   coach             Coach?          @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  coachName         String?
+  startDate         DateTime?
+  endDate           DateTime?
   initialSessions   Int
   remainingSessions Int
   notes             String?
@@ -369,36 +379,45 @@ model CustomerPackageService {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
+  freezes PackageFreeze[]
+
   @@index([customerPackageId])
   @@index([packageId])
   @@index([categoryId])
   @@index([coachId])
+  @@index([startDate])
+  @@index([endDate])
   @@index([isActive])
   @@index([sortOrder])
 }
 
 model PackageFreeze {
-  id                      String              @id @default(cuid())
-  customerPackageId       String
-  customerPackage         CustomerPackage     @relation(fields: [customerPackageId], references: [id])
-  mode                    PackageFreezeMode
-  status                  PackageFreezeStatus @default(ACTIVE)
-  plannedDays             Int
-  actualDays              Int?
-  startDate               DateTime
-  plannedEndDate          DateTime?
-  actualEndDate           DateTime?
-  originalExpirationDate  DateTime
-  resultingExpirationDate DateTime?
-  createdById             String
-  createdBy               StaffUser           @relation("PackageFreezeCreatedBy", fields: [createdById], references: [id])
-  reactivatedById         String?
-  reactivatedBy           StaffUser?          @relation("PackageFreezeReactivatedBy", fields: [reactivatedById], references: [id])
-  notes                   String?
-  createdAt               DateTime            @default(now())
-  updatedAt               DateTime            @updatedAt
+  id                       String                  @id @default(cuid())
+  customerPackageId        String
+  customerPackage          CustomerPackage         @relation(fields: [customerPackageId], references: [id])
+  customerPackageServiceId String?
+  customerPackageService   CustomerPackageService? @relation(fields: [customerPackageServiceId], references: [id], onDelete: SetNull)
+  mode                     PackageFreezeMode
+  status                   PackageFreezeStatus     @default(ACTIVE)
+  plannedDays              Int
+  actualDays               Int?
+  startDate                DateTime
+  plannedEndDate           DateTime?
+  actualEndDate            DateTime?
+  originalExpirationDate   DateTime
+  resultingExpirationDate  DateTime?
+  originalServiceEndDate   DateTime?
+  resultingServiceEndDate  DateTime?
+  createdById              String
+  createdBy                StaffUser               @relation("PackageFreezeCreatedBy", fields: [createdById], references: [id])
+  reactivatedById          String?
+  reactivatedBy            StaffUser?              @relation("PackageFreezeReactivatedBy", fields: [reactivatedById], references: [id])
+  notes                    String?
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
 
   @@index([customerPackageId])
+  @@index([customerPackageServiceId])
   @@index([status])
   @@index([startDate])
   @@index([actualEndDate])

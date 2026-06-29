@@ -3,6 +3,11 @@ import {
   groupOccupancyEventsByDay,
 } from "../analytics/basic";
 import { getVisitAnalytics } from "../analytics/data";
+import {
+  membershipDisplayName,
+  personDisplayName,
+  serviceLineCoachDisplayName,
+} from "../customer-memberships";
 import { db } from "../db";
 
 const SERVICE_DEDUCTION_REASON_PREFIX = "Service check-in deduction:";
@@ -20,10 +25,6 @@ function serviceNameFromReason(reason: string | null) {
     .slice(SERVICE_DEDUCTION_REASON_PREFIX.length)
     .replace(/\s+\[service:[^\]]+\]$/, "")
     .trim();
-}
-
-function personName(person: { firstName: string; lastName: string } | null) {
-  return person ? `${person.firstName} ${person.lastName}` : null;
 }
 
 function topCounts(counts: Map<string, number>) {
@@ -52,6 +53,7 @@ async function getServiceDeductionAnalytics(weekRange: {
       customerPackage: {
         select: {
           coach: { select: { firstName: true, lastName: true } },
+          membershipName: true,
           package: {
             select: {
               assignedCoach: { select: { firstName: true, lastName: true } },
@@ -82,6 +84,7 @@ async function getServiceDeductionAnalytics(weekRange: {
   const services = await db.customerPackageService.findMany({
     select: {
       coach: { select: { firstName: true, lastName: true } },
+      coachName: true,
       id: true,
       serviceName: true,
     },
@@ -99,12 +102,12 @@ async function getServiceDeductionAnalytics(weekRange: {
     const serviceLabel =
       service?.serviceName ??
       serviceNameFromReason(change.reason) ??
-      change.customerPackage.package.name;
+      membershipDisplayName(change.customerPackage);
     const coachLabel =
-      personName(service?.coach ?? null) ??
-      personName(change.customerPackage.coach) ??
-      personName(change.customerPackage.package.assignedCoach) ??
-      "No coach assigned";
+      serviceLineCoachDisplayName(service ?? {}) ??
+      personDisplayName(change.customerPackage.coach) ??
+      personDisplayName(change.customerPackage.package?.assignedCoach) ??
+      "No coach/person assigned";
 
     totalSessionsUsed += amount;
     serviceCounts.set(serviceLabel, (serviceCounts.get(serviceLabel) ?? 0) + amount);

@@ -24,7 +24,7 @@ export function CheckOutPanel({
       </h3>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary">
         Check-out closes the open gym visit and decreases occupancy by the same
-        party size recorded at check-in. It does not deduct package sessions or
+        party size recorded at check-in. It does not deduct service sessions or
         guest passes.
       </p>
       <form action={checkOutAction} className="mt-5">
@@ -39,7 +39,12 @@ export function CheckOutPanel({
           <input name="returnPath" type="hidden" value={returnPath} />
         ) : null}
         {compact ? <input name="view" type="hidden" value="compact" /> : null}
-        <Button className="w-full sm:w-auto" type="submit" variant="warning">
+        <Button
+          className="w-full sm:w-auto"
+          pendingLabel="Checking out..."
+          type="submit"
+          variant="warning"
+        >
           Check out customer
         </Button>
       </form>

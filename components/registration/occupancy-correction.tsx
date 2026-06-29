@@ -90,7 +90,11 @@ export function OccupancyCorrection({
               +
             </Button>
           </div>
-          <Button disabled={draftCount === currentCount} type="submit">
+          <Button
+            disabled={draftCount === currentCount}
+            pendingLabel="Saving..."
+            type="submit"
+          >
             Save occupancy
           </Button>
         </form>

@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { membershipDisplayName } from "../customer-memberships";
 
 export type CustomerRecentActivityItem = {
   actorName: string;
@@ -19,7 +20,9 @@ function staffName(staff: { name: string | null; username: string | null }) {
 }
 
 function serviceNameFromReason(reason: string | null) {
-  const match = reason?.match(/^Service check-in deduction: (.*?) \[service:/);
+  const match = reason?.match(
+    /^(?:Service check-in deduction|Manual service correction): (.*?) \[service:/,
+  );
 
   return match?.[1] ?? null;
 }
@@ -50,6 +53,7 @@ export async function getCustomerRecentActivity(customerId: string) {
         reason: true,
         customerPackage: {
           select: {
+            membershipName: true,
             package: { select: { name: true } },
           },
         },
@@ -100,7 +104,7 @@ export async function getCustomerRecentActivity(customerId: string) {
   }
 
   for (const change of sessionChanges) {
-    const packageName = change.customerPackage.package.name;
+    const membershipName = membershipDisplayName(change.customerPackage);
     const serviceName = serviceNameFromReason(change.reason);
     const sessionsDeducted = Math.abs(change.delta);
 
@@ -110,13 +114,15 @@ export async function getCustomerRecentActivity(customerId: string) {
             actorName: staffName(change.changedBy),
             description: serviceName
               ? `${serviceName}: ${sessionsDeducted} service session${sessionsDeducted === 1 ? "" : "s"} deducted at check-in.`
-              : `${packageName}: one session deducted at check-in.`,
+              : `${membershipName}: one session deducted at check-in.`,
             occurredAt: change.createdAt,
             type: "SESSION_DEDUCTED",
           }
         : {
             actorName: staffName(change.changedBy),
-            description: `${packageName}: sessions corrected from ${change.previousRemainingSessions} to ${change.newRemainingSessions}.`,
+            description: serviceName
+              ? `${serviceName}: service sessions corrected from ${change.previousRemainingSessions} to ${change.newRemainingSessions}.`
+              : `${membershipName}: sessions corrected from ${change.previousRemainingSessions} to ${change.newRemainingSessions}.`,
             occurredAt: change.createdAt,
             type: "SESSION_CORRECTED",
           },

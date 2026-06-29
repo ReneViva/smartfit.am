@@ -11,6 +11,7 @@ import {
   packageTypeLabel,
 } from "../../lib/package-types";
 import { MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE } from "../../lib/package-freezes";
+import { ImageInput } from "./image-input";
 import { Button } from "../ui/button";
 
 const inputClass =
@@ -46,9 +47,11 @@ export type AdminPackageValue = {
   defaultGuestPasses: number;
   description: string | null;
   discountPrice: string | null;
+  discountRibbonPercent: number | null;
   hasTimeRestriction: boolean;
   highlightOnPublicPackages: boolean;
   id: string;
+  imageUrl: string | null;
   isActive: boolean;
   name: string;
   packageType: string;
@@ -203,6 +206,10 @@ function displayPrice(value: string) {
     : value;
 }
 
+function RequiredMark() {
+  return <span className="text-button-danger" aria-hidden="true"> *</span>;
+}
+
 function PackageFormFields({
   categories,
   categoryError = false,
@@ -240,7 +247,7 @@ function PackageFormFields({
       {gymPackage ? <input name="id" type="hidden" value={gymPackage.id} /> : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <label className={labelClass}>
-          Name
+          Name<RequiredMark />
           <input
             className={inputClass}
             defaultValue={gymPackage?.name ?? ""}
@@ -250,7 +257,7 @@ function PackageFormFields({
           />
         </label>
         <label className={labelClass}>
-          Original price
+          Original price<RequiredMark />
           <input
             className={inputClass}
             defaultValue={gymPackage?.price ?? ""}
@@ -276,16 +283,35 @@ function PackageFormFields({
           </span>
         </label>
         <label className={labelClass}>
+          Discount ribbon percentage
+          <input
+            className={inputClass}
+            defaultValue={gymPackage?.discountRibbonPercent ?? ""}
+            max={99}
+            min={1}
+            name="discountRibbonPercent"
+            step={1}
+            type="number"
+          />
+          <span className="mt-1 block text-xs font-normal text-secondary">
+            Shown on the public card when the package has a discount. Enter a
+            whole number like 40.
+          </span>
+        </label>
+        <label className={labelClass}>
           Session count
           <input
             className={inputClass}
             defaultValue={gymPackage?.sessionCount ?? ""}
             min={0}
             name="sessionCount"
-            required
             step={1}
             type="number"
           />
+          <span className="mt-1 block text-xs font-normal text-secondary">
+            Optional for public display. Use 0 or leave empty when the details
+            are only written in the description.
+          </span>
         </label>
         <label className={labelClass}>
           Included guest passes
@@ -294,13 +320,16 @@ function PackageFormFields({
             defaultValue={gymPackage?.defaultGuestPasses ?? 0}
             min={0}
             name="defaultGuestPasses"
-            required
             step={1}
             type="number"
           />
+          <span className="mt-1 block text-xs font-normal text-secondary">
+            Optional for public display. Guest details can be written in the
+            description.
+          </span>
         </label>
         <label className={labelClass}>
-          Default freeze chances
+          Default freeze chances<RequiredMark />
           <input
             className={inputClass}
             defaultValue={gymPackage?.defaultFreezeChances ?? 3}
@@ -331,6 +360,17 @@ function PackageFormFields({
             ))}
           </select>
         </label>
+        <div className="md:col-span-2 xl:col-span-3">
+          <ImageInput
+            defaultValue={gymPackage?.imageUrl ?? ""}
+            label="Package image"
+            name="imageUrl"
+            uploadName="packageImageUpload"
+          />
+          <p className="mt-2 text-xs leading-5 text-secondary">
+            Image is optional. Use only public-safe package or gym imagery.
+          </p>
+        </div>
         <label className={`${labelClass} md:col-span-2 xl:col-span-3`}>
           Description
           <textarea
@@ -339,12 +379,16 @@ function PackageFormFields({
             maxLength={2000}
             name="description"
           />
+          <span className="mt-1 block text-xs font-normal text-secondary">
+            Sessions, guest passes, and coach can be written in the description
+            for public display.
+          </span>
         </label>
       </div>
 
       <fieldset className="mt-4 rounded-xl border border-border bg-page p-4">
         <legend className="px-2 text-sm font-bold text-foreground">
-          Package categories
+          Package categories{categories.length ? <RequiredMark /> : null}
         </legend>
         {categories.length ? (
           <>
@@ -416,7 +460,7 @@ function PackageFormFields({
           compatibility.
         </p>
         <label className={`${labelClass} mt-4`}>
-          Internal package type
+          Internal package type<RequiredMark />
           <select
             className={inputClass}
             onChange={(event) => setPackageTypeMode(event.target.value)}
@@ -612,7 +656,11 @@ export function AdminPackageManager({
             categoryError={categoryError && !selectedPackageId}
             coaches={coaches}
           />
-          <Button className="mt-5 w-full sm:w-auto" type="submit">
+          <Button
+            className="mt-5 w-full sm:w-auto"
+            pendingLabel="Creating..."
+            type="submit"
+          >
             Create package
           </Button>
         </form>
@@ -851,7 +899,11 @@ export function AdminPackageManager({
                     coaches={coaches}
                     gymPackage={gymPackage}
                   />
-                  <Button className="mt-5 w-full sm:w-auto" type="submit">
+                  <Button
+                    className="mt-5 w-full sm:w-auto"
+                    pendingLabel="Saving..."
+                    type="submit"
+                  >
                     Save changes
                   </Button>
                 </form>

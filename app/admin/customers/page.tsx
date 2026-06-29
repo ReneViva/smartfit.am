@@ -7,6 +7,7 @@ import {
 import Link from "next/link";
 
 import { CustomerForm } from "../../../components/admin/customer-form";
+import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { db } from "../../../lib/db";
@@ -397,12 +398,13 @@ export default async function CustomersPage({
               <option value="missing-birth-date">Missing birth date</option>
             </select>
           </label>
-          <button
-            className="inline-flex min-h-11 items-center justify-center self-end rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+          <Button
+            className="self-end"
+            pendingLabel="Applying..."
             type="submit"
           >
             Apply filters
-          </button>
+          </Button>
         </form>
       </Card>
 

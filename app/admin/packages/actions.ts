@@ -7,6 +7,10 @@ import { requireStaffRole } from "../../../lib/auth";
 import { db } from "../../../lib/db";
 import { writeAuditLog } from "../../../lib/logging";
 import { MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE } from "../../../lib/package-freezes";
+import {
+  imageUploadErrorCode,
+  uploadImageFromForm,
+} from "../../../lib/uploads/storage";
 
 const PACKAGES_PATH = "/admin/packages";
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -38,11 +42,31 @@ function optionalText(formData: FormData, name: string, maxLength: number) {
   return value.trim().slice(0, maxLength) || null;
 }
 
-function nonNegativeInteger(formData: FormData, name: string) {
-  const rawValue = optionalText(formData, name, 20);
-  const value = rawValue === null ? Number.NaN : Number(rawValue);
+function optionalPublicUrl(formData: FormData, name: string) {
+  const value = optionalText(formData, name, 1000);
 
-  return Number.isInteger(value) && value >= 0 ? value : null;
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function optionalPercent(formData: FormData, name: string) {
+  const rawValue = optionalText(formData, name, 3);
+
+  if (rawValue === null) {
+    return null;
+  }
+
+  const value = Number(rawValue);
+
+  return Number.isInteger(value) && value >= 1 && value <= 99 ? value : undefined;
 }
 
 function nonNegativeIntegerOrZero(formData: FormData, name: string) {
@@ -86,7 +110,13 @@ export async function savePackageAction(formData: FormData) {
   const packageType = optionalText(formData, "packageType", 200);
   const price = optionalText(formData, "price", 30);
   const discountPrice = optionalText(formData, "discountPrice", 30);
-  const sessionCount = nonNegativeInteger(formData, "sessionCount");
+  const discountRibbonPercent = optionalPercent(
+    formData,
+    "discountRibbonPercent",
+  );
+  const rawImageUrl = optionalText(formData, "imageUrl", 1000);
+  const imageUrl = optionalPublicUrl(formData, "imageUrl");
+  const sessionCount = nonNegativeIntegerOrZero(formData, "sessionCount");
   const defaultGuestPasses = nonNegativeIntegerOrZero(
     formData,
     "defaultGuestPasses",
@@ -131,6 +161,10 @@ export async function savePackageAction(formData: FormData) {
       Number(discountPrice) >= Number(price))
   ) {
     redirectPackageError("invalid-discount-price", id);
+  }
+
+  if (discountRibbonPercent === undefined) {
+    redirectPackageError("invalid-discount-ribbon", id);
   }
 
   if (sessionCount === null) {
@@ -189,6 +223,18 @@ export async function savePackageAction(formData: FormData) {
     redirectPackageError("invalid-coach", id);
   }
 
+  const uploadedImageUrl = await uploadImageFromForm(
+    formData,
+    "packageImageUpload",
+    { prefix: "package-images" },
+  ).catch((error) => {
+    redirectPackageError(`upload-${imageUploadErrorCode(error)}`, id);
+  });
+
+  if (rawImageUrl && !imageUrl && !uploadedImageUrl) {
+    redirectPackageError("invalid-url", id);
+  }
+
   const assignableCategoryIds = new Set(
     assignableCategories.map((category) => category.id),
   );
@@ -212,9 +258,11 @@ export async function savePackageAction(formData: FormData) {
     defaultGuestPasses,
     description: optionalText(formData, "description", 2000),
     discountPrice,
+    discountRibbonPercent: discountPrice ? discountRibbonPercent : null,
     hasTimeRestriction,
     highlightOnPublicPackages:
       formData.get("highlightOnPublicPackages") === "on",
+    imageUrl: uploadedImageUrl ?? imageUrl,
     isActive: formData.get("isActive") === "on",
     name,
     packageType,

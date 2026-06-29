@@ -229,7 +229,12 @@ export function CustomerDocumentsPanel({
               Uploads are validated on the server and stored through the
               private document provider.
             </p>
-            <Button disabled={isUploading} type="submit">
+            <Button
+              disabled={isUploading}
+              isPending={isUploading}
+              pendingLabel="Uploading..."
+              type="submit"
+            >
               {isUploading ? "Uploading..." : "Upload document"}
             </Button>
           </div>
@@ -338,7 +343,11 @@ export function CustomerDocumentsPanel({
                           </Link>
                           <Button
                             disabled={isArchiving}
+                            isPending={
+                              isArchiving && pendingArchiveId === document.id
+                            }
                             onClick={() => archiveDocument(document)}
+                            pendingLabel="Archiving..."
                             variant="danger"
                           >
                             {isArchiving && pendingArchiveId === document.id

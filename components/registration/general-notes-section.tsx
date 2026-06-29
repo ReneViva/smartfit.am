@@ -58,7 +58,11 @@ export function GeneralNotesSection({
             />
           </label>
           <div className="mt-3 flex justify-end">
-            <Button className="w-full sm:w-auto" type="submit">
+            <Button
+              className="w-full sm:w-auto"
+              pendingLabel="Adding..."
+              type="submit"
+            >
               Add general note
             </Button>
           </div>
@@ -111,7 +115,9 @@ export function GeneralNotesSection({
                     />
                   </label>
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
-                    <Button type="submit">Save note</Button>
+                    <Button pendingLabel="Saving..." type="submit">
+                      Save note
+                    </Button>
                   </div>
                 </form>
                 <form action={deleteGeneralNoteAction} className="mt-2">
@@ -122,7 +128,7 @@ export function GeneralNotesSection({
                     value={note.updatedAt.toISOString()}
                   />
                   <input name="returnPath" type="hidden" value={returnPath} />
-                  <Button type="submit" variant="danger">
+                  <Button pendingLabel="Deleting..." type="submit" variant="danger">
                     Delete note
                   </Button>
                 </form>

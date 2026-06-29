@@ -9,6 +9,12 @@ export type FreezeUsageRecord = {
   status: string;
 };
 
+export type FreezeWindowRecord = {
+  plannedEndDate: Date | null;
+  startDate: Date;
+  status: string;
+};
+
 export type FreezeUsage = {
   confirmedFreezeCount: number;
   remainingFreezeCount: number;
@@ -202,4 +208,22 @@ export function calculateAdjustedExpiration(
   }
 
   return addUtcCalendarDays(originalExpirationDate, actualFrozenDays);
+}
+
+export function freezeBlocksDate(
+  freeze: FreezeWindowRecord,
+  now = new Date(),
+) {
+  return (
+    freeze.status === "ACTIVE" &&
+    freeze.startDate <= now &&
+    (!freeze.plannedEndDate || freeze.plannedEndDate > now)
+  );
+}
+
+export function hasBlockingFreeze(
+  freezes: FreezeWindowRecord[] | null | undefined,
+  now = new Date(),
+) {
+  return Boolean(freezes?.some((freeze) => freezeBlocksDate(freeze, now)));
 }

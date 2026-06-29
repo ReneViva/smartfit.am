@@ -272,7 +272,9 @@ export function CustomerPackageEditForm({
         additional package can still be added separately.
       </p>
       <div className="mt-5 flex flex-wrap gap-3">
-        <Button type="submit">Save package changes</Button>
+        <Button pendingLabel="Saving..." type="submit">
+          Save package changes
+        </Button>
         <Button type="reset" variant="neutral">
           Cancel changes
         </Button>

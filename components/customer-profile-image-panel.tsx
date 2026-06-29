@@ -138,7 +138,12 @@ export function CustomerProfileImagePanel({
             </p>
           ) : null}
           <div className="flex flex-wrap gap-3">
-            <Button disabled={isPending} type="submit">
+            <Button
+              disabled={isPending}
+              isPending={isPending}
+              pendingLabel="Saving..."
+              type="submit"
+            >
               {isPending ? "Saving..." : hasProfileImage ? "Change photo" : "Upload photo"}
             </Button>
           </div>
@@ -148,7 +153,13 @@ export function CustomerProfileImagePanel({
           <form action={formAction} className="mt-3">
             <input name="customerId" type="hidden" value={customerId} />
             <input name="removeProfileImage" type="hidden" value="1" />
-            <Button disabled={isPending} type="submit" variant="neutral">
+            <Button
+              disabled={isPending}
+              isPending={isPending}
+              pendingLabel="Removing..."
+              type="submit"
+              variant="neutral"
+            >
               Remove photo
             </Button>
           </form>

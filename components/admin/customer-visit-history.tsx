@@ -27,9 +27,16 @@ function packageUsageText(usage: CustomerVisitHistoryItem["packageUsages"][numbe
   const guestText = usage.guestPassesDeducted
     ? `, ${usage.guestPassesDeducted} guest pass${usage.guestPassesDeducted === 1 ? "" : "es"}`
     : "";
-  const sessionText = usage.sessionsDeducted
-    ? `${usage.sessionsDeducted} service session${usage.sessionsDeducted === 1 ? "" : "s"}`
-    : "no service sessions deducted";
+  const sessionText =
+    usage.sessionsDeducted && usage.serviceInitialSessions
+      ? `${usage.sessionsDeducted} used / ${usage.serviceInitialSessions} total${
+          usage.serviceRemainingSessions === null
+            ? ""
+            : `, ${usage.serviceRemainingSessions} currently remaining`
+        }`
+      : usage.sessionsDeducted
+        ? `${usage.sessionsDeducted} service session${usage.sessionsDeducted === 1 ? "" : "s"} used`
+        : "No service deduction";
   const usageName = usage.serviceName ?? usage.packageName;
 
   return `${usageName}: ${sessionText}${guestText}`;
@@ -125,7 +132,7 @@ export function CustomerVisitHistory({
 
                 <div className="mt-4 border-t border-border pt-4">
                   <p className="text-sm font-semibold text-secondary">
-                    Packages used
+                    Service usage
                   </p>
                   {visit.packageUsages.length ? (
                     <ul className="mt-2 space-y-2 text-sm text-foreground">

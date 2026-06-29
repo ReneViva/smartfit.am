@@ -80,7 +80,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             />
           </label>
 
-          <Button className="w-full" type="submit">
+          <Button className="w-full" pendingLabel="Signing in..." type="submit">
             Sign in
           </Button>
         </form>

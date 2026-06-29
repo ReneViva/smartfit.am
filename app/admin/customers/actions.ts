@@ -9,6 +9,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireStaffRole } from "../../../lib/auth";
+import {
+  membershipDisplayName,
+  serviceLineDisplayName,
+} from "../../../lib/customer-memberships";
 import { db } from "../../../lib/db";
 import { writeAuditLog } from "../../../lib/logging";
 import {
@@ -24,6 +28,7 @@ import {
 const CUSTOMERS_PATH = "/admin/customers";
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const customerStatuses = new Set(Object.values(CustomerStatus));
 const packageStatuses = new Set(Object.values(CustomerPackageStatus));
 
@@ -156,6 +161,59 @@ function accessLimit(formData: FormData, unlimitedName: string, limitName: strin
     : { limit, ok: true as const, unlimited };
 }
 
+function timeMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function optionalTime(formData: FormData, name: string) {
+  const value = optionalText(formData, name, 5);
+
+  if (!value) {
+    return { ok: true as const, value: null };
+  }
+
+  return TIME_PATTERN.test(value)
+    ? { ok: true as const, value }
+    : { ok: false as const, value: null };
+}
+
+function timeRuleFromForm(formData: FormData) {
+  const hasTimeRestriction = formData.get("hasTimeRestriction") === "on";
+
+  if (!hasTimeRestriction) {
+    return {
+      allowedEndTime: null,
+      allowedStartTime: null,
+      hasTimeRestriction,
+      ok: true as const,
+      timeRestrictionLabel: null,
+    };
+  }
+
+  const startTime = optionalTime(formData, "allowedStartTime");
+  const endTime = optionalTime(formData, "allowedEndTime");
+
+  if (!startTime.ok || !endTime.ok || !endTime.value) {
+    return { ok: false as const };
+  }
+
+  const startMinutes = startTime.value ? timeMinutes(startTime.value) : 0;
+  const endMinutes = timeMinutes(endTime.value);
+
+  if (startMinutes >= endMinutes) {
+    return { ok: false as const };
+  }
+
+  return {
+    allowedEndTime: endTime.value,
+    allowedStartTime: startTime.value,
+    hasTimeRestriction,
+    ok: true as const,
+    timeRestrictionLabel: optionalText(formData, "timeRestrictionLabel", 200),
+  };
+}
+
 function requiredDate(formData: FormData, name: string) {
   const value = optionalText(formData, name, 10);
 
@@ -269,6 +327,52 @@ function startOfTodayUtc() {
 
 function activeStatusForExpiration(expirationDate: Date) {
   return expirationDate < startOfTodayUtc() ? "EXPIRED" : "ACTIVE";
+}
+
+function dateIsBeforeUtcDay(value: Date, boundary: Date) {
+  return value.getTime() < boundary.getTime();
+}
+
+function isMembershipFreeze(freeze: {
+  customerPackageServiceId?: string | null;
+}) {
+  return !freeze.customerPackageServiceId;
+}
+
+function serviceFreezeDateError({
+  actualEndDate,
+  retroactive,
+  serviceEndDate,
+  serviceStartDate,
+  startDate,
+}: {
+  actualEndDate?: Date;
+  retroactive: boolean;
+  serviceEndDate: Date | null;
+  serviceStartDate: Date | null;
+  startDate: Date;
+}) {
+  if (!serviceStartDate || !serviceEndDate) {
+    return "service-freeze-dates-required";
+  }
+
+  if (startDate < serviceStartDate) {
+    return "service-freeze-before-start";
+  }
+
+  if (startDate > serviceEndDate) {
+    return "service-freeze-after-end";
+  }
+
+  if (!retroactive && serviceEndDate < startOfTodayUtc()) {
+    return "service-freeze-expired";
+  }
+
+  if (retroactive && actualEndDate && actualEndDate > new Date()) {
+    return "invalid-retroactive-freeze";
+  }
+
+  return null;
 }
 
 function appendFreezeNote(existingNote: string | null, label: string, note: string | null) {
@@ -737,10 +841,14 @@ export async function assignCustomerPackageAction(formData: FormData) {
     }),
     db.package.findFirst({
       select: {
+        allowedEndTime: true,
+        allowedStartTime: true,
         defaultFreezeChances: true,
         defaultGuestPasses: true,
+        hasTimeRestriction: true,
         id: true,
         name: true,
+        timeRestrictionLabel: true,
       },
       where: { deletedAt: null, id: packageId, isActive: true },
     }),
@@ -768,9 +876,12 @@ export async function assignCustomerPackageAction(formData: FormData) {
       const saved = await transaction.customerPackage.create({
         data: {
           activationDate,
+          allowedEndTime: gymPackage.allowedEndTime,
+          allowedStartTime: gymPackage.allowedStartTime,
           coachId,
           customerId,
           expirationDate,
+          hasTimeRestriction: gymPackage.hasTimeRestriction,
           initialGuestPasses,
           initialSessions,
           packageId,
@@ -781,6 +892,7 @@ export async function assignCustomerPackageAction(formData: FormData) {
           ),
           remainingSessions,
           status: rawStatus as CustomerPackageStatus,
+          timeRestrictionLabel: gymPackage.timeRestrictionLabel,
         },
       });
 
@@ -898,7 +1010,15 @@ export async function editCustomerPackageAction(formData: FormData) {
           },
         }),
         transaction.package.findFirst({
-          select: { id: true, isActive: true, name: true },
+          select: {
+            allowedEndTime: true,
+            allowedStartTime: true,
+            hasTimeRestriction: true,
+            id: true,
+            isActive: true,
+            name: true,
+            timeRestrictionLabel: true,
+          },
           where: { deletedAt: null, id: packageId },
         }),
         transaction.visitPackageUsage.findFirst({
@@ -950,8 +1070,20 @@ export async function editCustomerPackageAction(formData: FormData) {
       const update = await transaction.customerPackage.updateMany({
         data: {
           activationDate,
+          allowedEndTime:
+            existing.packageId === gymPackage.id
+              ? existing.allowedEndTime
+              : gymPackage.allowedEndTime,
+          allowedStartTime:
+            existing.packageId === gymPackage.id
+              ? existing.allowedStartTime
+              : gymPackage.allowedStartTime,
           coachId,
           expirationDate,
+          hasTimeRestriction:
+            existing.packageId === gymPackage.id
+              ? existing.hasTimeRestriction
+              : gymPackage.hasTimeRestriction,
           initialGuestPasses,
           initialSessions,
           packageId,
@@ -959,6 +1091,10 @@ export async function editCustomerPackageAction(formData: FormData) {
           remainingFreezeChances,
           remainingSessions,
           status: nextStatus,
+          timeRestrictionLabel:
+            existing.packageId === gymPackage.id
+              ? existing.timeRestrictionLabel
+              : gymPackage.timeRestrictionLabel,
         },
         where: {
           customerId,
@@ -985,12 +1121,15 @@ export async function editCustomerPackageAction(formData: FormData) {
         actionType: "PACKAGE_EDIT",
         actorId: user.id,
         customerId: existing.customer.id,
-        description: `Updated assigned package ${existing.package.name} for ${existing.customer.customerCode}: ${existing.customer.fullName}.`,
+        description: `Updated assigned package ${membershipDisplayName(existing)} for ${existing.customer.customerCode}: ${existing.customer.fullName}.`,
         newValue: {
+          allowedEndTime: saved.allowedEndTime,
+          allowedStartTime: saved.allowedStartTime,
           activationDate: saved.activationDate,
           coachId: saved.coachId,
           coachName: coachName(nextCoach),
           expirationDate: saved.expirationDate,
+          hasTimeRestriction: saved.hasTimeRestriction,
           initialGuestPasses: saved.initialGuestPasses,
           initialSessions: saved.initialSessions,
           packageId: saved.packageId,
@@ -999,20 +1138,25 @@ export async function editCustomerPackageAction(formData: FormData) {
           remainingFreezeChances: saved.remainingFreezeChances,
           remainingSessions: saved.remainingSessions,
           status: saved.status,
+          timeRestrictionLabel: saved.timeRestrictionLabel,
         },
         oldValue: {
+          allowedEndTime: existing.allowedEndTime,
+          allowedStartTime: existing.allowedStartTime,
           activationDate: existing.activationDate,
           coachId: existing.coachId,
           coachName: coachName(existing.coach),
           expirationDate: existing.expirationDate,
+          hasTimeRestriction: existing.hasTimeRestriction,
           initialGuestPasses: existing.initialGuestPasses,
           initialSessions: existing.initialSessions,
           packageId: existing.packageId,
-          packageName: existing.package.name,
+          packageName: existing.package?.name ?? null,
           remainingGuestPasses: existing.remainingGuestPasses,
           remainingFreezeChances: existing.remainingFreezeChances,
           remainingSessions: existing.remainingSessions,
           status: existing.status,
+          timeRestrictionLabel: existing.timeRestrictionLabel,
         },
         targetId: saved.id,
         targetType: "CustomerPackage",
@@ -1045,8 +1189,7 @@ export async function saveCustomerMembershipAction(formData: FormData) {
   const user = await requireStaffRole("ADMIN");
   const customerId = optionalText(formData, "customerId", 100);
   const customerPackageId = optionalText(formData, "customerPackageId", 100);
-  const packageId = optionalText(formData, "packageId", 100);
-  const coachId = optionalText(formData, "coachId", 100);
+  const membershipName = optionalText(formData, "membershipName", 200);
   const activationDate = requiredDate(formData, "activationDate");
   const expirationDate = requiredDate(formData, "expirationDate");
   const initialGuestPasses = nonNegativeInteger(
@@ -1072,17 +1215,19 @@ export async function saveCustomerMembershipAction(formData: FormData) {
     "hasUnlimitedDailyCheckIns",
     "dailyCheckInLimit",
   );
+  const timeRule = timeRuleFromForm(formData);
 
   if (
     !customerId ||
-    !packageId ||
+    !membershipName ||
     !activationDate ||
     !expirationDate ||
     initialGuestPasses === null ||
     remainingGuestPasses === null ||
     remainingFreezeChances === null ||
     !rawStatus ||
-    !packageStatuses.has(rawStatus as CustomerPackageStatus)
+    !packageStatuses.has(rawStatus as CustomerPackageStatus) ||
+    !timeRule.ok
   ) {
     redirect(customerActionPath(formData, customerId, "error=invalid-membership"));
   }
@@ -1102,29 +1247,15 @@ export async function saveCustomerMembershipAction(formData: FormData) {
     redirect(customerActionPath(formData, customerId, "error=invalid-access-limit"));
   }
 
-  if (!(await coachExists(coachId))) {
-    redirect(customerActionPath(formData, customerId, "error=invalid-coach"));
-  }
-
   try {
     await db.$transaction(async (transaction) => {
-      const [customer, gymPackage] = await Promise.all([
-        transaction.customer.findFirst({
-          select: { customerCode: true, fullName: true, id: true },
-          where: { deletedAt: null, id: customerId },
-        }),
-        transaction.package.findFirst({
-          select: { id: true, name: true },
-          where: { deletedAt: null, id: packageId },
-        }),
-      ]);
+      const customer = await transaction.customer.findFirst({
+        select: { customerCode: true, fullName: true, id: true },
+        where: { deletedAt: null, id: customerId },
+      });
 
       if (!customer) {
         throw new AssignedPackageEditError("invalid-customer");
-      }
-
-      if (!gymPackage) {
-        throw new AssignedPackageEditError("invalid-package");
       }
 
       const activeCount = await activeMembershipCount(transaction, customerId);
@@ -1134,17 +1265,20 @@ export async function saveCustomerMembershipAction(formData: FormData) {
 
       const data = {
         activationDate,
-        coachId,
+        allowedEndTime: timeRule.allowedEndTime,
+        allowedStartTime: timeRule.allowedStartTime,
         expirationDate,
+        hasTimeRestriction: timeRule.hasTimeRestriction,
         hasUnlimitedDailyCheckIns: dailyLimit.unlimited,
         hasUnlimitedIntervalCheckIns: intervalLimit.unlimited,
         initialGuestPasses,
         intervalCheckInLimit: intervalLimit.limit,
         dailyCheckInLimit: dailyLimit.limit,
-        packageId,
+        membershipName,
         remainingFreezeChances,
         remainingGuestPasses,
         status: rawStatus as CustomerPackageStatus,
+        timeRestrictionLabel: timeRule.timeRestrictionLabel,
       };
 
       if (customerPackageId) {
@@ -1218,6 +1352,7 @@ export async function saveCustomerMembershipAction(formData: FormData) {
           ...data,
           customerId,
           initialSessions: 0,
+          packageId: null,
           remainingSessions: 0,
         },
       });
@@ -1226,7 +1361,7 @@ export async function saveCustomerMembershipAction(formData: FormData) {
         actionType: "PACKAGE_RENEWAL",
         actorId: user.id,
         customerId,
-        description: `Created membership container from ${gymPackage.name} for ${customer.customerCode}: ${customer.fullName}.`,
+        description: `Created manual membership ${membershipDisplayName(saved)} for ${customer.customerCode}: ${customer.fullName}.`,
         newValue: saved,
         targetId: saved.id,
         targetType: "CustomerPackage",
@@ -1255,10 +1390,10 @@ export async function saveCustomerPackageServiceAction(formData: FormData) {
   const customerId = optionalText(formData, "customerId", 100);
   const customerPackageId = optionalText(formData, "customerPackageId", 100);
   const serviceId = optionalText(formData, "serviceId", 100);
-  const packageId = optionalText(formData, "servicePackageId", 100);
-  const categoryId = optionalText(formData, "categoryId", 100);
-  const coachId = optionalText(formData, "serviceCoachId", 100);
   const serviceName = optionalText(formData, "serviceName", 200);
+  const coachName = optionalText(formData, "serviceCoachName", 200);
+  const startDate = requiredDate(formData, "serviceStartDate");
+  const endDate = requiredDate(formData, "serviceEndDate");
   const initialSessions = nonNegativeInteger(formData, "serviceInitialSessions");
   const remainingSessions = nonNegativeInteger(
     formData,
@@ -1273,6 +1408,8 @@ export async function saveCustomerPackageServiceAction(formData: FormData) {
     !customerId ||
     !customerPackageId ||
     !serviceName ||
+    !startDate ||
+    !endDate ||
     initialSessions === null ||
     remainingSessions === null ||
     sortOrder === null
@@ -1282,6 +1419,10 @@ export async function saveCustomerPackageServiceAction(formData: FormData) {
 
   if (remainingSessions > initialSessions) {
     redirect(customerActionPath(formData, customerId, "error=service-balance-invalid"));
+  }
+
+  if (endDate < startDate) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-service-dates"));
   }
 
   try {
@@ -1310,45 +1451,23 @@ export async function saveCustomerPackageServiceAction(formData: FormData) {
         throw new AssignedPackageEditError("membership-conflict");
       }
 
-      const [servicePackage, category, coach] = await Promise.all([
-        packageId
-          ? transaction.package.findFirst({
-              select: { id: true, name: true },
-              where: { deletedAt: null, id: packageId, isActive: true },
-            })
-          : null,
-        categoryId
-          ? transaction.category.findFirst({
-              select: { id: true, name: true },
-              where: { id: categoryId, isArchived: false },
-            })
-          : null,
-        coachId
-          ? transaction.coach.findFirst({
-              select: { firstName: true, id: true, lastName: true },
-              where: { deletedAt: null, id: coachId },
-            })
-          : null,
-      ]);
-
       if (
-        (packageId && !servicePackage) ||
-        (categoryId && !category) ||
-        (coachId && !coach)
+        startDate < membership.activationDate ||
+        endDate > membership.expirationDate
       ) {
-        throw new AssignedPackageEditError("invalid-service-reference");
+        throw new AssignedPackageEditError("service-date-outside-membership");
       }
 
       const data = {
-        categoryId,
-        coachId,
+        coachName,
+        endDate,
         initialSessions,
         isActive,
         notes,
-        packageId,
         remainingSessions,
         serviceName,
         sortOrder,
+        startDate,
       };
 
       if (serviceId) {
@@ -1398,7 +1517,7 @@ export async function saveCustomerPackageServiceAction(formData: FormData) {
         actionType: "PACKAGE_EDIT",
         actorId: user.id,
         customerId,
-        description: `Added service line ${saved.serviceName} to ${membership.package.name} for ${membership.customer.customerCode}: ${membership.customer.fullName}.`,
+        description: `Added service line ${saved.serviceName} to ${membershipDisplayName(membership)} for ${membership.customer.customerCode}: ${membership.customer.fullName}.`,
         newValue: saved,
         targetId: saved.id,
         targetType: "CustomerPackageService",
@@ -1506,12 +1625,19 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
   const customerId = optionalText(formData, "customerId", 100);
   const customerCode = optionalText(formData, "customerCode", 100);
   const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const startDate = requiredDate(formData, "startDate");
   const plannedDays = positiveInteger(formData, "plannedDays");
   const notes = optionalText(formData, "notes", 1000);
 
   if (!customerId || !customerCode || !customerPackageId) {
     redirect(
       customerActionPath(formData, customerId, "error=invalid-package-action"),
+    );
+  }
+
+  if (!startDate || startDate < startOfTodayUtc()) {
+    redirect(
+      customerActionPath(formData, customerId, "error=invalid-freeze-dates"),
     );
   }
 
@@ -1532,6 +1658,7 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             select: {
               actualDays: true,
+              customerPackageServiceId: true,
               id: true,
               plannedDays: true,
               status: true,
@@ -1556,7 +1683,11 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
         throw new AdvancedFreezeError("invalid-package-action");
       }
 
-      if (customerPackage.freezes.some((freeze) => freeze.status === "ACTIVE")) {
+      if (
+        customerPackage.freezes.some(
+          (freeze) => freeze.status === "ACTIVE" && isMembershipFreeze(freeze),
+        )
+      ) {
         throw new AdvancedFreezeError("package-active-freeze");
       }
 
@@ -1565,8 +1696,11 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
         customerPackage.status !== "ACTIVE" ||
         customerPackage.expirationDate < today ||
         customerPackage.remainingSessions <= 0 ||
-        customerPackage.package.deletedAt ||
-        !customerPackage.package.isActive
+        Boolean(
+          customerPackage.package &&
+            (customerPackage.package.deletedAt ||
+              !customerPackage.package.isActive),
+        )
       ) {
         throw new AdvancedFreezeError("package-not-freezable");
       }
@@ -1584,7 +1718,6 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
         );
       }
 
-      const startDate = new Date();
       const plannedEndDate = calculatePlannedFreezeEndDate(
         startDate,
         plannedDays,
@@ -1593,13 +1726,18 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
         customerPackage.expirationDate,
         plannedDays,
       );
+      const startsNow = !dateIsBeforeUtcDay(startOfTodayUtc(), startDate);
       const update = await transaction.customerPackage.updateMany({
         data: {
           expirationDate: resultingExpirationDate,
-          frozenAt: startDate,
           reactivatedAt: null,
           remainingFreezeChances: { decrement: 1 },
-          status: "FROZEN",
+          ...(startsNow
+            ? {
+                frozenAt: startDate,
+                status: "FROZEN" as const,
+              }
+            : {}),
         },
         where: {
           customerId,
@@ -1634,7 +1772,7 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
         actionType: "PACKAGE_FREEZE",
         actorId: user.id,
         customerId: customerPackage.customer.id,
-        description: `Advanced normal freeze for ${customerPackage.package.name} on ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName} for ${plannedDays} day${plannedDays === 1 ? "" : "s"}.`,
+        description: `Advanced normal freeze for ${membershipDisplayName(customerPackage)} on ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName} for ${plannedDays} day${plannedDays === 1 ? "" : "s"}.`,
         newValue: {
           freezeId: freeze.id,
           freezeCountAfter: freezePolicy.usage.confirmedFreezeCount + 1,
@@ -1656,7 +1794,7 @@ export async function adminFreezeCustomerPackageAction(formData: FormData) {
             customerPackage.remainingFreezeChances - 1,
           resultingExpirationDate,
           startDate,
-          status: "FROZEN",
+          status: startsNow ? "FROZEN" : customerPackage.status,
         },
         oldValue: {
           expirationDate: customerPackage.expirationDate,
@@ -1708,6 +1846,7 @@ export async function adminReactivateCustomerPackageAction(formData: FormData) {
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             select: {
               createdAt: true,
+              customerPackageServiceId: true,
               id: true,
               mode: true,
               notes: true,
@@ -1720,6 +1859,7 @@ export async function adminReactivateCustomerPackageAction(formData: FormData) {
             take: 1,
             where: {
               ...(packageFreezeId ? { id: packageFreezeId } : {}),
+              customerPackageServiceId: null,
               status: "ACTIVE",
             },
           },
@@ -1743,11 +1883,15 @@ export async function adminReactivateCustomerPackageAction(formData: FormData) {
       }
 
       const activeFreeze = customerPackage.freezes[0] ?? null;
-      if (!activeFreeze || customerPackage.status !== "FROZEN") {
+      if (!activeFreeze) {
         throw new AdvancedFreezeError("package-not-frozen");
       }
 
       const actualEndDate = new Date();
+      if (actualEndDate < activeFreeze.startDate) {
+        throw new AdvancedFreezeError("package-not-frozen");
+      }
+
       const actualDays = calculateActualFrozenDays(
         activeFreeze.startDate,
         actualEndDate,
@@ -1797,7 +1941,7 @@ export async function adminReactivateCustomerPackageAction(formData: FormData) {
           customerId,
           deletedAt: null,
           id: customerPackage.id,
-          status: "FROZEN",
+          status: { in: ["ACTIVE", "FROZEN"] },
           updatedAt: customerPackage.updatedAt,
         },
       });
@@ -1810,7 +1954,7 @@ export async function adminReactivateCustomerPackageAction(formData: FormData) {
         actionType: "PACKAGE_REACTIVATION",
         actorId: user.id,
         customerId: customerPackage.customer.id,
-        description: `Advanced reactivation for ${customerPackage.package.name} on ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName}${nextStatus === "EXPIRED" ? " as expired" : ""}.`,
+        description: `Advanced reactivation for ${membershipDisplayName(customerPackage)} on ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName}${nextStatus === "EXPIRED" ? " as expired" : ""}.`,
         newValue: {
           actualDays,
           actualEndDate,
@@ -1861,6 +2005,8 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
   const customerId = optionalText(formData, "customerId", 100);
   const customerCode = optionalText(formData, "customerCode", 100);
   const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const retroactiveStartDate = requiredDate(formData, "retroactiveStartDate");
+  const actualDays = positiveInteger(formData, "actualDays");
   const notes = optionalText(formData, "notes", 1000);
 
   if (!customerId || !customerCode || !customerPackageId) {
@@ -1869,43 +2015,44 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
     );
   }
 
+  if (
+    !retroactiveStartDate ||
+    actualDays === null ||
+    !validateFreezeDays(actualDays)
+  ) {
+    redirect(
+      customerActionPath(formData, customerId, "error=invalid-retroactive-freeze"),
+    );
+  }
+
   try {
     await db.$transaction(async (transaction) => {
-      const [customerPackage, latestVisit] = await Promise.all([
-        transaction.customerPackage.findFirst({
-          include: {
-            customer: {
-              select: { customerCode: true, fullName: true, id: true },
-            },
-            freezes: {
-              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-              select: {
-                actualDays: true,
-                id: true,
-                plannedDays: true,
-                status: true,
-              },
-            },
-            package: {
-              select: { deletedAt: true, isActive: true, name: true },
+      const customerPackage = await transaction.customerPackage.findFirst({
+        include: {
+          customer: {
+            select: { customerCode: true, fullName: true, id: true },
+          },
+          freezes: {
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: {
+              actualDays: true,
+              customerPackageServiceId: true,
+              id: true,
+              plannedDays: true,
+              status: true,
             },
           },
-          where: {
-            customer: { deletedAt: null },
-            customerId,
-            deletedAt: null,
-            id: customerPackageId,
+          package: {
+            select: { deletedAt: true, isActive: true, name: true },
           },
-        }),
-        transaction.gymVisit.findFirst({
-          orderBy: [{ checkedOutAt: "desc" }, { id: "desc" }],
-          select: { checkedOutAt: true },
-          where: {
-            checkedOutAt: { not: null },
-            customerId,
-          },
-        }),
-      ]);
+        },
+        where: {
+          customer: { deletedAt: null },
+          customerId,
+          deletedAt: null,
+          id: customerPackageId,
+        },
+      });
 
       if (
         !customerPackage ||
@@ -1914,30 +2061,32 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
         throw new AdvancedFreezeError("invalid-package-action");
       }
 
-      if (customerPackage.freezes.some((freeze) => freeze.status === "ACTIVE")) {
+      if (
+        customerPackage.freezes.some(
+          (freeze) => freeze.status === "ACTIVE" && isMembershipFreeze(freeze),
+        )
+      ) {
         throw new AdvancedFreezeError("package-active-freeze");
       }
 
       if (
         !["ACTIVE", "EXPIRED"].includes(customerPackage.status) ||
         customerPackage.remainingSessions <= 0 ||
-        customerPackage.package.deletedAt ||
-        !customerPackage.package.isActive
+        Boolean(
+          customerPackage.package &&
+            (customerPackage.package.deletedAt ||
+              !customerPackage.package.isActive),
+        )
       ) {
         throw new AdvancedFreezeError("package-not-freezable");
       }
 
-      if (!latestVisit?.checkedOutAt) {
-        throw new AdvancedFreezeError("package-no-checkout");
-      }
-
-      const actualEndDate = new Date();
-      const actualDays = calculateActualFrozenDays(
-        latestVisit.checkedOutAt,
-        actualEndDate,
+      const actualEndDate = calculatePlannedFreezeEndDate(
+        retroactiveStartDate,
+        actualDays,
       );
 
-      if (!validateFreezeDays(actualDays)) {
+      if (actualEndDate > new Date()) {
         throw new AdvancedFreezeError("invalid-retroactive-freeze");
       }
 
@@ -1993,7 +2142,7 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
           plannedEndDate: actualEndDate,
           reactivatedById: user.id,
           resultingExpirationDate,
-          startDate: latestVisit.checkedOutAt,
+          startDate: retroactiveStartDate,
           status: "REACTIVATED",
         },
       });
@@ -2002,7 +2151,7 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
         actionType: "PACKAGE_FREEZE",
         actorId: user.id,
         customerId: customerPackage.customer.id,
-        description: `Advanced retroactive freeze for ${customerPackage.package.name} on ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName} for ${actualDays} day${actualDays === 1 ? "" : "s"} from latest checkout.`,
+        description: `Advanced retroactive freeze for ${membershipDisplayName(customerPackage)} on ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName} for ${actualDays} day${actualDays === 1 ? "" : "s"}.`,
         newValue: {
           actualDays,
           actualEndDate,
@@ -2016,11 +2165,11 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
           freezeDaysUsedAfter: freezePolicy.usage.usedFreezeDays + actualDays,
           freezeDaysUsedBefore: freezePolicy.usage.usedFreezeDays,
           freezeNumber: freezePolicy.freezeNumber,
-          latestCheckoutAt: latestVisit.checkedOutAt,
           mode: freeze.mode,
           paidFreezeNoticeRequired: freezePolicy.isPaid,
           remainingFreezeChances:
             customerPackage.remainingFreezeChances - 1,
+          retroactiveStartDate,
           resultingExpirationDate,
           status: nextStatus,
         },
@@ -2047,4 +2196,620 @@ export async function adminRetroactiveFreezeCustomerPackageAction(
   redirect(
     customerActionPath(formData, customerId, "status=package-retroactive-frozen"),
   );
+}
+
+export async function adminFreezeCustomerPackageServiceAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const customerId = optionalText(formData, "customerId", 100);
+  const customerCode = optionalText(formData, "customerCode", 100);
+  const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const serviceId = optionalText(formData, "serviceId", 100);
+  const startDate = requiredDate(formData, "startDate");
+  const plannedDays = positiveInteger(formData, "plannedDays");
+  const notes = optionalText(formData, "notes", 1000);
+
+  if (!customerId || !customerCode || !customerPackageId || !serviceId) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-service"));
+  }
+
+  if (!startDate || startDate < startOfTodayUtc()) {
+    redirect(
+      customerActionPath(formData, customerId, "error=invalid-freeze-dates"),
+    );
+  }
+
+  if (plannedDays === null || !validateFreezeDays(plannedDays)) {
+    redirect(
+      customerActionPath(formData, customerId, "error=invalid-freeze-days"),
+    );
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const service = await transaction.customerPackageService.findFirst({
+        include: {
+          customerPackage: {
+            include: {
+              customer: {
+                select: { customerCode: true, fullName: true, id: true },
+              },
+              freezes: {
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: {
+                  actualDays: true,
+                  customerPackageServiceId: true,
+                  id: true,
+                  plannedDays: true,
+                  status: true,
+                },
+              },
+              package: {
+                select: { deletedAt: true, isActive: true, name: true },
+              },
+            },
+          },
+          freezes: {
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: { id: true, status: true },
+          },
+          package: { select: { name: true } },
+        },
+        where: {
+          customerPackageId,
+          customerPackage: {
+            customer: { deletedAt: null },
+            customerId,
+            deletedAt: null,
+          },
+          deletedAt: null,
+          id: serviceId,
+        },
+      });
+
+      if (
+        !service ||
+        service.customerPackage.customer.customerCode !== customerCode
+      ) {
+        throw new AdvancedFreezeError("invalid-service");
+      }
+
+      const membership = service.customerPackage;
+      if (
+        membership.status !== "ACTIVE" ||
+        membership.expirationDate < startOfTodayUtc() ||
+        Boolean(
+          membership.package &&
+            (membership.package.deletedAt || !membership.package.isActive),
+        )
+      ) {
+        throw new AdvancedFreezeError("package-not-freezable");
+      }
+
+      if (
+        membership.freezes.some(
+          (freeze) => freeze.status === "ACTIVE" && isMembershipFreeze(freeze),
+        )
+      ) {
+        throw new AdvancedFreezeError("package-active-freeze");
+      }
+
+      if (service.freezes.some((freeze) => freeze.status === "ACTIVE")) {
+        throw new AdvancedFreezeError("service-active-freeze");
+      }
+
+      const plannedEndDate = calculatePlannedFreezeEndDate(
+        startDate,
+        plannedDays,
+      );
+      const dateError = serviceFreezeDateError({
+        retroactive: false,
+        serviceEndDate: service.endDate,
+        serviceStartDate: service.startDate,
+        startDate,
+      });
+
+      if (dateError) {
+        throw new AdvancedFreezeError(dateError);
+      }
+      const originalServiceEndDate = service.endDate;
+
+      if (!originalServiceEndDate) {
+        throw new AdvancedFreezeError("service-freeze-dates-required");
+      }
+
+      const freezePolicy = validateFreezePolicy({
+        freezes: membership.freezes,
+        remainingFreezeChances: membership.remainingFreezeChances,
+        requestedDays: plannedDays,
+      });
+
+      if (!freezePolicy.ok) {
+        throw new AdvancedFreezeError(
+          freezePolicy.code,
+          freezePolicy.usage.remainingFreezeDays,
+        );
+      }
+
+      const resultingServiceEndDate = calculateAdjustedExpiration(
+        originalServiceEndDate,
+        plannedDays,
+      );
+      const membershipUpdate = await transaction.customerPackage.updateMany({
+        data: { remainingFreezeChances: { decrement: 1 } },
+        where: {
+          customerId,
+          deletedAt: null,
+          id: membership.id,
+          remainingFreezeChances: { gt: 0 },
+          status: "ACTIVE",
+          updatedAt: membership.updatedAt,
+        },
+      });
+
+      if (membershipUpdate.count !== 1) {
+        throw new AdvancedFreezeError("package-status-stale");
+      }
+
+      const serviceUpdate =
+        await transaction.customerPackageService.updateMany({
+          data: { endDate: resultingServiceEndDate },
+          where: {
+            customerPackageId: membership.id,
+            deletedAt: null,
+            id: service.id,
+            isActive: true,
+            updatedAt: service.updatedAt,
+          },
+        });
+
+      if (serviceUpdate.count !== 1) {
+        throw new AdvancedFreezeError("service-stale");
+      }
+
+      const freeze = await transaction.packageFreeze.create({
+        data: {
+          createdById: user.id,
+          customerPackageId: membership.id,
+          customerPackageServiceId: service.id,
+          mode: "NORMAL",
+          notes,
+          originalExpirationDate: membership.expirationDate,
+          originalServiceEndDate,
+          plannedDays,
+          plannedEndDate,
+          resultingExpirationDate: membership.expirationDate,
+          resultingServiceEndDate,
+          startDate,
+          status: "ACTIVE",
+        },
+      });
+
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_FREEZE",
+        actorId: user.id,
+        customerId: membership.customer.id,
+        description: `Service freeze for ${serviceLineDisplayName(service)} inside ${membershipDisplayName(membership)} on ${membership.customer.customerCode}: ${membership.customer.fullName} for ${plannedDays} day${plannedDays === 1 ? "" : "s"}.`,
+        newValue: {
+          freezeId: freeze.id,
+          freezeNumber: freezePolicy.freezeNumber,
+          membershipName: membershipDisplayName(membership),
+          mode: freeze.mode,
+          originalServiceEndDate,
+          plannedDays,
+          plannedEndDate,
+          remainingFreezeChances: membership.remainingFreezeChances - 1,
+          resultingServiceEndDate,
+          serviceName: serviceLineDisplayName(service),
+          startDate,
+          targetScope: "SERVICE",
+        },
+        oldValue: {
+          remainingFreezeChances: membership.remainingFreezeChances,
+          serviceEndDate: originalServiceEndDate,
+        },
+        targetId: freeze.id,
+        targetType: "PackageFreeze",
+      });
+    });
+  } catch (error) {
+    redirect(
+      customerActionPath(
+        formData,
+        customerId,
+        freezeErrorQuery(error, "service-freeze-unavailable"),
+      ),
+    );
+  }
+
+  revalidatePackageWorkflow(customerId);
+  redirect(customerActionPath(formData, customerId, "status=service-frozen"));
+}
+
+export async function adminRetroactiveFreezeCustomerPackageServiceAction(
+  formData: FormData,
+) {
+  const user = await requireStaffRole("ADMIN");
+  const customerId = optionalText(formData, "customerId", 100);
+  const customerCode = optionalText(formData, "customerCode", 100);
+  const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const serviceId = optionalText(formData, "serviceId", 100);
+  const retroactiveStartDate = requiredDate(formData, "retroactiveStartDate");
+  const actualDays = positiveInteger(formData, "actualDays");
+  const notes = optionalText(formData, "notes", 1000);
+
+  if (!customerId || !customerCode || !customerPackageId || !serviceId) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-service"));
+  }
+
+  if (
+    !retroactiveStartDate ||
+    actualDays === null ||
+    !validateFreezeDays(actualDays)
+  ) {
+    redirect(
+      customerActionPath(formData, customerId, "error=invalid-retroactive-freeze"),
+    );
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const service = await transaction.customerPackageService.findFirst({
+        include: {
+          customerPackage: {
+            include: {
+              customer: {
+                select: { customerCode: true, fullName: true, id: true },
+              },
+              freezes: {
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: {
+                  actualDays: true,
+                  customerPackageServiceId: true,
+                  id: true,
+                  plannedDays: true,
+                  status: true,
+                },
+              },
+            },
+          },
+          freezes: {
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: { id: true, status: true },
+          },
+          package: { select: { name: true } },
+        },
+        where: {
+          customerPackageId,
+          customerPackage: {
+            customer: { deletedAt: null },
+            customerId,
+            deletedAt: null,
+          },
+          deletedAt: null,
+          id: serviceId,
+        },
+      });
+
+      if (
+        !service ||
+        service.customerPackage.customer.customerCode !== customerCode
+      ) {
+        throw new AdvancedFreezeError("invalid-service");
+      }
+
+      const membership = service.customerPackage;
+      if (!["ACTIVE", "EXPIRED"].includes(membership.status)) {
+        throw new AdvancedFreezeError("package-not-freezable");
+      }
+
+      if (
+        membership.freezes.some(
+          (freeze) => freeze.status === "ACTIVE" && isMembershipFreeze(freeze),
+        )
+      ) {
+        throw new AdvancedFreezeError("package-active-freeze");
+      }
+
+      if (service.freezes.some((freeze) => freeze.status === "ACTIVE")) {
+        throw new AdvancedFreezeError("service-active-freeze");
+      }
+
+      const actualEndDate = calculatePlannedFreezeEndDate(
+        retroactiveStartDate,
+        actualDays,
+      );
+      const dateError = serviceFreezeDateError({
+        actualEndDate,
+        retroactive: true,
+        serviceEndDate: service.endDate,
+        serviceStartDate: service.startDate,
+        startDate: retroactiveStartDate,
+      });
+
+      if (dateError) {
+        throw new AdvancedFreezeError(dateError);
+      }
+      const originalServiceEndDate = service.endDate;
+
+      if (!originalServiceEndDate) {
+        throw new AdvancedFreezeError("service-freeze-dates-required");
+      }
+
+      const freezePolicy = validateFreezePolicy({
+        freezes: membership.freezes,
+        remainingFreezeChances: membership.remainingFreezeChances,
+        requestedDays: actualDays,
+      });
+
+      if (!freezePolicy.ok) {
+        throw new AdvancedFreezeError(
+          freezePolicy.code,
+          freezePolicy.usage.remainingFreezeDays,
+        );
+      }
+
+      const resultingServiceEndDate = calculateAdjustedExpiration(
+        originalServiceEndDate,
+        actualDays,
+      );
+      const membershipUpdate = await transaction.customerPackage.updateMany({
+        data: { remainingFreezeChances: { decrement: 1 } },
+        where: {
+          customerId,
+          deletedAt: null,
+          id: membership.id,
+          remainingFreezeChances: { gt: 0 },
+          status: { in: ["ACTIVE", "EXPIRED"] },
+          updatedAt: membership.updatedAt,
+        },
+      });
+
+      if (membershipUpdate.count !== 1) {
+        throw new AdvancedFreezeError("package-status-stale");
+      }
+
+      const serviceUpdate =
+        await transaction.customerPackageService.updateMany({
+          data: { endDate: resultingServiceEndDate },
+          where: {
+            customerPackageId: membership.id,
+            deletedAt: null,
+            id: service.id,
+            updatedAt: service.updatedAt,
+          },
+        });
+
+      if (serviceUpdate.count !== 1) {
+        throw new AdvancedFreezeError("service-stale");
+      }
+
+      const freeze = await transaction.packageFreeze.create({
+        data: {
+          actualDays,
+          actualEndDate,
+          createdById: user.id,
+          customerPackageId: membership.id,
+          customerPackageServiceId: service.id,
+          mode: "RETROACTIVE",
+          notes,
+          originalExpirationDate: membership.expirationDate,
+          originalServiceEndDate,
+          plannedDays: actualDays,
+          plannedEndDate: actualEndDate,
+          reactivatedById: user.id,
+          resultingExpirationDate: membership.expirationDate,
+          resultingServiceEndDate,
+          startDate: retroactiveStartDate,
+          status: "REACTIVATED",
+        },
+      });
+
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_FREEZE",
+        actorId: user.id,
+        customerId: membership.customer.id,
+        description: `Retroactive service freeze for ${serviceLineDisplayName(service)} inside ${membershipDisplayName(membership)} on ${membership.customer.customerCode}: ${membership.customer.fullName} for ${actualDays} day${actualDays === 1 ? "" : "s"}.`,
+        newValue: {
+          actualDays,
+          actualEndDate,
+          freezeId: freeze.id,
+          freezeNumber: freezePolicy.freezeNumber,
+          membershipName: membershipDisplayName(membership),
+          mode: freeze.mode,
+          originalServiceEndDate,
+          remainingFreezeChances: membership.remainingFreezeChances - 1,
+          resultingServiceEndDate,
+          retroactiveStartDate,
+          serviceName: serviceLineDisplayName(service),
+          targetScope: "SERVICE",
+        },
+        oldValue: {
+          remainingFreezeChances: membership.remainingFreezeChances,
+          serviceEndDate: originalServiceEndDate,
+        },
+        targetId: freeze.id,
+        targetType: "PackageFreeze",
+      });
+    });
+  } catch (error) {
+    redirect(
+      customerActionPath(
+        formData,
+        customerId,
+        freezeErrorQuery(error, "service-freeze-unavailable"),
+      ),
+    );
+  }
+
+  revalidatePackageWorkflow(customerId);
+  redirect(
+    customerActionPath(formData, customerId, "status=service-retroactive-frozen"),
+  );
+}
+
+export async function adminReactivateCustomerPackageServiceAction(
+  formData: FormData,
+) {
+  const user = await requireStaffRole("ADMIN");
+  const customerId = optionalText(formData, "customerId", 100);
+  const customerCode = optionalText(formData, "customerCode", 100);
+  const customerPackageId = optionalText(formData, "customerPackageId", 100);
+  const serviceId = optionalText(formData, "serviceId", 100);
+  const packageFreezeId = optionalText(formData, "packageFreezeId", 100);
+  const notes = optionalText(formData, "notes", 1000);
+
+  if (!customerId || !customerCode || !customerPackageId || !serviceId) {
+    redirect(customerActionPath(formData, customerId, "error=invalid-service"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const service = await transaction.customerPackageService.findFirst({
+        include: {
+          customerPackage: {
+            select: {
+              customer: {
+                select: { customerCode: true, fullName: true, id: true },
+              },
+              membershipName: true,
+              package: { select: { name: true } },
+            },
+          },
+          freezes: {
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: {
+              id: true,
+              notes: true,
+              originalServiceEndDate: true,
+              plannedDays: true,
+              plannedEndDate: true,
+              startDate: true,
+              updatedAt: true,
+            },
+            take: 1,
+            where: {
+              ...(packageFreezeId ? { id: packageFreezeId } : {}),
+              status: "ACTIVE",
+            },
+          },
+          package: { select: { name: true } },
+        },
+        where: {
+          customerPackageId,
+          customerPackage: {
+            customer: { deletedAt: null },
+            customerId,
+            deletedAt: null,
+          },
+          deletedAt: null,
+          id: serviceId,
+        },
+      });
+
+      if (
+        !service ||
+        service.customerPackage.customer.customerCode !== customerCode
+      ) {
+        throw new AdvancedFreezeError("invalid-service");
+      }
+
+      const activeFreeze = service.freezes[0] ?? null;
+      if (!activeFreeze?.originalServiceEndDate) {
+        throw new AdvancedFreezeError("service-not-frozen");
+      }
+
+      const actualEndDate = new Date();
+      if (actualEndDate < activeFreeze.startDate) {
+        throw new AdvancedFreezeError("service-not-frozen");
+      }
+
+      const actualDays = calculateActualFrozenDays(
+        activeFreeze.startDate,
+        actualEndDate,
+      );
+      const resultingServiceEndDate = calculateAdjustedExpiration(
+        activeFreeze.originalServiceEndDate,
+        actualDays,
+      );
+      const nextNotes = appendFreezeNote(
+        activeFreeze.notes,
+        "Service reactivation note",
+        notes,
+      );
+      const freezeUpdateData: Prisma.PackageFreezeUncheckedUpdateManyInput = {
+        actualDays,
+        actualEndDate,
+        reactivatedById: user.id,
+        resultingServiceEndDate,
+        status: "REACTIVATED",
+      };
+
+      if (nextNotes !== undefined) {
+        freezeUpdateData.notes = nextNotes;
+      }
+
+      const freezeUpdate = await transaction.packageFreeze.updateMany({
+        data: freezeUpdateData,
+        where: {
+          id: activeFreeze.id,
+          status: "ACTIVE",
+          updatedAt: activeFreeze.updatedAt,
+        },
+      });
+
+      if (freezeUpdate.count !== 1) {
+        throw new AdvancedFreezeError("package-status-stale");
+      }
+
+      const serviceUpdate =
+        await transaction.customerPackageService.updateMany({
+          data: { endDate: resultingServiceEndDate },
+          where: {
+            customerPackageId,
+            deletedAt: null,
+            id: service.id,
+            updatedAt: service.updatedAt,
+          },
+        });
+
+      if (serviceUpdate.count !== 1) {
+        throw new AdvancedFreezeError("service-stale");
+      }
+
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_REACTIVATION",
+        actorId: user.id,
+        customerId: service.customerPackage.customer.id,
+        description: `Service reactivation for ${serviceLineDisplayName(service)} inside ${membershipDisplayName(service.customerPackage)} on ${service.customerPackage.customer.customerCode}: ${service.customerPackage.customer.fullName}.`,
+        newValue: {
+          actualDays,
+          actualEndDate,
+          freezeId: activeFreeze.id,
+          membershipName: membershipDisplayName(service.customerPackage),
+          originalServiceEndDate: activeFreeze.originalServiceEndDate,
+          resultingServiceEndDate,
+          serviceName: serviceLineDisplayName(service),
+          targetScope: "SERVICE",
+        },
+        oldValue: {
+          plannedDays: activeFreeze.plannedDays,
+          plannedEndDate: activeFreeze.plannedEndDate,
+          serviceEndDate: service.endDate,
+        },
+        targetId: activeFreeze.id,
+        targetType: "PackageFreeze",
+      });
+    });
+  } catch (error) {
+    redirect(
+      customerActionPath(
+        formData,
+        customerId,
+        freezeErrorQuery(error, "service-reactivation-unavailable"),
+      ),
+    );
+  }
+
+  revalidatePackageWorkflow(customerId);
+  redirect(customerActionPath(formData, customerId, "status=service-reactivated"));
 }

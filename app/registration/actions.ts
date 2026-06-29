@@ -5,19 +5,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireStaffUser } from "../../lib/auth";
+import {
+  membershipDisplayName,
+  serviceLineDisplayName,
+} from "../../lib/customer-memberships";
 import { db } from "../../lib/db";
 import { writeAuditLog } from "../../lib/logging";
 import type { NoteMutationResult } from "../../lib/notes";
-import {
-  calculateActualFrozenDays,
-  calculateAdjustedExpiration,
-  calculatePlannedFreezeEndDate,
-  validateFreezeDays,
-  validateFreezePolicy,
-} from "../../lib/package-freezes";
+import { hasBlockingFreeze } from "../../lib/package-freezes";
 import {
   packageTimeRestrictionReason,
-  packageUsability,
 } from "../../lib/registration/package-usability";
 
 const REGISTRATION_PATH = "/registration";
@@ -40,17 +37,6 @@ class Phase11Error extends Error {
   constructor(code: string) {
     super(code);
     this.code = code;
-  }
-}
-
-class PackageStatusError extends Error {
-  code: string;
-  freezeDaysLeft?: number;
-
-  constructor(code: string, freezeDaysLeft?: number) {
-    super(code);
-    this.code = code;
-    this.freezeDaysLeft = freezeDaysLeft;
   }
 }
 
@@ -411,10 +397,26 @@ function startOfUtcDay(value: Date) {
   return date;
 }
 
-function startOfTodayUtc() {
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  return today;
+function serviceDateError(
+  service: {
+    endDate: Date | null;
+    startDate: Date | null;
+  },
+  today: Date,
+) {
+  if (!service.startDate || !service.endDate) {
+    return "invalid-service" as const;
+  }
+
+  if (service.startDate > today) {
+    return "service-not-yet-active" as const;
+  }
+
+  if (service.endDate < today) {
+    return "service-expired" as const;
+  }
+
+  return null;
 }
 
 function addDays(value: Date, days: number) {
@@ -432,10 +434,6 @@ function startOfYerevanDayUtc(now: Date) {
   return new Date(
     localTime.getTime() - YEREVAN_UTC_OFFSET_MINUTES * 60_000,
   );
-}
-
-function activeStatusForExpiration(expirationDate: Date) {
-  return expirationDate < startOfTodayUtc() ? "EXPIRED" : "ACTIVE";
 }
 
 async function recalculateMembershipSessionTotals(
@@ -551,51 +549,8 @@ function serviceDeductionReason(serviceName: string, serviceId: string) {
   return `${SERVICE_DEDUCTION_REASON_PREFIX} ${serviceName} [service:${serviceId}]`;
 }
 
-function freezeErrorCode(error: unknown, fallback: string) {
-  if (error instanceof PackageStatusError) {
-    return error.code;
-  }
-
-  if (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
-  ) {
-    return "package-active-freeze";
-  }
-
-  return fallback;
-}
-
-function freezeErrorQuery(error: unknown, fallback: string) {
-  const params = new URLSearchParams({
-    error: freezeErrorCode(error, fallback),
-  });
-
-  if (
-    error instanceof PackageStatusError &&
-    typeof error.freezeDaysLeft === "number"
-  ) {
-    params.set("freezeDaysLeft", error.freezeDaysLeft.toString());
-  }
-
-  return params.toString();
-}
-
-async function assertRegistrationPackageFreezeAllowed(
-  transaction: Prisma.TransactionClient,
-  userRole: string,
-) {
-  if (userRole === "ADMIN") {
-    return;
-  }
-
-  const settings = await transaction.gymSettings.findFirst({
-    select: { allowRegistrationPackageFreeze: true },
-  });
-
-  if (!settings?.allowRegistrationPackageFreeze) {
-    throw new PackageStatusError("package-freeze-disabled");
-  }
+function serviceCorrectionReason(serviceName: string, serviceId: string) {
+  return `Manual service correction: ${serviceName} [service:${serviceId}]`;
 }
 
 function customerPath(
@@ -726,6 +681,15 @@ export async function checkInAction(formData: FormData) {
 
       const customerPackages = await transaction.customerPackage.findMany({
         include: {
+          freezes: {
+            select: {
+              customerPackageServiceId: true,
+              plannedEndDate: true,
+              startDate: true,
+              status: true,
+            },
+            where: { status: "ACTIVE" },
+          },
           package: {
             select: {
               allowedEndTime: true,
@@ -741,11 +705,21 @@ export async function checkInAction(formData: FormData) {
             orderBy: [{ sortOrder: "asc" }, { serviceName: "asc" }],
             select: {
               deletedAt: true,
+              endDate: true,
+              freezes: {
+                select: {
+                  plannedEndDate: true,
+                  startDate: true,
+                  status: true,
+                },
+                where: { status: "ACTIVE" },
+              },
               id: true,
               initialSessions: true,
               isActive: true,
               remainingSessions: true,
               serviceName: true,
+              startDate: true,
             },
             where: { deletedAt: null },
           },
@@ -774,6 +748,18 @@ export async function checkInAction(formData: FormData) {
       }
 
       const activeMembership = activeMemberships[0] ?? null;
+
+      if (
+        activeMembership &&
+        hasBlockingFreeze(
+          activeMembership.freezes.filter(
+            (freeze) => !freeze.customerPackageServiceId,
+          ),
+          now,
+        )
+      ) {
+        throw new CheckInError("frozen-package");
+      }
 
       if (!activeMembership) {
         if (frozenMembership) {
@@ -839,6 +825,15 @@ export async function checkInAction(formData: FormData) {
 
           if (!service) {
             throw new CheckInError("invalid-service");
+          }
+
+          const dateError = serviceDateError(service, today);
+          if (dateError) {
+            throw new CheckInError(dateError);
+          }
+
+          if (hasBlockingFreeze(service.freezes, now)) {
+            throw new CheckInError("service-frozen");
           }
 
           if (deduction > service.remainingSessions) {
@@ -914,7 +909,7 @@ export async function checkInAction(formData: FormData) {
           actionType: "CUSTOMER_CHECK_IN",
           actorId: user.id,
           customerId: customer.id,
-          description: `Deducted ${guestCount} guest pass${guestCount === 1 ? "" : "es"} from ${activeMembership.package.name} for ${customer.customerCode}: ${customer.fullName}.`,
+          description: `Deducted ${guestCount} guest pass${guestCount === 1 ? "" : "es"} from ${membershipDisplayName(activeMembership)} for ${customer.customerCode}: ${customer.fullName}.`,
           newValue: {
             guestPassesDeducted: guestCount,
             remainingGuestPasses: newRemainingGuestPasses,
@@ -1481,6 +1476,7 @@ export async function saveSessionCorrectionAction(formData: FormData) {
         },
       },
       id: true,
+      membershipName: true,
       package: {
         select: {
           name: true,
@@ -1560,7 +1556,7 @@ export async function saveSessionCorrectionAction(formData: FormData) {
         actionType: "SESSION_CORRECTION",
         actorId: user.id,
         customerId: customer.id,
-        description: `Corrected ${customerPackage.package.name} sessions for ${customer.customerCode}: ${customer.fullName} from ${previousRemainingSessions} to ${newRemainingSessions}.`,
+        description: `Corrected ${membershipDisplayName(customerPackage)} sessions for ${customer.customerCode}: ${customer.fullName} from ${previousRemainingSessions} to ${newRemainingSessions}.`,
         newValue: {
           remainingSessions: newRemainingSessions,
           sessionChangeId: sessionChange.id,
@@ -1599,254 +1595,36 @@ export async function saveSessionCorrectionAction(formData: FormData) {
   );
 }
 
-export async function freezeCustomerPackageAction(formData: FormData) {
+export async function saveServiceSessionCorrectionAction(formData: FormData) {
   const user = await requireStaffUser();
-  const customerId = optionalText(formData, "customerId", 100);
-  const customerCode = optionalText(formData, "customerCode", 100);
-  const customerPackageId = optionalText(formData, "customerPackageId", 100);
-  const plannedDays = positiveInteger(formData, "freezeDays");
-  const compact = formData.get("view") === "compact";
-  const requestedReturnPath = optionalText(formData, "returnPath", 300);
-  const adminReturnPath =
-    user.role === "ADMIN" &&
-    customerId &&
-    requestedReturnPath ===
-      `/admin/customers/${encodeURIComponent(customerId)}`
-      ? requestedReturnPath
-      : null;
-
-  if (!customerId || !customerCode || !customerPackageId) {
-    redirect(
-      adminReturnPath
-        ? `${adminReturnPath}?error=invalid-package-action`
-        : `${REGISTRATION_PATH}?error=invalid-package-action`,
-    );
-  }
-
-  if (plannedDays === null || !validateFreezeDays(plannedDays)) {
-    redirect(
-      adminReturnPath
-        ? `${adminReturnPath}?error=invalid-freeze-days`
-        : customerPath(
-            customerCode,
-            "error=invalid-freeze-days",
-            true,
-            compact,
-          ),
-    );
-  }
-
-  try {
-    await db.$transaction(async (transaction) => {
-      await assertRegistrationPackageFreezeAllowed(transaction, user.role);
-
-      const customerPackage = await transaction.customerPackage.findFirst({
-        include: {
-          customer: {
-            select: {
-              customerCode: true,
-              fullName: true,
-              id: true,
-            },
-          },
-          freezes: {
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            select: {
-              actualDays: true,
-              id: true,
-              plannedDays: true,
-              status: true,
-            },
-          },
-          package: {
-            select: {
-              deletedAt: true,
-              isActive: true,
-              name: true,
-            },
-          },
-        },
-        where: {
-          customer: { deletedAt: null },
-          customerId,
-          deletedAt: null,
-          id: customerPackageId,
-        },
-      });
-
-      if (
-        !customerPackage ||
-        customerPackage.customer.customerCode !== customerCode
-      ) {
-        throw new PackageStatusError("invalid-package-action");
-      }
-
-      if (customerPackage.freezes.some((freeze) => freeze.status === "ACTIVE")) {
-        throw new PackageStatusError("package-active-freeze");
-      }
-
-      const today = startOfTodayUtc();
-
-      if (
-        customerPackage.status !== "ACTIVE" ||
-        customerPackage.expirationDate < today ||
-        customerPackage.remainingSessions <= 0 ||
-        customerPackage.package.deletedAt ||
-        !customerPackage.package.isActive
-      ) {
-        throw new PackageStatusError("package-not-freezable");
-      }
-
-      const freezePolicy = validateFreezePolicy({
-        freezes: customerPackage.freezes,
-        remainingFreezeChances: customerPackage.remainingFreezeChances,
-        requestedDays: plannedDays,
-      });
-
-      if (!freezePolicy.ok) {
-        throw new PackageStatusError(
-          freezePolicy.code,
-          freezePolicy.usage.remainingFreezeDays,
-        );
-      }
-
-      const startDate = new Date();
-      const plannedEndDate = calculatePlannedFreezeEndDate(
-        startDate,
-        plannedDays,
-      );
-      const resultingExpirationDate = calculateAdjustedExpiration(
-        customerPackage.expirationDate,
-        plannedDays,
-      );
-
-      const update = await transaction.customerPackage.updateMany({
-        data: {
-          expirationDate: resultingExpirationDate,
-          frozenAt: startDate,
-          reactivatedAt: null,
-          remainingFreezeChances: { decrement: 1 },
-          status: "FROZEN",
-        },
-        where: {
-          customerId,
-          deletedAt: null,
-          id: customerPackage.id,
-          remainingFreezeChances: { gt: 0 },
-          status: "ACTIVE",
-          updatedAt: customerPackage.updatedAt,
-        },
-      });
-
-      if (update.count !== 1) {
-        throw new PackageStatusError("package-status-stale");
-      }
-
-      const freeze = await transaction.packageFreeze.create({
-        data: {
-          createdById: user.id,
-          customerPackageId: customerPackage.id,
-          mode: "NORMAL",
-          originalExpirationDate: customerPackage.expirationDate,
-          plannedDays,
-          plannedEndDate,
-          resultingExpirationDate,
-          startDate,
-          status: "ACTIVE",
-        },
-      });
-
-      await writeAuditLog(transaction, {
-        actionType: "PACKAGE_FREEZE",
-        actorId: user.id,
-        customerId: customerPackage.customer.id,
-        description: `Advanced normal freeze for ${customerPackage.package.name} on ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName} for ${plannedDays} day${plannedDays === 1 ? "" : "s"}.`,
-        newValue: {
-          freezeId: freeze.id,
-          freezeCountAfter: freezePolicy.usage.confirmedFreezeCount + 1,
-          freezeCountBefore: freezePolicy.usage.confirmedFreezeCount,
-          freezeDaysRemainingAfter: Math.max(
-            0,
-            freezePolicy.usage.remainingFreezeDays - plannedDays,
-          ),
-          freezeDaysUsedAfter:
-            freezePolicy.usage.usedFreezeDays + plannedDays,
-          freezeDaysUsedBefore: freezePolicy.usage.usedFreezeDays,
-          freezeNumber: freezePolicy.freezeNumber,
-          mode: freeze.mode,
-          originalExpirationDate: customerPackage.expirationDate,
-          paidFreezeNoticeRequired: freezePolicy.isPaid,
-          plannedDays,
-          plannedEndDate,
-          remainingFreezeChances:
-            customerPackage.remainingFreezeChances - 1,
-          resultingExpirationDate,
-          startDate,
-          status: "FROZEN",
-        },
-        oldValue: {
-          expirationDate: customerPackage.expirationDate,
-          remainingFreezeChances: customerPackage.remainingFreezeChances,
-          status: customerPackage.status,
-        },
-        targetId: customerPackage.id,
-        targetType: "CustomerPackage",
-      });
-    });
-  } catch (error) {
-    const errorQuery = freezeErrorQuery(error, "package-freeze-unavailable");
-    redirect(
-      adminReturnPath
-        ? `${adminReturnPath}?${errorQuery}`
-        : customerPath(customerCode, errorQuery, true, compact),
-    );
-  }
-
-  revalidatePath(REGISTRATION_PATH);
-  revalidatePath("/admin/logs");
-  revalidatePath("/admin/customers");
-  if (adminReturnPath) {
-    revalidatePath(adminReturnPath);
-  }
-  redirect(
-    adminReturnPath
-      ? `${adminReturnPath}?status=package-frozen`
-      : customerPath(customerCode, "status=package-frozen", true, compact),
-  );
-}
-
-export async function reactivateCustomerPackageAction(formData: FormData) {
-  const user = await requireStaffUser();
-  const customerId = optionalText(formData, "customerId", 100);
-  const customerCode = optionalText(formData, "customerCode", 100);
-  const customerPackageId = optionalText(formData, "customerPackageId", 100);
   const compact = formData.get("view") === "compact";
   const showAllPackages = formData.get("showAllPackages") === "1";
-  const requestedReturnPath = optionalText(formData, "returnPath", 300);
-  const adminReturnPath =
-    user.role === "ADMIN" &&
-    customerId &&
-    requestedReturnPath ===
-      `/admin/customers/${encodeURIComponent(customerId)}`
-      ? requestedReturnPath
-      : null;
+  const customerPackageServiceId = optionalText(
+    formData,
+    "customerPackageServiceId",
+    100,
+  );
+  const previousRemainingSessions = nonNegativeInteger(
+    formData,
+    "previousRemainingSessions",
+  );
+  const newRemainingSessions = nonNegativeInteger(
+    formData,
+    "newRemainingSessions",
+  );
 
-  if (!customerId || !customerCode || !customerPackageId) {
-    redirect(
-      adminReturnPath
-        ? `${adminReturnPath}?error=invalid-package-action`
-        : `${REGISTRATION_PATH}?error=invalid-package-action`,
-    );
+  if (
+    !customerPackageServiceId ||
+    previousRemainingSessions === null ||
+    newRemainingSessions === null
+  ) {
+    redirect(`${REGISTRATION_PATH}?error=invalid-service-correction`);
   }
 
-  let reactivatedStatus: "ACTIVE" | "EXPIRED";
-
-  try {
-    reactivatedStatus = await db.$transaction(async (transaction) => {
-      await assertRegistrationPackageFreezeAllowed(transaction, user.role);
-
-      const customerPackage = await transaction.customerPackage.findFirst({
-        include: {
+  const service = await db.customerPackageService.findFirst({
+    select: {
+      customerPackage: {
+        select: {
           customer: {
             select: {
               customerCode: true,
@@ -1854,206 +1632,206 @@ export async function reactivateCustomerPackageAction(formData: FormData) {
               id: true,
             },
           },
-          freezes: {
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            select: {
-              id: true,
-              originalExpirationDate: true,
-              plannedDays: true,
-              plannedEndDate: true,
-              startDate: true,
-              updatedAt: true,
-            },
-            take: 1,
-            where: { status: "ACTIVE" },
-          },
+          deletedAt: true,
+          id: true,
+          membershipName: true,
           package: {
             select: { name: true },
           },
         },
-        where: {
-          customer: { deletedAt: null },
-          customerId,
-          deletedAt: null,
-          id: customerPackageId,
-        },
-      });
+      },
+      id: true,
+      initialSessions: true,
+      isActive: true,
+      remainingSessions: true,
+      serviceName: true,
+    },
+    where: {
+      deletedAt: null,
+      id: customerPackageServiceId,
+    },
+  });
 
-      if (
-        !customerPackage ||
-        customerPackage.customer.customerCode !== customerCode
-      ) {
-        throw new PackageStatusError("invalid-package-action");
-      }
+  if (!service?.customerPackage.customer || service.customerPackage.deletedAt) {
+    redirect(`${REGISTRATION_PATH}?error=invalid-service-correction`);
+  }
 
-      if (customerPackage.status !== "FROZEN") {
-        throw new PackageStatusError("package-not-frozen");
-      }
+  const { customer } = service.customerPackage;
 
-      const activeFreeze = customerPackage.freezes[0] ?? null;
-      const reactivatedAt = new Date();
+  if (!service.isActive) {
+    redirect(
+      customerPath(
+        customer.customerCode,
+        "error=invalid-service-correction",
+        showAllPackages,
+        compact,
+      ),
+    );
+  }
 
-      if (!activeFreeze) {
-        const nextStatus = activeStatusForExpiration(
-          customerPackage.expirationDate,
-        );
+  if (newRemainingSessions > service.initialSessions) {
+    redirect(
+      customerPath(
+        customer.customerCode,
+        "error=service-correction-balance-invalid",
+        showAllPackages,
+        compact,
+      ),
+    );
+  }
 
-        const update = await transaction.customerPackage.updateMany({
-          data: {
-            reactivatedAt,
-            status: nextStatus,
-          },
-          where: {
-            customerId,
-            deletedAt: null,
-            id: customerPackage.id,
-            status: "FROZEN",
-            updatedAt: customerPackage.updatedAt,
-          },
-        });
+  if (service.remainingSessions !== previousRemainingSessions) {
+    redirect(
+      customerPath(
+        customer.customerCode,
+        "error=stale-correction",
+        showAllPackages,
+        compact,
+      ),
+    );
+  }
 
-        if (update.count !== 1) {
-          throw new PackageStatusError("package-status-stale");
-        }
+  if (newRemainingSessions === previousRemainingSessions) {
+    redirect(
+      customerPath(
+        customer.customerCode,
+        "status=no-change",
+        showAllPackages,
+        compact,
+      ),
+    );
+  }
 
-        await writeAuditLog(transaction, {
-          actionType: "PACKAGE_REACTIVATION",
-          actorId: user.id,
-          customerId: customerPackage.customer.id,
-          description: `Reactivated legacy frozen package ${customerPackage.package.name} for ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName}${nextStatus === "EXPIRED" ? " as expired" : ""}.`,
-          newValue: {
-            expirationDate: customerPackage.expirationDate,
-            frozenAt: customerPackage.frozenAt,
-            legacyFreeze: true,
-            reactivatedAt,
-            remainingSessions: customerPackage.remainingSessions,
-            status: nextStatus,
-          },
-          oldValue: {
-            expirationDate: customerPackage.expirationDate,
-            frozenAt: customerPackage.frozenAt,
-            reactivatedAt: customerPackage.reactivatedAt,
-            remainingSessions: customerPackage.remainingSessions,
-            status: customerPackage.status,
-          },
-          targetId: customerPackage.id,
-          targetType: "CustomerPackage",
-        });
+  const delta = newRemainingSessions - previousRemainingSessions;
 
-        return nextStatus;
-      }
-
-      const actualDays = calculateActualFrozenDays(
-        activeFreeze.startDate,
-        reactivatedAt,
-      );
-      const resultingExpirationDate = calculateAdjustedExpiration(
-        activeFreeze.originalExpirationDate,
-        actualDays,
-      );
-      const nextStatus = activeStatusForExpiration(resultingExpirationDate);
-
-      const freezeUpdate = await transaction.packageFreeze.updateMany({
+  try {
+    await db.$transaction(async (transaction) => {
+      const update = await transaction.customerPackageService.updateMany({
         data: {
-          actualDays,
-          actualEndDate: reactivatedAt,
-          reactivatedById: user.id,
-          resultingExpirationDate,
-          status: "REACTIVATED",
+          remainingSessions: newRemainingSessions,
         },
         where: {
-          id: activeFreeze.id,
-          status: "ACTIVE",
-          updatedAt: activeFreeze.updatedAt,
-        },
-      });
-
-      if (freezeUpdate.count !== 1) {
-        throw new PackageStatusError("package-status-stale");
-      }
-
-      const update = await transaction.customerPackage.updateMany({
-        data: {
-          expirationDate: resultingExpirationDate,
-          reactivatedAt,
-          status: nextStatus,
-        },
-        where: {
-          customerId,
           deletedAt: null,
-          id: customerPackage.id,
-          status: "FROZEN",
-          updatedAt: customerPackage.updatedAt,
+          id: service.id,
+          isActive: true,
+          remainingSessions: previousRemainingSessions,
         },
       });
 
       if (update.count !== 1) {
-        throw new PackageStatusError("package-status-stale");
+        throw new Error("STALE_CORRECTION");
       }
 
-      await writeAuditLog(transaction, {
-        actionType: "PACKAGE_REACTIVATION",
-        actorId: user.id,
-        customerId: customerPackage.customer.id,
-        description: `Advanced reactivation for ${customerPackage.package.name} on ${customerPackage.customer.customerCode}: ${customerPackage.customer.fullName}${nextStatus === "EXPIRED" ? " as expired" : ""}.`,
-        newValue: {
-          actualDays,
-          actualEndDate: reactivatedAt,
-          freezeId: activeFreeze.id,
-          originalExpirationDate: activeFreeze.originalExpirationDate,
-          resultingExpirationDate,
-          status: nextStatus,
+      await recalculateMembershipSessionTotals(
+        transaction,
+        service.customerPackage.id,
+      );
+
+      const sessionChange = await transaction.packageSessionChange.create({
+        data: {
+          changeType: "MANUAL_CORRECTION",
+          changedById: user.id,
+          customerPackageId: service.customerPackage.id,
+          delta,
+          newRemainingSessions,
+          previousRemainingSessions,
+          reason: serviceCorrectionReason(service.serviceName, service.id),
         },
-        oldValue: {
-          expirationDate: customerPackage.expirationDate,
-          freezeId: activeFreeze.id,
-          plannedDays: activeFreeze.plannedDays,
-          plannedEndDate: activeFreeze.plannedEndDate,
-          status: customerPackage.status,
-        },
-        targetId: customerPackage.id,
-        targetType: "CustomerPackage",
       });
 
-      return nextStatus;
+      await writeAuditLog(transaction, {
+        actionType: "SESSION_CORRECTION",
+        actorId: user.id,
+        customerId: customer.id,
+        description: `Corrected ${serviceLineDisplayName(service)} service sessions for ${customer.customerCode}: ${customer.fullName} from ${previousRemainingSessions} to ${newRemainingSessions}.`,
+        newValue: {
+          customerPackageId: service.customerPackage.id,
+          customerPackageServiceId: service.id,
+          remainingSessions: newRemainingSessions,
+          serviceName: service.serviceName,
+          sessionChangeId: sessionChange.id,
+        },
+        oldValue: {
+          remainingSessions: previousRemainingSessions,
+          serviceName: service.serviceName,
+        },
+        targetId: service.id,
+        targetType: "CustomerPackageService",
+      });
     });
   } catch (error) {
-    const errorCode = freezeErrorCode(
-      error,
-      "package-reactivation-unavailable",
-    );
+    const errorCode =
+      error instanceof Error && error.message === "STALE_CORRECTION"
+        ? "stale-correction"
+        : "correction-unavailable";
+
     redirect(
-      adminReturnPath
-        ? `${adminReturnPath}?error=${errorCode}`
-        : customerPath(
-            customerCode,
-            `error=${errorCode}`,
-            showAllPackages,
-            compact,
-          ),
+      customerPath(
+        customer.customerCode,
+        `error=${errorCode}`,
+        showAllPackages,
+        compact,
+      ),
     );
   }
 
   revalidatePath(REGISTRATION_PATH);
+  revalidatePath(REGISTRATION_GENERAL_PATH);
   revalidatePath("/admin/logs");
-  revalidatePath("/admin/customers");
-  if (adminReturnPath) {
-    revalidatePath(adminReturnPath);
-  }
+  revalidatePath(`/admin/customers/${encodeURIComponent(customer.id)}`);
+  redirect(
+    customerPath(
+      customer.customerCode,
+      "status=service-correction-saved",
+      showAllPackages,
+      compact,
+    ),
+  );
+}
+
+export async function freezeCustomerPackageAction(formData: FormData) {
+  await requireStaffUser();
+  const customerId = optionalText(formData, "customerId", 100);
+  const customerCode = optionalText(formData, "customerCode", 100);
+  const compact = formData.get("view") === "compact";
+  const requestedReturnPath = optionalText(formData, "returnPath", 300);
+  const adminReturnPath =
+    customerId &&
+    requestedReturnPath ===
+      `/admin/customers/${encodeURIComponent(customerId)}`
+      ? requestedReturnPath
+      : null;
+  const adminOnlyQuery = "error=package-freeze-admin-only";
+
   redirect(
     adminReturnPath
-      ? `${adminReturnPath}?${
-          reactivatedStatus === "EXPIRED"
-            ? "status=package-reactivated-expired"
-            : "status=package-reactivated"
-        }`
-      : customerPath(
-          customerCode,
-          reactivatedStatus === "EXPIRED"
-            ? "status=package-reactivated-expired"
-            : "status=package-reactivated",
-          showAllPackages,
-          compact,
-        ),
+      ? `${adminReturnPath}?${adminOnlyQuery}`
+      : customerCode
+        ? customerPath(customerCode, adminOnlyQuery, true, compact)
+        : `${REGISTRATION_PATH}?${adminOnlyQuery}`,
+  );
+}
+
+export async function reactivateCustomerPackageAction(formData: FormData) {
+  await requireStaffUser();
+  const customerId = optionalText(formData, "customerId", 100);
+  const customerCode = optionalText(formData, "customerCode", 100);
+  const compact = formData.get("view") === "compact";
+  const showAllPackages = formData.get("showAllPackages") === "1";
+  const requestedReturnPath = optionalText(formData, "returnPath", 300);
+  const adminReturnPath =
+    customerId &&
+    requestedReturnPath ===
+      `/admin/customers/${encodeURIComponent(customerId)}`
+      ? requestedReturnPath
+      : null;
+  const adminOnlyQuery = "error=package-freeze-admin-only";
+
+  redirect(
+    adminReturnPath
+      ? `${adminReturnPath}?${adminOnlyQuery}`
+      : customerCode
+        ? customerPath(customerCode, adminOnlyQuery, showAllPackages, compact)
+        : `${REGISTRATION_PATH}?${adminOnlyQuery}`,
   );
 }

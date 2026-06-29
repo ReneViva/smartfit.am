@@ -236,7 +236,7 @@ export function CustomerSearchResults({
                       </p>
                     ) : null}
                     <p className="mt-2 text-sm font-semibold text-foreground">
-                      {activePackages} active package
+                      {activePackages} active membership
                       {activePackages === 1 ? "" : "s"}
                     </p>
                   </div>
@@ -258,13 +258,13 @@ export function CustomerSearchResults({
                       {customer.status.toLowerCase()} customer
                     </StatusBadge>
                     {hasNoPackage ? (
-                      <StatusBadge status="high">no package</StatusBadge>
+                      <StatusBadge status="high">no membership</StatusBadge>
                     ) : null}
                     {hasFrozen ? (
-                      <StatusBadge status="medium">frozen package</StatusBadge>
+                      <StatusBadge status="medium">frozen membership</StatusBadge>
                     ) : null}
                     {hasExpired ? (
-                      <StatusBadge status="expired">expired package</StatusBadge>
+                      <StatusBadge status="expired">expired membership</StatusBadge>
                     ) : null}
                     {hasZeroSessions ? (
                       <StatusBadge status="high">zero sessions</StatusBadge>

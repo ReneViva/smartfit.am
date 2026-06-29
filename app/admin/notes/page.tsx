@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CustomerNotesOverview } from "../../../components/registration/customer-notes-overview";
 import { GeneralNotesSection } from "../../../components/registration/general-notes-section";
 import { NotesLiveRefresh } from "../../../components/registration/notes-live-refresh";
+import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import {
   getCustomerNotesOverview,
@@ -91,12 +92,9 @@ export default async function AdminNotesPage({
                   placeholder="Name or member code..."
                 />
               </label>
-              <button
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
-                type="submit"
-              >
+              <Button pendingLabel="Searching..." type="submit">
                 Search
-              </button>
+              </Button>
             </form>
           </Card>
           <div className="mt-6">

@@ -1,7 +1,12 @@
 import { AuditActionType, Prisma } from "@prisma/client";
 import Link from "next/link";
 
+import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
+import {
+  membershipDisplayName,
+  serviceLineDisplayName,
+} from "../../../lib/customer-memberships";
 import { db } from "../../../lib/db";
 
 type LogsPageProps = {
@@ -147,6 +152,7 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
       select: {
         customer: { select: { customerCode: true, fullName: true } },
         id: true,
+        membershipName: true,
         package: { select: { name: true } },
         status: true,
       },
@@ -157,10 +163,12 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
         customerPackage: {
           select: {
             customer: { select: { customerCode: true, fullName: true } },
+            membershipName: true,
             package: { select: { name: true } },
           },
         },
         id: true,
+        package: { select: { name: true } },
         serviceName: true,
       },
       where: { id: { in: targetIds(logs, "CustomerPackageService") } },
@@ -206,7 +214,15 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
         customerPackage: {
           select: {
             customer: { select: { customerCode: true, fullName: true } },
+            membershipName: true,
             package: { select: { name: true } },
+          },
+        },
+        customerPackageService: {
+          select: {
+            coachName: true,
+            package: { select: { name: true } },
+            serviceName: true,
           },
         },
         id: true,
@@ -245,7 +261,7 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
       targetLabels,
       "CustomerPackage",
       membership.id,
-      `${membership.customer.customerCode}: ${membership.customer.fullName} / ${membership.package.name} (${membership.status})`,
+      `${membership.customer.customerCode}: ${membership.customer.fullName} / ${membershipDisplayName(membership)} (${membership.status})`,
     );
   }
 
@@ -254,7 +270,7 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
       targetLabels,
       "CustomerPackageService",
       service.id,
-      `${service.serviceName} for ${service.customerPackage.customer.customerCode}: ${service.customerPackage.customer.fullName}`,
+      `${serviceLineDisplayName(service)} for ${service.customerPackage.customer.customerCode}: ${service.customerPackage.customer.fullName}`,
     );
   }
 
@@ -308,11 +324,15 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
   }
 
   for (const freeze of targetFreezes) {
+    const targetName = freeze.customerPackageService
+      ? `${serviceLineDisplayName(freeze.customerPackageService)} service in ${membershipDisplayName(freeze.customerPackage)}`
+      : membershipDisplayName(freeze.customerPackage);
+
     setTargetLabel(
       targetLabels,
       "PackageFreeze",
       freeze.id,
-      `${freeze.customerPackage.package.name} for ${freeze.customerPackage.customer.customerCode}: ${freeze.customerPackage.customer.fullName} (${freeze.mode.toLowerCase()} ${freeze.status.toLowerCase()})`,
+      `${targetName} for ${freeze.customerPackage.customer.customerCode}: ${freeze.customerPackage.customer.fullName} (${freeze.mode.toLowerCase()} ${freeze.status.toLowerCase()})`,
     );
   }
 
@@ -380,12 +400,13 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
               placeholder="Name or member code..."
             />
           </label>
-          <button
-            className="inline-flex min-h-11 items-center justify-center self-end rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+          <Button
+            className="self-end"
+            pendingLabel="Applying..."
             type="submit"
           >
             Apply filters
-          </button>
+          </Button>
         </form>
       </Card>
 

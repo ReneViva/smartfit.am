@@ -2,24 +2,22 @@
 
 import { useEffect } from "react";
 
-const THEME_KEY = "smartfit-public-theme";
-
-function applyTheme(theme: "dark" | "light") {
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.style.colorScheme = theme;
-}
+import { THEME_STORAGE_KEY } from "../../lib/theme";
+import { getPreferredClientTheme, persistTheme } from "./theme-client";
 
 export function ThemeInit() {
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem(THEME_KEY);
-    const theme =
-      storedTheme === "dark" || storedTheme === "light"
-        ? storedTheme
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
+    persistTheme(getPreferredClientTheme());
 
-    applyTheme(theme);
+    function handleStorage(event: StorageEvent) {
+      if (event.key === THEME_STORAGE_KEY) {
+        persistTheme(getPreferredClientTheme());
+      }
+    }
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   return null;

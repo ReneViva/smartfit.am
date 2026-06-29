@@ -296,6 +296,7 @@ export function CustomerPackageAssignmentForm({
       <div className="mt-5 flex flex-wrap gap-3">
         <Button
           disabled={!packages.length || !selectedPackageId}
+          pendingLabel="Assigning..."
           type="submit"
         >
           Assign package / service

@@ -60,7 +60,7 @@ const registrationToggleFields = [
   },
   {
     defaultChecked: false,
-    label: "Allow Registration to freeze/reactivate packages",
+    label: "Legacy Registration freeze toggle (ignored)",
     name: "allowRegistrationPackageFreeze",
   },
 ] as const;
@@ -341,9 +341,9 @@ export default async function SettingsPage({
             Registration workspace
           </h3>
           <p className="mt-2 text-sm leading-6 text-secondary">
-            Control daily Registration visibility and package freeze access.
-            When freeze access is disabled, only Admin can freeze or reactivate
-            customer packages.
+            Control daily Registration visibility. The legacy freeze toggle is
+            retained for migration compatibility, but freezing and reactivation
+            are Admin-only in this branch.
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {registrationToggleFields.map(({ defaultChecked, label, name }) => (
@@ -364,7 +364,9 @@ export default async function SettingsPage({
           </div>
         </Card>
 
-        <Button type="submit">Save settings</Button>
+        <Button pendingLabel="Saving..." type="submit">
+          Save settings
+        </Button>
       </form>
     </>
   );

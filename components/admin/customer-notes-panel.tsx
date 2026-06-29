@@ -134,6 +134,8 @@ export function CustomerNotesPanel({
             </Link>
             <Button
               disabled={isPending || !draft.trim()}
+              isPending={isPending}
+              pendingLabel="Saving..."
               type="submit"
             >
               {isPending ? "Saving note..." : "Add note"}

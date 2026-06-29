@@ -11,6 +11,7 @@ import {
   adminReactivateCustomerPackageAction,
   adminRetroactiveFreezeCustomerPackageAction,
 } from "../../app/admin/customers/actions";
+import { membershipDisplayName } from "../../lib/customer-memberships";
 import {
   calculateActualFrozenDays,
   calculateFreezeUsage,
@@ -29,6 +30,7 @@ type ActiveFreezeValue = {
   actualDays: number | null;
   actualEndDate: Date | null;
   createdAt: Date;
+  customerPackageServiceId?: string | null;
   id: string;
   mode: PackageFreezeMode;
   notes: string | null;
@@ -44,11 +46,12 @@ type CustomerPackageFreezeValue = {
   expirationDate: Date;
   freezes: ActiveFreezeValue[];
   id: string;
+  membershipName: string | null;
   package: {
     deletedAt: Date | null;
     isActive: boolean;
     name: string;
-  };
+  } | null;
   remainingFreezeChances: number;
   remainingSessions: number;
   status: CustomerPackageStatus;
@@ -120,14 +123,20 @@ export function CustomerPackageFreezeControls({
   latestCompletedCheckoutAt: Date | null;
 }) {
   const activeFreeze =
-    customerPackage.freezes.find((freeze) => freeze.status === "ACTIVE") ??
+    customerPackage.freezes.find(
+      (freeze) =>
+        freeze.status === "ACTIVE" && !freeze.customerPackageServiceId,
+    ) ??
     null;
   const freezeUsage = calculateFreezeUsage(customerPackage.freezes);
   const nextFreezeNumber = getNextFreezeNumber(freezeUsage);
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
+  const membershipName = membershipDisplayName(customerPackage);
   const packageDefinitionAvailable =
-    !customerPackage.package.deletedAt && customerPackage.package.isActive;
+    customerPackage.package
+      ? !customerPackage.package.deletedAt && customerPackage.package.isActive
+      : true;
   const hasValidFreezeCounter =
     Number.isInteger(customerPackage.remainingFreezeChances) &&
     customerPackage.remainingFreezeChances >= 0;
@@ -158,23 +167,21 @@ export function CustomerPackageFreezeControls({
     hasUsableSessions &&
     packageDefinitionAvailable &&
     (customerPackage.status === "ACTIVE" ||
-      customerPackage.status === "EXPIRED") &&
-    retroactiveDays !== null &&
-    retroactiveDays <= freezeUsage.remainingFreezeDays;
+      customerPackage.status === "EXPIRED");
   const canReactivate =
     Boolean(activeFreeze) && customerPackage.status === "FROZEN";
   const freezeNotice = activeFreeze
     ? `Active freeze reserves ${activeFreeze.plannedDays} planned day${activeFreeze.plannedDays === 1 ? "" : "s"} until reactivation.`
     : !hasValidFreezeCounter
-      ? "Freeze counter is invalid. Review the assigned package before freezing."
+      ? `Freeze counter is invalid. Review ${membershipName} before freezing.`
       : hasCounterMismatch
         ? "Freeze counter needs review before freezing."
         : !hasFreezeChance
-          ? "This assignment has no remaining freeze chances."
+          ? "This membership has no remaining freeze chances."
           : !hasFreezeCountRoom
             ? "Maximum 3 freezes already used."
             : !hasFreezeDayRoom
-              ? "This package already used the maximum 30 freeze days."
+              ? "This membership already used the maximum 30 freeze days."
               : isPaidFreezeNumber(nextFreezeNumber)
                 ? `Freeze #${nextFreezeNumber} is paid. Collect payment before confirming.`
                 : "Freeze #1 is free.";
@@ -228,7 +235,7 @@ export function CustomerPackageFreezeControls({
 
       {!hasFreezeChance ? (
         <p className="rounded-lg border border-status-medium bg-page px-3 py-2 text-sm font-semibold text-foreground">
-          This assignment has no remaining freeze chances. Edit the assignment
+          This membership has no remaining freeze chances. Edit the membership
           counter before freezing.
         </p>
       ) : null}
@@ -293,13 +300,17 @@ export function CustomerPackageFreezeControls({
                 Expiration will be recalculated from the original expiration
                 plus the actual frozen days.
               </p>
-              <Button className="mt-4 w-full sm:w-auto" type="submit">
+              <Button
+                className="mt-4 w-full sm:w-auto"
+                pendingLabel="Reactivating..."
+                type="submit"
+              >
                 Reactivate with actual days
               </Button>
             </form>
           ) : (
             <p className="mt-4 rounded-lg border border-status-high bg-card px-3 py-2 text-sm font-semibold text-foreground">
-              An active freeze record exists, but this assignment is not marked
+              An active freeze record exists, but this membership is not marked
               frozen. Review the record before changing status.
             </p>
           )}
@@ -321,6 +332,17 @@ export function CustomerPackageFreezeControls({
               customerPackageId={customerPackage.id}
             />
             <label className={labelClass}>
+              Freeze start date
+              <input
+                className={inputClass}
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                min={new Date().toISOString().slice(0, 10)}
+                name="startDate"
+                required
+                type="date"
+              />
+            </label>
+            <label className={`${labelClass} mt-3`}>
               Planned days
               <input
                 className={inputClass}
@@ -345,11 +367,13 @@ export function CustomerPackageFreezeControls({
             </label>
             <p className="mt-2 text-sm text-secondary">
               Creates an active freeze record, decrements one chance, marks the
-              package frozen, and extends expiration by the planned days.
+              membership frozen when the start date is today, and extends
+              expiration by the planned days.
             </p>
             <Button
               className="mt-4 w-full sm:w-auto"
               disabled={!canNormalFreeze}
+              pendingLabel="Freezing..."
               type="submit"
               variant="warning"
             >
@@ -357,8 +381,8 @@ export function CustomerPackageFreezeControls({
             </Button>
             {!canNormalFreeze ? (
               <p className="mt-3 text-sm font-semibold text-secondary">
-                Normal freeze requires an active, unexpired assignment with
-                remaining sessions, an available package definition, no active
+                Normal freeze requires an active, unexpired membership with
+                remaining sessions, an available legacy package definition when linked, no active
                 freeze, at least one freeze chance, fewer than 3 freezes, and
                 available days inside the 30-day limit.
               </p>
@@ -368,7 +392,7 @@ export function CustomerPackageFreezeControls({
 
         <details className="smooth-panel rounded-xl border border-border bg-page p-4 open:border-brand">
           <summary className="cursor-pointer list-none font-bold text-foreground">
-            Retroactive freeze from latest checkout
+            Retroactive freeze
           </summary>
           <div className="mt-4 space-y-3">
             <p className="rounded-lg bg-card px-3 py-2 text-sm text-secondary">
@@ -394,6 +418,32 @@ export function CustomerPackageFreezeControls({
                 customerId={customerId}
                 customerPackageId={customerPackage.id}
               />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className={labelClass}>
+                  Retroactive start date
+                  <input
+                    className={inputClass}
+                    max={new Date().toISOString().slice(0, 10)}
+                    name="retroactiveStartDate"
+                    required
+                    type="date"
+                  />
+                </label>
+                <label className={labelClass}>
+                  Actual frozen days
+                  <input
+                    className={inputClass}
+                    defaultValue={retroactiveDays ?? 1}
+                    inputMode="numeric"
+                    max={freezeUsage.remainingFreezeDays || undefined}
+                    min={1}
+                    name="actualDays"
+                    required
+                    step={1}
+                    type="number"
+                  />
+                </label>
+              </div>
               <label className={labelClass}>
                 Retroactive note
                 <textarea
@@ -405,12 +455,13 @@ export function CustomerPackageFreezeControls({
               </label>
               <p className="mt-2 text-sm text-secondary">
                 Creates a completed freeze record, decrements one chance,
-                extends expiration by the calculated days, and does not leave
-                the package frozen.
+                extends expiration by the actual days, and does not leave
+                the membership frozen.
               </p>
               <Button
                 className="mt-4 w-full sm:w-auto"
                 disabled={!canRetroactiveFreeze}
+                pendingLabel="Freezing..."
                 type="submit"
                 variant="warning"
               >
@@ -418,10 +469,10 @@ export function CustomerPackageFreezeControls({
               </Button>
               {!canRetroactiveFreeze ? (
                 <p className="mt-3 text-sm font-semibold text-secondary">
-                  Retroactive freeze requires a completed checkout, calculated
-                  positive days, no active freeze, remaining sessions, and at
-                  least one freeze chance. Calculated days must also fit inside
-                  the remaining 30-day freeze budget.
+                  Retroactive freeze requires a past start date, positive days,
+                  no active membership freeze, remaining sessions, and at least
+                  one freeze chance. Days must fit inside the remaining 30-day
+                  freeze budget.
                 </p>
               ) : null}
             </form>

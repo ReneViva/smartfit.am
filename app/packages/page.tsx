@@ -191,7 +191,11 @@ export default async function PackagesPage({
                 <option value="price-desc">Price high to low</option>
               </select>
             </label>
-            <Button className="w-full xl:min-w-36" type="submit">
+            <Button
+              className="w-full xl:min-w-36"
+              pendingLabel="Applying..."
+              type="submit"
+            >
               Apply filters
             </Button>
           </form>
@@ -234,37 +238,55 @@ export default async function PackagesPage({
             <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {catalog.packages.map((gymPackage) => {
                 const hasDiscount = Boolean(gymPackage.discountPrice);
+                const ribbonLabel = hasDiscount
+                  ? gymPackage.discountRibbonPercent
+                    ? `${gymPackage.discountRibbonPercent}%`
+                    : "Discount"
+                  : null;
 
                 return (
                   <article
-                    className={`public-interactive-card group flex min-h-full flex-col overflow-hidden rounded-lg border shadow-sm ${
+                    className={`public-interactive-card group relative flex min-h-full flex-col overflow-hidden rounded-lg border shadow-sm ${
                       gymPackage.highlightOnPublicPackages
                         ? "border-brand/70 bg-soft-blue shadow-lg shadow-brand/10"
                         : "border-border bg-card"
                     }`}
                     key={gymPackage.id}
                   >
-                    <div
-                      className={
-                        gymPackage.highlightOnPublicPackages
-                          ? "h-2 bg-status-low"
-                          : "h-2 bg-brand"
-                      }
-                    />
+                    {ribbonLabel ? (
+                      <div className="absolute left-3 top-3 z-10 rounded-full bg-button-danger px-3 py-1.5 text-xs font-black uppercase tracking-wide text-white shadow-lg">
+                        {ribbonLabel}
+                      </div>
+                    ) : null}
+                    {gymPackage.highlightOnPublicPackages ? (
+                      <div className="absolute right-3 top-3 z-10 rounded-full bg-brand px-3 py-1.5 text-xs font-black uppercase tracking-wide text-white shadow-lg">
+                        Featured
+                      </div>
+                    ) : null}
+                    <div className="relative aspect-[16/10] overflow-hidden bg-[#07111d]">
+                      {gymPackage.imageUrl ? (
+                        <img
+                          alt={`${gymPackage.name} package image`}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          src={gymPackage.imageUrl}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_25%,rgba(0,166,255,0.45),transparent_32%),linear-gradient(135deg,#061521,#0f1f2f_52%,#101826)] px-6 text-center">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/65">
+                              Smartfit.am
+                            </p>
+                            <p className="mt-2 text-2xl font-black text-white">
+                              Training Package
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <div className="flex flex-1 flex-col p-6">
                       <div className="flex flex-wrap gap-2">
-                        {gymPackage.highlightOnPublicPackages ? (
-                          <span className="w-fit rounded-full bg-brand px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-                            Featured
-                          </span>
-                        ) : null}
-                        {hasDiscount ? (
-                          <span className="w-fit rounded-full border border-status-low bg-card px-3 py-1 text-xs font-bold uppercase tracking-wide text-foreground">
-                            Discount
-                          </span>
-                        ) : null}
                         {gymPackage.categories.length ? (
-                          gymPackage.categories.map((category) => (
+                          gymPackage.categories.slice(0, 2).map((category) => (
                             <span
                               className="w-fit rounded-full bg-card px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary-active ring-1 ring-brand/20"
                               key={category.slug}
@@ -321,48 +343,12 @@ export default async function PackagesPage({
                         )}
                       </div>
 
-                      <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-                        <div>
-                          <dt className="font-semibold text-secondary">
-                            Sessions
-                          </dt>
-                          <dd className="mt-1 text-lg font-bold text-foreground">
-                            {gymPackage.sessionCount}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="font-semibold text-secondary">
-                            Guest passes
-                          </dt>
-                          <dd className="mt-1 text-lg font-bold text-foreground">
-                            {gymPackage.defaultGuestPasses}
-                          </dd>
-                        </div>
-                        {gymPackage.assignedCoach ? (
-                          <div className="sm:col-span-2">
-                            <dt className="font-semibold text-secondary">
-                              Coach
-                            </dt>
-                            <dd className="mt-1 text-foreground">
-                              {gymPackage.assignedCoach.firstName}{" "}
-                              {gymPackage.assignedCoach.lastName}
-                            </dd>
-                          </div>
-                        ) : null}
-                      </dl>
-
-                      {gymPackage.timeRestrictionLabel ? (
-                        <p className="mt-5 rounded-lg border border-brand/30 bg-card px-3 py-2 text-sm font-semibold text-primary-active">
-                          {gymPackage.timeRestrictionLabel}
-                        </p>
-                      ) : null}
-
-                      {/* <Link
-                      className="mt-auto inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-bold text-white transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                      href="/contact"
-                    >
-                      Ask about this package
-                    </Link> */}
+                      <Link
+                        className="mt-auto inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-bold text-white transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                        href="/contact"
+                      >
+                        Ask about this package
+                      </Link>
                     </div>
                   </article>
                 );

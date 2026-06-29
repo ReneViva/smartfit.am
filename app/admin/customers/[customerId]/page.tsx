@@ -6,12 +6,14 @@ import { CustomerProfileImagePanel } from "../../../../components/customer-profi
 import { CustomerDocumentsPanel } from "../../../../components/admin/customer-documents-panel";
 import { CustomerForm } from "../../../../components/admin/customer-form";
 import { CustomerMembershipEditor } from "../../../../components/admin/customer-membership-editor";
+import { CustomerMembershipHistory } from "../../../../components/admin/customer-membership-history";
 import { CustomerNotesPanel } from "../../../../components/admin/customer-notes-panel";
 import { CustomerPackageOverview } from "../../../../components/admin/customer-package-overview";
 import { CustomerVisitHistory } from "../../../../components/admin/customer-visit-history";
 import { CustomerWorkspaceActions } from "../../../../components/admin/customer-workspace-actions";
 import { Card } from "../../../../components/ui/card";
 import { StatusBadge } from "../../../../components/ui/status-badge";
+import { getCustomerMembershipHistoryForAdmin } from "../../../../lib/admin/customer-membership-history";
 import { getCustomerVisitHistoryForAdmin } from "../../../../lib/admin/customer-visit-history";
 import { listCustomerDocumentsForAdmin } from "../../../../lib/customer-documents/actions";
 import { db } from "../../../../lib/db";
@@ -50,14 +52,16 @@ const errorMessages: Record<string, string> = {
   "invalid-email": "Enter a valid email address or leave it empty.",
   "invalid-freeze-days":
     "Freeze duration must be a positive whole number of days.",
+  "invalid-freeze-dates":
+    "Freeze dates must be valid. Planned freezes cannot start before today.",
   "invalid-retroactive-freeze":
-    "Retroactive freeze days could not be calculated from the latest checkout.",
+    "Enter a past start date and a positive whole-number frozen-day count.",
   "invalid-package": "Choose an available package definition.",
   "invalid-membership":
-    "Choose a package template and enter valid membership dates, guest passes, freeze chances, access limits, and status.",
+    "Enter a membership title, dates, guest passes, freeze chances, access limits, time rule, and status.",
   "invalid-membership-balance":
     "Remaining guest passes and freeze chances cannot exceed their allowed values.",
-  "invalid-package-action": "The package status action is not available.",
+  "invalid-package-action": "The membership status action is not available.",
   "invalid-package-balance":
     "Remaining sessions and guest passes cannot exceed their initial values.",
   "invalid-package-edit":
@@ -75,29 +79,29 @@ const errorMessages: Record<string, string> = {
   "package-edit-unavailable":
     "The assigned package could not be updated. Please review it and try again.",
   "package-freeze-unavailable":
-    "The package could not be frozen. Please try again.",
+    "The membership could not be frozen. Please try again.",
   "package-active-freeze":
-    "This package already has an active freeze record.",
+    "This membership already has an active freeze record.",
   "package-no-checkout":
     "No completed checkout was found for a retroactive freeze.",
   "package-no-freeze-chances":
     "This assignment has no remaining freeze chances. Edit the counter before freezing.",
   "package-freeze-counter-invalid":
-    "Remaining freeze chances are invalid for this package.",
+    "Remaining freeze chances are invalid for this membership.",
   "package-freeze-counter-mismatch":
     "Remaining freeze chances do not match the freeze record limit. Review the assignment counter.",
   "package-freeze-days-limit":
-    "This package already used the maximum 30 freeze days.",
+    "This membership already used the maximum 30 freeze days.",
   "package-freeze-limit": "Maximum 3 freezes already used.",
   "package-not-freezable":
-    "Only an active, unexpired package with remaining sessions can be frozen.",
-  "package-not-frozen": "This package is no longer frozen.",
+    "Only an active, unexpired membership with remaining sessions can be frozen.",
+  "package-not-frozen": "This membership is no longer frozen.",
   "package-reactivation-unavailable":
-    "The package could not be reactivated. Please try again.",
+    "The membership could not be reactivated. Please try again.",
   "retroactive-freeze-unavailable":
     "The retroactive freeze could not be saved. Please try again.",
   "package-status-stale":
-    "The package status changed before the action completed. Review it and try again.",
+    "The membership status changed before the action completed. Review it and try again.",
   "membership-conflict":
     "This customer has multiple active membership containers from older data. Resolve manually before using the new membership editor.",
   "membership-exists":
@@ -105,13 +109,34 @@ const errorMessages: Record<string, string> = {
   "membership-unavailable":
     "The membership could not be saved. Please review it and try again.",
   "invalid-service":
-    "Enter a service name and valid whole-number service sessions.",
+    "Enter a service name, valid dates, and whole-number service sessions.",
+  "invalid-service-dates":
+    "Service end date cannot be before service start date.",
   "invalid-service-reference":
-    "Selected service package, category, or coach is not available.",
+    "The service line could not be matched to this membership. Review and try again.",
   "service-balance-invalid":
     "Remaining service sessions cannot exceed initial service sessions.",
+  "service-date-outside-membership":
+    "Service dates must stay inside the parent membership date range.",
   "service-unavailable":
     "The service line could not be saved. Please review it and try again.",
+  "service-active-freeze":
+    "This service line already has an active freeze.",
+  "service-freeze-after-end":
+    "Service freeze start cannot be after the service end date.",
+  "service-freeze-before-start":
+    "Service freeze start cannot be before the service start date.",
+  "service-freeze-dates-required":
+    "Set valid service start and end dates before freezing this service.",
+  "service-freeze-expired":
+    "Expired service lines cannot receive a planned/current freeze.",
+  "service-freeze-unavailable":
+    "The service line could not be frozen. Please review it and try again.",
+  "service-not-frozen": "This service line is not currently frozen.",
+  "service-reactivation-unavailable":
+    "The service line could not be reactivated. Please review it and try again.",
+  "service-stale":
+    "The service line changed before the freeze action completed. Review and try again.",
 };
 
 const statusMessages: Record<string, string> = {
@@ -119,13 +144,19 @@ const statusMessages: Record<string, string> = {
   "package-assigned":
     "Package assigned. A new package history record was created.",
   "package-frozen":
-    "Package frozen. A freeze record was created and the chance counter was updated.",
+    "Membership frozen. A freeze record was created and the chance counter was updated.",
   "package-reactivated":
-    "Package reactivated. Expiration was recalculated from actual frozen days.",
+    "Membership reactivated. Expiration was recalculated from actual frozen days.",
   "package-reactivated-expired":
-    "Package reactivated as expired because its expiration date has passed.",
+    "Membership reactivated as expired because its expiration date has passed.",
   "package-retroactive-frozen":
-    "Retroactive freeze saved. The package was not left frozen.",
+    "Retroactive freeze saved. The membership was not left frozen.",
+  "service-frozen":
+    "Service freeze saved. The service end date was extended and a freeze chance was used.",
+  "service-reactivated":
+    "Service reactivated. The service end date was recalculated from actual frozen days.",
+  "service-retroactive-frozen":
+    "Retroactive service freeze saved. The service end date was extended.",
   "package-updated":
     "Assigned package updated. Previous and new values were logged.",
   "membership-saved": "Membership saved.",
@@ -153,7 +184,7 @@ function freezeDaysExceededMessage(value: string | undefined) {
   const freezeDaysLeft = Number(value);
 
   if (Number.isInteger(freezeDaysLeft) && freezeDaysLeft >= 0) {
-    return `Only ${freezeDaysLeft} freeze day${freezeDaysLeft === 1 ? "" : "s"} remain for this package.`;
+    return `Only ${freezeDaysLeft} freeze day${freezeDaysLeft === 1 ? "" : "s"} remain for this membership.`;
   }
 
   return "The requested freeze would exceed the maximum 30 freeze days.";
@@ -168,9 +199,9 @@ export default async function CustomerDetailPage({
     customer,
     coaches,
     packageOptions,
-    categories,
     customerDocuments,
     recentVisits,
+    membershipHistory,
     latestCompletedVisit,
     openVisit,
   ] =
@@ -228,6 +259,7 @@ export default async function CustomerDetailPage({
                   actualDays: true,
                   actualEndDate: true,
                   createdAt: true,
+                  customerPackageServiceId: true,
                   id: true,
                   mode: true,
                   notes: true,
@@ -245,11 +277,30 @@ export default async function CustomerDetailPage({
                   category: {
                     select: { name: true },
                   },
-                  categoryId: true,
                   coach: {
                     select: { firstName: true, lastName: true },
                   },
-                  coachId: true,
+                  coachName: true,
+                  endDate: true,
+                  freezes: {
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    select: {
+                      actualDays: true,
+                      actualEndDate: true,
+                      createdAt: true,
+                      id: true,
+                      mode: true,
+                      notes: true,
+                      originalExpirationDate: true,
+                      originalServiceEndDate: true,
+                      plannedDays: true,
+                      plannedEndDate: true,
+                      resultingExpirationDate: true,
+                      resultingServiceEndDate: true,
+                      startDate: true,
+                      status: true,
+                    },
+                  },
                   id: true,
                   initialSessions: true,
                   isActive: true,
@@ -257,10 +308,10 @@ export default async function CustomerDetailPage({
                   package: {
                     select: { name: true },
                   },
-                  packageId: true,
                   remainingSessions: true,
                   serviceName: true,
                   sortOrder: true,
+                  startDate: true,
                 },
                 where: { deletedAt: null },
               },
@@ -299,13 +350,12 @@ export default async function CustomerDetailPage({
         },
         where: { deletedAt: null },
       }),
-      db.category.findMany({
-        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-        select: { id: true, name: true },
-        where: { isArchived: false },
-      }),
       listCustomerDocumentsForAdmin(customerId),
-      getCustomerVisitHistoryForAdmin(customerId, { take: 3 }),
+      getCustomerVisitHistoryForAdmin(customerId, {
+        scope: "current",
+        take: 3,
+      }),
+      getCustomerMembershipHistoryForAdmin(customerId, { take: 20 }),
       db.gymVisit.findFirst({
         orderBy: [{ checkedOutAt: "desc" }, { id: "desc" }],
         select: { checkedOutAt: true },
@@ -490,7 +540,7 @@ export default async function CustomerDetailPage({
               </dd>
             </div>
             <div className="rounded-xl bg-card p-4">
-              <dt className="font-semibold text-secondary">Package history</dt>
+              <dt className="font-semibold text-secondary">Membership history</dt>
               <dd className="mt-1 font-semibold text-foreground">
                 {customer.packages.length} record
                 {customer.packages.length === 1 ? "" : "s"}
@@ -533,12 +583,11 @@ export default async function CustomerDetailPage({
       <Card className="mt-6 scroll-mt-6" id="customer-packages">
         <CustomerMembershipEditor
           activeMembershipConflict={activeMembershipConflict}
-          categories={categories}
-          coaches={coaches}
+          customerCode={customer.customerCode}
           customerId={customer.id}
+          latestCompletedCheckoutAt={latestCompletedVisit?.checkedOutAt ?? null}
           legacyActiveMemberships={activeMemberships}
           membership={editableMembership}
-          packages={packageOptions}
         />
       </Card>
 
@@ -550,23 +599,27 @@ export default async function CustomerDetailPage({
       </div>
 
       <Card className="mt-6 scroll-mt-6" id="customer-package-history">
-        <CustomerPackageOverview
-          coaches={coaches}
-          customerCode={customer.customerCode}
-          customerId={customer.id}
-          latestCompletedCheckoutAt={
-            latestCompletedVisit?.checkedOutAt ?? null
-          }
-          mode="history"
-          packageDefinitions={packageOptions}
-          packages={customer.packages}
-          readOnly
-        />
+        <CustomerMembershipHistory events={membershipHistory} />
+        <div className="mt-8 border-t border-border pt-8">
+          <CustomerPackageOverview
+            coaches={coaches}
+            customerCode={customer.customerCode}
+            customerId={customer.id}
+            latestCompletedCheckoutAt={
+              latestCompletedVisit?.checkedOutAt ?? null
+            }
+            mode="history"
+            packageDefinitions={packageOptions}
+            packages={customer.packages}
+            readOnly
+          />
+        </div>
       </Card>
 
       <div className="mt-6">
         <CustomerVisitHistory
-          description="Latest three check-in and check-out records. Open visits stay clearly marked."
+          description="Latest check-in and check-out records connected to the current active membership, with service usage and no-deduction visits called out. Older visits remain available through all history."
+          title="Current membership visits"
           viewAllHref={`/admin/customers/${encodeURIComponent(customer.id)}/visits`}
           visits={recentVisits}
         />

@@ -2,32 +2,22 @@
 
 import { useEffect, useState } from "react";
 
-const THEME_KEY = "smartfit-public-theme";
-
-function applyTheme(theme: "dark" | "light") {
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.style.colorScheme = theme;
-}
+import type { ThemeMode } from "../../lib/theme";
+import { getPreferredClientTheme, persistTheme } from "./theme-client";
 
 export function ThemeToggle({
   variant = "default",
 }: {
   variant?: "default" | "onHero";
 }) {
-  const [theme, setTheme] = useState<"dark" | "light">("light");
+  const [theme, setTheme] = useState<ThemeMode>("light");
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem(THEME_KEY);
-    const preferredTheme =
-      storedTheme === "dark" || storedTheme === "light"
-        ? storedTheme
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
+    const preferredTheme = getPreferredClientTheme();
 
     setTheme(preferredTheme);
-    applyTheme(preferredTheme);
+    persistTheme(preferredTheme);
     setReady(true);
   }, []);
 
@@ -43,8 +33,7 @@ export function ThemeToggle({
       className={buttonClassName}
       onClick={() => {
         setTheme(nextTheme);
-        applyTheme(nextTheme);
-        window.localStorage.setItem(THEME_KEY, nextTheme);
+        persistTheme(nextTheme);
       }}
       title={`Switch to ${nextTheme} theme`}
       type="button"

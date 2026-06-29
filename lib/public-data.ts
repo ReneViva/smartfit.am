@@ -445,6 +445,48 @@ function activePackagePriceValue({
   return Number(discountPrice ?? price);
 }
 
+function discountRibbonPercent({
+  discountPrice,
+  discountRibbonPercent: storedRibbonPercent,
+  price,
+}: {
+  discountPrice: string | null;
+  discountRibbonPercent: number | null;
+  price: string;
+}) {
+  if (!discountPrice) {
+    return null;
+  }
+
+  if (
+    typeof storedRibbonPercent === "number" &&
+    Number.isInteger(storedRibbonPercent) &&
+    storedRibbonPercent >= 1 &&
+    storedRibbonPercent <= 99
+  ) {
+    return storedRibbonPercent;
+  }
+
+  const originalPrice = Number(price);
+  const finalPrice = Number(discountPrice);
+
+  if (
+    !Number.isFinite(originalPrice) ||
+    !Number.isFinite(finalPrice) ||
+    originalPrice <= 0 ||
+    finalPrice <= 0 ||
+    finalPrice >= originalPrice
+  ) {
+    return null;
+  }
+
+  const calculated = Math.round(
+    ((originalPrice - finalPrice) / originalPrice) * 100,
+  );
+
+  return calculated >= 1 && calculated <= 99 ? calculated : null;
+}
+
 export async function getPublicPackageCatalog(
   searchParams: PublicPackageSearchParams,
 ) {
@@ -501,14 +543,6 @@ export async function getPublicPackageCatalog(
     const packages = await db.package.findMany({
       orderBy: [{ name: "asc" }],
       select: {
-        assignedCoach: {
-          select: {
-            deletedAt: true,
-            firstName: true,
-            isActive: true,
-            lastName: true,
-          },
-        },
         categories: {
           orderBy: {
             category: {
@@ -526,14 +560,12 @@ export async function getPublicPackageCatalog(
         },
         description: true,
         discountPrice: true,
-        defaultGuestPasses: true,
+        discountRibbonPercent: true,
         highlightOnPublicPackages: true,
         id: true,
+        imageUrl: true,
         name: true,
-        packageType: true,
         price: true,
-        sessionCount: true,
-        timeRestrictionLabel: true,
       },
       where: {
         AND: [
@@ -555,25 +587,19 @@ export async function getPublicPackageCatalog(
       },
     });
     const publicPackages = packages.map((gymPackage) => ({
-      assignedCoach:
-        gymPackage.assignedCoach?.isActive &&
-        !gymPackage.assignedCoach.deletedAt
-          ? {
-              firstName: gymPackage.assignedCoach.firstName,
-              lastName: gymPackage.assignedCoach.lastName,
-            }
-          : null,
       categories: gymPackage.categories.map(({ category: option }) => option),
       description: gymPackage.description,
       discountPrice: gymPackage.discountPrice?.toString() ?? null,
-      defaultGuestPasses: gymPackage.defaultGuestPasses,
+      discountRibbonPercent: discountRibbonPercent({
+        discountPrice: gymPackage.discountPrice?.toString() ?? null,
+        discountRibbonPercent: gymPackage.discountRibbonPercent,
+        price: gymPackage.price.toString(),
+      }),
       highlightOnPublicPackages: gymPackage.highlightOnPublicPackages,
       id: gymPackage.id,
+      imageUrl: safePublicUrl(gymPackage.imageUrl),
       name: gymPackage.name,
-      packageType: gymPackage.packageType,
       price: gymPackage.price.toString(),
-      sessionCount: gymPackage.sessionCount,
-      timeRestrictionLabel: gymPackage.timeRestrictionLabel,
     }));
     const filteredPackages =
       minPrice.valid && maxPrice.valid && rangeIsValid

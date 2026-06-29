@@ -185,17 +185,17 @@ export default async function AnalyticsPage() {
 
         <Card>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand">
-            Coach-linked usage
+            Coach/person usage
           </p>
           <h3 className="mt-2 text-2xl font-bold text-foreground">
-            Weekly service sessions by coach
+            Weekly service sessions by coach/person
           </h3>
           <p className="mt-2 text-sm leading-6 text-secondary">
-            Uses the service-line coach when available, then the membership or
-            package coach.
+            Uses the service-line coach/person text when available, then
+            legacy membership or package coach fallback.
           </p>
           <UsageList
-            emptyMessage="No coach-linked service deductions have been recorded for the current server-local week."
+            emptyMessage="No coach/person service deductions have been recorded for the current server-local week."
             items={analytics.serviceDeductions.topCoaches}
           />
         </Card>

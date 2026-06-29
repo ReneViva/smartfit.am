@@ -17,6 +17,8 @@ const errorMessages: Record<string, string> = {
     "Select at least one available category. Archived or unknown categories cannot be assigned.",
   "invalid-discount-price":
     "Discount price must be a positive number lower than the original price.",
+  "invalid-discount-ribbon":
+    "Discount ribbon percentage must be a whole number from 1 to 99.",
   "invalid-freeze-chances":
     "Default freeze chances must be a whole number from 0 to 3.",
   "invalid-guest-passes":
@@ -28,7 +30,13 @@ const errorMessages: Record<string, string> = {
   "invalid-sessions": "Session count must be a non-negative whole number.",
   "invalid-time": "Time values must use a valid 24-hour time.",
   "invalid-time-order": "Start time must be earlier than end time.",
+  "invalid-url": "Image URLs must use http or https.",
   unavailable: "Package could not be saved. Please try again.",
+  "upload-configuration":
+    "Image upload storage is not configured. Add storage values to .env or use an image URL.",
+  "upload-failed": "Image upload failed. Try again or use an image URL.",
+  "upload-file-size": "Image files must be 5 MB or smaller.",
+  "upload-file-type": "Choose a valid image file.",
 };
 
 export default async function PackagesPage({ searchParams }: PackagesPageProps) {
@@ -63,9 +71,11 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
         defaultGuestPasses: true,
         description: true,
         discountPrice: true,
+        discountRibbonPercent: true,
         hasTimeRestriction: true,
         highlightOnPublicPackages: true,
         id: true,
+        imageUrl: true,
         isActive: true,
         name: true,
         packageType: true,

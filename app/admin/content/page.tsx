@@ -226,6 +226,7 @@ function MoveContentControls({
           <Button
             className="min-h-9 px-3 py-2"
             disabled={isFirst}
+            pendingLabel="Moving..."
             type="submit"
             variant="neutral"
           >
@@ -238,6 +239,7 @@ function MoveContentControls({
           <Button
             className="min-h-9 px-3 py-2"
             disabled={isLast}
+            pendingLabel="Moving..."
             type="submit"
             variant="neutral"
           >
@@ -313,7 +315,7 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
         </h3>
         <form action={savePublicContentAction} className="mt-5">
           <ContentFields />
-          <Button className="mt-5" type="submit">
+          <Button className="mt-5" pendingLabel="Creating..." type="submit">
             Create content
           </Button>
         </form>
@@ -397,7 +399,11 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
                   </div>
                   <form action={savePublicContentAction}>
                     <ContentFields content={item} />
-                    <Button className="mt-5" type="submit">
+                    <Button
+                      className="mt-5"
+                      pendingLabel="Saving..."
+                      type="submit"
+                    >
                       Save changes
                     </Button>
                   </form>

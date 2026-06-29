@@ -213,7 +213,7 @@ export default async function CategoriesPage({
             error={selectedCategoryId ? undefined : params.error}
             field={selectedCategoryId ? undefined : params.field}
           />
-          <Button className="mt-5" type="submit">
+          <Button className="mt-5" pendingLabel="Creating..." type="submit">
             Create category
           </Button>
         </form>
@@ -298,7 +298,11 @@ export default async function CategoriesPage({
                         error={isSelected ? params.error : undefined}
                         field={isSelected ? params.field : undefined}
                       />
-                      <Button className="mt-5" type="submit">
+                      <Button
+                        className="mt-5"
+                        pendingLabel="Saving..."
+                        type="submit"
+                      >
                         Save category
                       </Button>
                     </form>
@@ -309,6 +313,7 @@ export default async function CategoriesPage({
                         <input name="direction" type="hidden" value="up" />
                         <Button
                           disabled={index === 0}
+                          pendingLabel="Moving..."
                           type="submit"
                           variant="neutral"
                         >
@@ -320,6 +325,7 @@ export default async function CategoriesPage({
                         <input name="direction" type="hidden" value="down" />
                         <Button
                           disabled={index === categories.length - 1}
+                          pendingLabel="Moving..."
                           type="submit"
                           variant="neutral"
                         >
@@ -335,6 +341,7 @@ export default async function CategoriesPage({
                         />
                         <Button
                           disabled={category.isArchived && !category.isPublic}
+                          pendingLabel="Saving..."
                           type="submit"
                           variant="neutral"
                         >
@@ -349,6 +356,9 @@ export default async function CategoriesPage({
                           value={category.isArchived ? "restore" : "archive"}
                         />
                         <Button
+                          pendingLabel={
+                            category.isArchived ? "Restoring..." : "Archiving..."
+                          }
                           type="submit"
                           variant={category.isArchived ? "success" : "warning"}
                         >
@@ -364,6 +374,7 @@ export default async function CategoriesPage({
                               category._count.packages + category._count.coaches >
                               0
                             }
+                            pendingLabel="Deleting..."
                             type="submit"
                             variant="danger"
                           >

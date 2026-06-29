@@ -6,12 +6,14 @@ import { checkInAction } from "../../app/registration/actions";
 import { Button } from "../ui/button";
 
 type CheckInServiceOption = {
-  categoryName: string | null;
   coachName: string | null;
+  dateRange: string;
   id: string;
   initialSessions: number;
+  isUsable: boolean;
   remainingSessions: number;
   serviceName: string;
+  statusLabel: string;
 };
 
 type CheckInMembershipOption = {
@@ -77,7 +79,11 @@ export function CheckInPanel({
   const hasInvalidServiceDraft = services.some((service) => {
     const draft = parsedDraft(serviceDeductions[service.id] ?? "0");
 
-    return draft === null || draft > service.remainingSessions;
+    return (
+      draft === null ||
+      draft > service.remainingSessions ||
+      (draft > 0 && !service.isUsable)
+    );
   });
   const parsedGuestCount = parsedDraft(guestCount);
   const occupancyDelta = parsedGuestCount !== null ? 1 + parsedGuestCount : 1;
@@ -92,8 +98,10 @@ export function CheckInPanel({
         ? "This membership is expired. Check-in is allowed without service or guest-pass deductions."
         : !services.length
           ? "No active service lines are available. This check-in will not deduct service sessions."
-          : services.every((service) => service.remainingSessions === 0)
-            ? "Active service lines have zero remaining sessions. This check-in will not deduct service sessions."
+          : services.every(
+              (service) => !service.isUsable || service.remainingSessions === 0,
+            )
+            ? "No active service line is currently valid with remaining sessions. This check-in will not deduct service sessions."
             : totalServiceDeductions === 0
               ? "No service deduction selected. Check-in is allowed without reducing service sessions."
               : null);
@@ -162,8 +170,11 @@ export function CheckInPanel({
               const value = serviceDeductions[service.id] ?? "0";
               const draft = parsedDraft(value);
               const isInvalid =
-                draft === null || draft > service.remainingSessions;
+                draft === null ||
+                draft > service.remainingSessions ||
+                (draft > 0 && !service.isUsable);
               const hasRemainingSessions = service.remainingSessions > 0;
+              const canDeduct = service.isUsable && hasRemainingSessions;
 
               return (
                 <div
@@ -180,9 +191,13 @@ export function CheckInPanel({
                       <p className="break-words font-bold text-foreground">
                         {service.serviceName}
                       </p>
-                      <p className="mt-1 text-sm text-secondary">
-                        {service.categoryName ?? "No category"} -{" "}
-                        {service.coachName ?? "no coach"}
+                      {service.coachName ? (
+                        <p className="mt-1 text-sm text-secondary">
+                          {service.coachName}
+                        </p>
+                      ) : null}
+                      <p className="mt-1 text-xs font-semibold text-secondary">
+                        {service.dateRange} / {service.statusLabel}
                       </p>
                     </div>
                     <p
@@ -193,7 +208,7 @@ export function CheckInPanel({
                   </div>
                   <label className="mt-4 block text-sm font-semibold text-foreground">
                     Sessions to deduct
-                    {hasRemainingSessions ? (
+                    {canDeduct ? (
                       <input
                         className="mt-2 min-h-11 w-full rounded-lg border border-input-border bg-card px-3 py-2 text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-soft-blue"
                         max={service.remainingSessions}
@@ -228,7 +243,11 @@ export function CheckInPanel({
                       Enter 0 to {service.remainingSessions}.
                     </p>
                   ) : null}
-                  {!hasRemainingSessions ? (
+                  {!service.isUsable ? (
+                    <p className="mt-2 text-sm font-semibold text-secondary">
+                      Service is {service.statusLabel}; no deduction will be applied.
+                    </p>
+                  ) : !hasRemainingSessions ? (
                     <p className="mt-2 text-sm font-semibold text-secondary">
                       Zero remaining; no deduction will be applied.
                     </p>
@@ -282,6 +301,7 @@ export function CheckInPanel({
         <Button
           className="mt-5 w-full sm:w-auto"
           disabled={Boolean(hardBlockMessage) || hasInvalidServiceDraft}
+          pendingLabel="Checking in..."
           type="submit"
           variant="success"
         >
