@@ -3,7 +3,12 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 
-import { savePackageAction } from "../../app/admin/packages/actions";
+import {
+  archivePackageAction,
+  deletePackageAction,
+  restorePackageAction,
+  savePackageAction,
+} from "../../app/admin/packages/actions";
 import {
   CUSTOM_PACKAGE_TYPE_VALUE,
   PACKAGE_TYPE_PRESETS,
@@ -11,6 +16,7 @@ import {
   packageTypeLabel,
 } from "../../lib/package-types";
 import { MAX_FREEZE_COUNT_PER_CUSTOMER_PACKAGE } from "../../lib/package-freezes";
+import { AdminRecordAction } from "./admin-record-action";
 import { ImageInput } from "./image-input";
 import { Button } from "../ui/button";
 
@@ -43,6 +49,7 @@ export type AdminPackageValue = {
   assignedCoachId: string | null;
   categories: AdminPackageCategory[];
   createdAt: string;
+  deletedAt: string | null;
   defaultFreezeChances: number;
   defaultGuestPasses: number;
   description: string | null;
@@ -569,12 +576,14 @@ function PackageFormFields({
 }
 
 export function AdminPackageManager({
+  archivedView = false,
   categories,
   categoryError = false,
   coaches,
   packages,
   selectedPackageId,
 }: {
+  archivedView?: boolean;
   categories: AdminPackageCategory[];
   categoryError?: boolean;
   coaches: AdminPackageCoach[];
@@ -631,46 +640,50 @@ export function AdminPackageManager({
 
   return (
     <>
-      <details className="smooth-panel mt-8 rounded-2xl border border-border bg-card shadow-sm">
-        <summary className="min-h-14 cursor-pointer list-none rounded-2xl px-5 py-4 font-semibold text-foreground transition-colors hover:bg-soft-blue sm:px-6">
-          <span className="flex flex-wrap items-center justify-between gap-3">
-            <span>
-              <span className="block text-lg font-bold">
-                Create new package / service
+      {!archivedView ? (
+        <details className="smooth-panel mt-8 rounded-2xl border border-border bg-card shadow-sm">
+          <summary className="min-h-14 cursor-pointer list-none rounded-2xl px-5 py-4 font-semibold text-foreground transition-colors hover:bg-soft-blue sm:px-6">
+            <span className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                <span className="block text-lg font-bold">
+                  Create new package / service
+                </span>
+                <span className="mt-1 block text-sm font-normal text-secondary">
+                  Open create form
+                </span>
               </span>
-              <span className="mt-1 block text-sm font-normal text-secondary">
-                Open create form
+              <span className="rounded-lg bg-brand px-4 py-2 text-sm text-white">
+                Create
               </span>
             </span>
-            <span className="rounded-lg bg-brand px-4 py-2 text-sm text-white">
-              Create
-            </span>
-          </span>
-        </summary>
-        <form
-          action={savePackageAction}
-          className="animate-panel-in border-t border-border p-5 sm:p-6"
-        >
-          <PackageFormFields
-            categories={categories}
-            categoryError={categoryError && !selectedPackageId}
-            coaches={coaches}
-          />
-          <Button
-            className="mt-5 w-full sm:w-auto"
-            pendingLabel="Creating..."
-            type="submit"
+          </summary>
+          <form
+            action={savePackageAction}
+            className="animate-panel-in border-t border-border p-5 sm:p-6"
           >
-            Create package
-          </Button>
-        </form>
-      </details>
+            <PackageFormFields
+              categories={categories}
+              categoryError={categoryError && !selectedPackageId}
+              coaches={coaches}
+            />
+            <Button
+              className="mt-5 w-full sm:w-auto"
+              pendingLabel="Creating..."
+              type="submit"
+            >
+              Create package
+            </Button>
+          </form>
+        </details>
+      ) : null}
 
       <section className="mt-8">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h3 className="text-2xl font-bold text-foreground">
-              Existing packages / services
+              {archivedView
+                ? "Archived packages / services"
+                : "Existing packages / services"}
             </h3>
             <p className="mt-1 text-sm text-secondary">
               Showing {visiblePackages.length} of {packages.length} packages.
@@ -815,12 +828,18 @@ export function AdminPackageManager({
                     </p>
                     <span
                       className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
-                        gymPackage.isActive
+                        archivedView
+                          ? "bg-neutral text-secondary"
+                          : gymPackage.isActive
                           ? "bg-soft-blue text-primary-active"
                           : "bg-neutral text-secondary"
                       }`}
                     >
-                      {gymPackage.isActive ? "Active" : "Inactive"}
+                      {archivedView
+                        ? "Archived"
+                        : gymPackage.isActive
+                          ? "Active"
+                          : "Inactive"}
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
@@ -883,30 +902,81 @@ export function AdminPackageManager({
                       </span>
                     ) : null}
                     <span className="ml-auto text-sm font-semibold text-brand">
-                      Open details / Edit
+                      {archivedView ? "Open actions" : "Open details / Edit"}
                     </span>
                   </div>
                 </summary>
-                <form
-                  action={savePackageAction}
-                  className="animate-panel-in border-t border-border p-4 sm:p-5"
-                >
-                  <PackageFormFields
-                    categories={categories}
-                    categoryError={
-                      categoryError && selectedPackageId === gymPackage.id
-                    }
-                    coaches={coaches}
-                    gymPackage={gymPackage}
-                  />
-                  <Button
-                    className="mt-5 w-full sm:w-auto"
-                    pendingLabel="Saving..."
-                    type="submit"
-                  >
-                    Save changes
-                  </Button>
-                </form>
+                {archivedView ? (
+                  <div className="animate-panel-in border-t border-border p-4 sm:p-5">
+                    <div className="rounded-xl border border-border bg-page p-4">
+                      <p className="text-sm leading-6 text-secondary">
+                        Restore this package to edit it again. Permanent delete
+                        is available only when no package history or service
+                        lines reference it.
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <AdminRecordAction
+                          action={restorePackageAction}
+                          confirmMessage={`Restore package "${gymPackage.name}"?`}
+                          fields={{ id: gymPackage.id }}
+                          pendingLabel="Restoring..."
+                          variant="success"
+                        >
+                          Restore
+                        </AdminRecordAction>
+                        <AdminRecordAction
+                          action={deletePackageAction}
+                          confirmMessage={`Permanently delete archived package "${gymPackage.name}"? This cannot be undone.`}
+                          fields={{ id: gymPackage.id }}
+                          pendingLabel="Deleting..."
+                          variant="danger"
+                        >
+                          Delete permanently
+                        </AdminRecordAction>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="animate-panel-in border-t border-border p-4 sm:p-5">
+                    <form action={savePackageAction}>
+                      <PackageFormFields
+                        categories={categories}
+                        categoryError={
+                          categoryError && selectedPackageId === gymPackage.id
+                        }
+                        coaches={coaches}
+                        gymPackage={gymPackage}
+                      />
+                      <Button
+                        className="mt-5 w-full sm:w-auto"
+                        pendingLabel="Saving..."
+                        type="submit"
+                      >
+                        Save changes
+                      </Button>
+                    </form>
+                    <div className="mt-5 rounded-xl border border-status-medium bg-page p-4">
+                      <p className="text-sm font-semibold text-foreground">
+                        Archive package
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-secondary">
+                        Hides this package from public pages, registration
+                        options, and active admin lists while preserving
+                        operational history.
+                      </p>
+                      <AdminRecordAction
+                        action={archivePackageAction}
+                        className="mt-3"
+                        confirmMessage={`Archive package "${gymPackage.name}"?`}
+                        fields={{ id: gymPackage.id }}
+                        pendingLabel="Archiving..."
+                        variant="danger"
+                      >
+                        Archive
+                      </AdminRecordAction>
+                    </div>
+                  </div>
+                )}
               </details>
             ))}
           </div>

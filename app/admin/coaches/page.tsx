@@ -1,17 +1,24 @@
 import Link from "next/link";
 
 import { AdminExpandableCard } from "../../../components/admin/admin-expandable-card";
+import { AdminRecordAction } from "../../../components/admin/admin-record-action";
 import { ImageInput } from "../../../components/admin/image-input";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { db } from "../../../lib/db";
-import { saveCoachAction } from "./actions";
+import {
+  archiveCoachAction,
+  deleteCoachAction,
+  restoreCoachAction,
+  saveCoachAction,
+} from "./actions";
 
 type CoachesPageProps = {
   searchParams: Promise<{
     error?: string;
     status?: string;
+    view?: string;
   }>;
 };
 
@@ -20,10 +27,17 @@ const inputClass =
 const labelClass = "block text-sm font-semibold text-foreground";
 
 const errorMessages: Record<string, string> = {
+  "archive-unavailable": "Coach could not be archived. Please try again.",
+  "coach-delete-blocked":
+    "Cannot permanently delete this coach because related records exist. Keep archived instead.",
+  "delete-unavailable":
+    "Archived coach could not be permanently deleted. Please try again.",
   "invalid-categories":
     "Selected categories must be active existing categories.",
+  "invalid-record": "Choose a valid coach.",
   "invalid-required": "First name, last name, and specialty are required.",
   "invalid-url": "Photo URL must use a valid http or https URL.",
+  "restore-unavailable": "Archived coach could not be restored. Please try again.",
   "upload-configuration":
     "Image upload storage is not configured. Add storage values to .env or use an image URL.",
   "upload-failed": "Image upload failed. Try again or use an image URL.",
@@ -32,9 +46,17 @@ const errorMessages: Record<string, string> = {
   unavailable: "Coach could not be saved. Please try again.",
 };
 
+const statusMessages: Record<string, string> = {
+  archived: "Coach archived.",
+  deleted: "Archived coach permanently deleted.",
+  restored: "Coach restored.",
+  saved: "Coach saved.",
+};
+
 type CoachFormValue = {
   categories: { category: CoachCategoryValue }[];
   contactInfo: string | null;
+  deletedAt?: Date | null;
   description: string | null;
   firstName: string;
   id: string;
@@ -223,7 +245,9 @@ function CoachFields({
 }
 
 export default async function CoachesPage({ searchParams }: CoachesPageProps) {
-  const [coaches, categories, params] = await Promise.all([
+  const params = await searchParams;
+  const isArchivedView = params.view === "archived";
+  const [coaches, categories, activeCount, archivedCount] = await Promise.all([
     db.coach.findMany({
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       select: {
@@ -245,6 +269,7 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
           },
         },
         contactInfo: true,
+        deletedAt: true,
         description: true,
         firstName: true,
         id: true,
@@ -253,7 +278,7 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
         photoUrl: true,
         specialty: true,
       },
-      where: { deletedAt: null },
+      where: isArchivedView ? { deletedAt: { not: null } } : { deletedAt: null },
     }),
     db.category.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -265,9 +290,11 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
       },
       where: { isArchived: false },
     }),
-    searchParams,
+    db.coach.count({ where: { deletedAt: null } }),
+    db.coach.count({ where: { deletedAt: { not: null } } }),
   ]);
   const errorMessage = params.error ? errorMessages[params.error] : null;
+  const statusMessage = params.status ? statusMessages[params.status] : null;
 
   return (
     <>
@@ -284,9 +311,32 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
         </p>
       </header>
 
-      {params.status === "saved" ? (
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Link
+          className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+            isArchivedView
+              ? "border-border bg-card text-secondary hover:border-brand hover:text-primary-active"
+              : "border-brand bg-soft-blue text-primary-active"
+          }`}
+          href="/admin/coaches"
+        >
+          Active coaches ({activeCount})
+        </Link>
+        <Link
+          className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+            isArchivedView
+              ? "border-brand bg-soft-blue text-primary-active"
+              : "border-border bg-card text-secondary hover:border-brand hover:text-primary-active"
+          }`}
+          href="/admin/coaches?view=archived"
+        >
+          Archived coaches ({archivedCount})
+        </Link>
+      </div>
+
+      {statusMessage ? (
         <p className="mt-6 rounded-xl border border-status-low bg-card px-4 py-3 text-sm font-semibold text-foreground">
-          Coach saved.
+          {statusMessage}
         </p>
       ) : null}
       {errorMessage ? (
@@ -298,18 +348,22 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
         </p>
       ) : null}
 
-      <Card className="mt-8">
-        <h3 className="text-xl font-bold text-foreground">Create coach</h3>
-        <form action={saveCoachAction} className="mt-5">
-          <CoachFields categories={categories} />
-          <Button className="mt-5" pendingLabel="Creating..." type="submit">
-            Create coach
-          </Button>
-        </form>
-      </Card>
+      {!isArchivedView ? (
+        <Card className="mt-8">
+          <h3 className="text-xl font-bold text-foreground">Create coach</h3>
+          <form action={saveCoachAction} className="mt-5">
+            <CoachFields categories={categories} />
+            <Button className="mt-5" pendingLabel="Creating..." type="submit">
+              Create coach
+            </Button>
+          </form>
+        </Card>
+      ) : null}
 
       <section className="mt-10">
-        <h3 className="text-2xl font-bold text-foreground">Existing coaches</h3>
+        <h3 className="text-2xl font-bold text-foreground">
+          {isArchivedView ? "Archived coaches" : "Existing coaches"}
+        </h3>
         {coaches.length ? (
           <div className="mt-5 grid gap-4 xl:grid-cols-2">
             {coaches.map((coach) => (
@@ -343,9 +397,19 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
                         </div>
                         <StatusBadge
                           className="px-2.5 py-1 text-xs"
-                          status={coach.isActive ? "active" : "notInGym"}
+                          status={
+                            isArchivedView
+                              ? "medium"
+                              : coach.isActive
+                                ? "active"
+                                : "notInGym"
+                          }
                         >
-                          {coach.isActive ? "Active" : "Inactive"}
+                          {isArchivedView
+                            ? "Archived"
+                            : coach.isActive
+                              ? "Active"
+                              : "Inactive"}
                         </StatusBadge>
                       </div>
                       <p className="mt-3 line-clamp-2 text-sm leading-6 text-secondary">
@@ -360,28 +424,80 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
               >
                 <div className="mb-5">
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
-                    Editing coach
+                    {isArchivedView ? "Archived coach" : "Editing coach"}
                   </p>
                   <h4 className="mt-1 text-lg font-bold text-foreground">
                     {coach.firstName} {coach.lastName}
                   </h4>
                 </div>
-                <form action={saveCoachAction}>
-                  <CoachFields categories={categories} coach={coach} />
-                  <Button
-                    className="mt-5"
-                    pendingLabel="Saving..."
-                    type="submit"
-                  >
-                    Save changes
-                  </Button>
-                </form>
+                {isArchivedView ? (
+                  <div className="rounded-xl border border-border bg-page p-4">
+                    <p className="text-sm leading-6 text-secondary">
+                      Restore this coach to edit the profile again. Permanent
+                      delete is available only when no related records exist.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <AdminRecordAction
+                        action={restoreCoachAction}
+                        confirmMessage={`Restore coach ${coach.firstName} ${coach.lastName}?`}
+                        fields={{ id: coach.id }}
+                        pendingLabel="Restoring..."
+                        variant="success"
+                      >
+                        Restore
+                      </AdminRecordAction>
+                      <AdminRecordAction
+                        action={deleteCoachAction}
+                        confirmMessage={`Permanently delete archived coach ${coach.firstName} ${coach.lastName}? This cannot be undone.`}
+                        fields={{ id: coach.id }}
+                        pendingLabel="Deleting..."
+                        variant="danger"
+                      >
+                        Delete permanently
+                      </AdminRecordAction>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <form action={saveCoachAction}>
+                      <CoachFields categories={categories} coach={coach} />
+                      <Button
+                        className="mt-5"
+                        pendingLabel="Saving..."
+                        type="submit"
+                      >
+                        Save changes
+                      </Button>
+                    </form>
+                    <div className="mt-5 rounded-xl border border-status-medium bg-page p-4">
+                      <p className="text-sm font-semibold text-foreground">
+                        Archive coach
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-secondary">
+                        Hides this coach from public pages and active admin
+                        lists without removing related history.
+                      </p>
+                      <AdminRecordAction
+                        action={archiveCoachAction}
+                        className="mt-3"
+                        confirmMessage={`Archive coach ${coach.firstName} ${coach.lastName}?`}
+                        fields={{ id: coach.id }}
+                        pendingLabel="Archiving..."
+                        variant="danger"
+                      >
+                        Archive
+                      </AdminRecordAction>
+                    </div>
+                  </>
+                )}
               </AdminExpandableCard>
             ))}
           </div>
         ) : (
           <p className="mt-5 rounded-2xl border border-dashed border-border bg-card px-6 py-10 text-center text-secondary">
-            No coaches have been created yet.
+            {isArchivedView
+              ? "No coaches have been archived."
+              : "No coaches have been created yet."}
           </p>
         )}
       </section>

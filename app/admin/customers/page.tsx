@@ -6,12 +6,14 @@ import {
 } from "@prisma/client";
 import Link from "next/link";
 
+import { AdminRecordAction } from "../../../components/admin/admin-record-action";
 import { CustomerForm } from "../../../components/admin/customer-form";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { db } from "../../../lib/db";
 import { packageTypeLabel } from "../../../lib/package-types";
+import { deleteCustomerAction, restoreCustomerAction } from "./actions";
 
 type CustomersPageProps = {
   searchParams: Promise<{
@@ -24,6 +26,7 @@ type CustomersPageProps = {
     presence?: string;
     q?: string;
     status?: string;
+    view?: string;
   }>;
 };
 
@@ -32,6 +35,12 @@ const inputClass =
 const labelClass = "block text-sm font-semibold text-foreground";
 
 const errorMessages: Record<string, string> = {
+  "customer-delete-blocked":
+    "Cannot permanently delete this customer because operational history exists. Keep archived instead.",
+  "customer-delete-unavailable":
+    "The archived customer profile could not be permanently deleted. Please try again.",
+  "customer-restore-unavailable":
+    "The archived customer profile could not be restored. Please try again.",
   "customer-unavailable": "The customer could not be saved. Please try again.",
   "duplicate-code": "That member code is already assigned to another customer.",
   "invalid-birth-date": "Birth date cannot be in the future.",
@@ -43,6 +52,8 @@ const errorMessages: Record<string, string> = {
 
 const statusMessages: Record<string, string> = {
   "customer-archived": "Customer profile archived.",
+  "customer-deleted": "Archived customer profile permanently deleted.",
+  "customer-restored": "Customer profile restored.",
   "customer-saved": "Customer created successfully.",
 };
 
@@ -66,6 +77,7 @@ export default async function CustomersPage({
   searchParams,
 }: CustomersPageProps) {
   const params = await searchParams;
+  const isArchivedView = params.view === "archived";
   const query = params.q?.trim().slice(0, 200) ?? "";
   const customerStatus = selectedEnum(
     params.customerStatus,
@@ -146,7 +158,7 @@ export default async function CustomersPage({
   }
 
   const where: Prisma.CustomerWhereInput = {
-    deletedAt: null,
+    deletedAt: isArchivedView ? { not: null } : null,
     ...(conditions.length ? { AND: conditions } : {}),
   };
 
@@ -159,6 +171,7 @@ export default async function CustomersPage({
     customersInGym,
     attentionPackages,
     missingBirthDates,
+    archivedCustomers,
   ] = await Promise.all([
     db.customer.findMany({
       orderBy: [{ fullName: "asc" }, { customerCode: "asc" }],
@@ -174,6 +187,7 @@ export default async function CustomersPage({
         },
         birthDate: true,
         customerCode: true,
+        deletedAt: true,
         fullName: true,
         gymPresenceStatus: true,
         id: true,
@@ -218,6 +232,7 @@ export default async function CustomersPage({
       },
     }),
     db.customer.count({ where: { birthDate: null, deletedAt: null } }),
+    db.customer.count({ where: { deletedAt: { not: null } } }),
   ]);
   const errorMessage = params.error ? errorMessages[params.error] : null;
   const statusMessage = params.status ? statusMessages[params.status] : null;
@@ -227,6 +242,7 @@ export default async function CustomersPage({
     { label: "Currently in gym", value: customersInGym },
     { label: "Packages needing attention", value: attentionPackages },
     { label: "Missing birth dates", value: missingBirthDates },
+    { label: "Archived customers", value: archivedCustomers },
   ];
 
   return (
@@ -244,6 +260,29 @@ export default async function CustomersPage({
         </p>
       </header>
 
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Link
+          className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+            isArchivedView
+              ? "border-border bg-card text-secondary hover:border-brand hover:text-primary-active"
+              : "border-brand bg-soft-blue text-primary-active"
+          }`}
+          href="/admin/customers"
+        >
+          Active customers ({totalCustomers})
+        </Link>
+        <Link
+          className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+            isArchivedView
+              ? "border-brand bg-soft-blue text-primary-active"
+              : "border-border bg-card text-secondary hover:border-brand hover:text-primary-active"
+          }`}
+          href="/admin/customers?view=archived"
+        >
+          Archived customers ({archivedCustomers})
+        </Link>
+      </div>
+
       {statusMessage ? (
         <p className="mt-6 rounded-xl border border-status-low bg-card px-4 py-3 text-sm font-semibold text-foreground">
           {statusMessage}
@@ -258,7 +297,7 @@ export default async function CustomersPage({
         </p>
       ) : null}
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {stats.map((stat) => (
           <Card className="p-5" key={stat.label}>
             <p className="text-sm font-semibold text-secondary">{stat.label}</p>
@@ -269,17 +308,19 @@ export default async function CustomersPage({
         ))}
       </section>
 
-      <details className="smooth-panel mt-8 rounded-2xl border border-border bg-card shadow-sm open:border-brand">
-        <summary className="cursor-pointer list-none rounded-2xl px-5 py-4 font-bold text-foreground transition-colors hover:bg-soft-blue sm:px-6">
-          Create a new customer
-          <span className="mt-1 block text-sm font-normal text-secondary">
-            Opens the customer registration form.
-          </span>
-        </summary>
-        <div className="animate-panel-in border-t border-border p-5 sm:p-6">
-          <CustomerForm coaches={coaches} />
-        </div>
-      </details>
+      {!isArchivedView ? (
+        <details className="smooth-panel mt-8 rounded-2xl border border-border bg-card shadow-sm open:border-brand">
+          <summary className="cursor-pointer list-none rounded-2xl px-5 py-4 font-bold text-foreground transition-colors hover:bg-soft-blue sm:px-6">
+            Create a new customer
+            <span className="mt-1 block text-sm font-normal text-secondary">
+              Opens the customer registration form.
+            </span>
+          </summary>
+          <div className="animate-panel-in border-t border-border p-5 sm:p-6">
+            <CustomerForm coaches={coaches} />
+          </div>
+        </details>
+      ) : null}
 
       <Card className="mt-8">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -293,12 +334,17 @@ export default async function CustomersPage({
           </div>
           <Link
             className="text-sm font-semibold text-brand hover:text-primary-hover"
-            href="/admin/customers"
+            href={
+              isArchivedView ? "/admin/customers?view=archived" : "/admin/customers"
+            }
           >
             Clear filters
           </Link>
         </div>
         <form className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {isArchivedView ? (
+            <input name="view" type="hidden" value="archived" />
+          ) : null}
           <label className={`${labelClass} md:col-span-2`}>
             Name, member code, or phone
             <input
@@ -412,7 +458,7 @@ export default async function CustomersPage({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h3 className="text-2xl font-bold text-foreground">
-              Customer directory
+              {isArchivedView ? "Archived customer directory" : "Customer directory"}
             </h3>
             <p className="mt-2 text-sm text-secondary">
               Showing {customers.length} matching customer
@@ -423,7 +469,113 @@ export default async function CustomersPage({
 
         {customers.length ? (
           <div className="mt-5 grid gap-4 xl:grid-cols-2">
-            {customers.map((customer) => (
+            {customers.map((customer) =>
+              isArchivedView ? (
+                <div
+                  className="animate-list-item-in rounded-2xl border border-border bg-card p-5 shadow-sm"
+                  key={customer.id}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
+                        Member ID: {customer.customerCode}
+                      </p>
+                      <h4 className="mt-2 break-words text-xl font-bold text-foreground">
+                        {customer.fullName}
+                      </h4>
+                      <p className="mt-2 text-sm text-secondary">
+                        {customer.assignedCoach
+                          ? `Coach: ${customer.assignedCoach.firstName} ${customer.assignedCoach.lastName}`
+                          : "No assigned coach"}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold text-brand">
+                      Manage archive
+                    </span>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <StatusBadge status="medium">archived</StatusBadge>
+                    <StatusBadge
+                      status={
+                        customer.status === "ACTIVE" ? "active" : "notInGym"
+                      }
+                    >
+                      {customer.status.toLowerCase()}
+                    </StatusBadge>
+                    <StatusBadge
+                      status={
+                        customer.gymPresenceStatus === "IN_GYM"
+                          ? "inGym"
+                          : "notInGym"
+                      }
+                    >
+                      {customer.gymPresenceStatus
+                        .toLowerCase()
+                        .replaceAll("_", " ")}
+                    </StatusBadge>
+                    {!customer.birthDate ? (
+                      <StatusBadge status="medium">
+                        missing birth date
+                      </StatusBadge>
+                    ) : null}
+                  </div>
+
+                  <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4 text-sm sm:grid-cols-4">
+                    <div>
+                      <dt className="font-semibold text-secondary">Birth date</dt>
+                      <dd className="mt-1 text-foreground">
+                        {displayDate(customer.birthDate)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-secondary">Phone</dt>
+                      <dd className="mt-1 break-words text-foreground">
+                        {customer.phone ?? "Not provided"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-secondary">Packages</dt>
+                      <dd className="mt-1 text-foreground">
+                        {customer._count.packages}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-secondary">Notes</dt>
+                      <dd className="mt-1 text-foreground">
+                        {customer._count.notes}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="mt-5 rounded-xl border border-border bg-page p-4">
+                    <p className="text-sm leading-6 text-secondary">
+                      Restore this profile to active admin lists, or permanently
+                      delete it only when no operational history exists.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <AdminRecordAction
+                        action={restoreCustomerAction}
+                        confirmMessage={`Restore customer ${customer.customerCode}: ${customer.fullName}?`}
+                        fields={{ customerId: customer.id }}
+                        pendingLabel="Restoring..."
+                        variant="success"
+                      >
+                        Restore
+                      </AdminRecordAction>
+                      <AdminRecordAction
+                        action={deleteCustomerAction}
+                        confirmMessage={`Permanently delete archived customer ${customer.customerCode}: ${customer.fullName}? This cannot be undone.`}
+                        fields={{ customerId: customer.id }}
+                        pendingLabel="Deleting..."
+                        variant="danger"
+                      >
+                        Delete permanently
+                      </AdminRecordAction>
+                    </div>
+                  </div>
+                </div>
+              ) : (
               <Link
                 className="animate-list-item-in group rounded-2xl border border-border bg-card p-5 shadow-sm hover:border-brand hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 href={`/admin/customers/${customer.id}`}
@@ -501,11 +653,14 @@ export default async function CustomersPage({
                   </div>
                 </dl>
               </Link>
-            ))}
+              ),
+            )}
           </div>
         ) : (
           <p className="mt-5 rounded-2xl border border-dashed border-border bg-card px-6 py-10 text-center text-secondary">
-            No customers match the current filters.
+            {isArchivedView
+              ? "No archived customers match the current filters."
+              : "No customers match the current filters."}
           </p>
         )}
       </section>

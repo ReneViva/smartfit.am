@@ -319,6 +319,33 @@ function revalidateCustomerPages() {
   revalidatePath(CUSTOMERS_PATH);
 }
 
+function customerListPath(
+  errorOrStatus: string,
+  isError = true,
+  view?: "archived",
+) {
+  const params = new URLSearchParams({
+    [isError ? "error" : "status"]: errorOrStatus,
+  });
+
+  if (view) {
+    params.set("view", view);
+  }
+
+  return `${CUSTOMERS_PATH}?${params.toString()}`;
+}
+
+function revalidateCustomerArchivePages(customerId?: string) {
+  revalidateCustomerPages();
+  if (customerId) {
+    revalidatePath(`${CUSTOMERS_PATH}/${encodeURIComponent(customerId)}`);
+  }
+  revalidatePath("/admin/logs");
+  revalidatePath("/registration");
+  revalidatePath("/registration/general");
+  revalidatePath("/registration/in-gym");
+}
+
 function startOfTodayUtc() {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -779,13 +806,148 @@ export async function archiveCustomerAction(formData: FormData) {
     );
   }
 
-  revalidateCustomerPages();
-  revalidatePath(`${CUSTOMERS_PATH}/${encodeURIComponent(customerId)}`);
-  revalidatePath("/admin/logs");
-  revalidatePath("/registration");
-  revalidatePath("/registration/general");
-  revalidatePath("/registration/in-gym");
+  revalidateCustomerArchivePages(customerId);
   redirect(`${CUSTOMERS_PATH}?status=customer-archived`);
+}
+
+export async function restoreCustomerAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const customerId = optionalText(formData, "customerId", 100);
+
+  if (!customerId) {
+    redirect(customerListPath("invalid-customer", true, "archived"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const customer = await transaction.customer.findFirst({
+        select: {
+          customerCode: true,
+          deletedAt: true,
+          fullName: true,
+          id: true,
+          status: true,
+        },
+        where: { deletedAt: { not: null }, id: customerId },
+      });
+
+      if (!customer) {
+        throw new CustomerArchiveError("customer-restore-unavailable");
+      }
+
+      const saved = await transaction.customer.update({
+        data: { deletedAt: null },
+        where: { id: customer.id },
+      });
+
+      await writeAuditLog(transaction, {
+        actionType: "CUSTOMER_EDIT",
+        actorId: user.id,
+        customerId: customer.id,
+        description: `Restored customer profile ${customer.customerCode}: ${customer.fullName}.`,
+        newValue: {
+          deletedAt: null,
+          status: saved.status,
+        },
+        oldValue: {
+          deletedAt: customer.deletedAt,
+          status: customer.status,
+        },
+        targetId: customer.id,
+        targetType: "Customer",
+      });
+    });
+  } catch (error) {
+    const errorCode =
+      error instanceof CustomerArchiveError
+        ? error.code
+        : "customer-restore-unavailable";
+
+    redirect(customerListPath(errorCode, true, "archived"));
+  }
+
+  revalidateCustomerArchivePages(customerId);
+  redirect(customerListPath("customer-restored", false));
+}
+
+export async function deleteCustomerAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const customerId = optionalText(formData, "customerId", 100);
+
+  if (!customerId) {
+    redirect(customerListPath("invalid-customer", true, "archived"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const customer = await transaction.customer.findFirst({
+        where: { deletedAt: { not: null }, id: customerId },
+      });
+
+      if (!customer) {
+        throw new CustomerArchiveError("customer-delete-unavailable");
+      }
+
+      const relationCounts = await Promise.all([
+        transaction.customerPackage.count({ where: { customerId } }),
+        transaction.gymVisit.count({ where: { customerId } }),
+        transaction.note.count({ where: { customerId } }),
+        transaction.customerDocument.count({ where: { customerId } }),
+        transaction.packageSessionChange.count({
+          where: { customerPackage: { customerId } },
+        }),
+        transaction.visitPackageUsage.count({
+          where: {
+            OR: [
+              { customerPackage: { customerId } },
+              { visit: { customerId } },
+            ],
+          },
+        }),
+        transaction.customerPackageService.count({
+          where: { customerPackage: { customerId } },
+        }),
+        transaction.packageFreeze.count({
+          where: { customerPackage: { customerId } },
+        }),
+        transaction.occupancyEvent.count({
+          where: { visit: { customerId } },
+        }),
+        transaction.auditLog.count({
+          where: {
+            OR: [
+              { customerId },
+              { targetId: customerId, targetType: "Customer" },
+            ],
+          },
+        }),
+      ]);
+
+      if (relationCounts.some((count) => count > 0)) {
+        throw new CustomerArchiveError("customer-delete-blocked");
+      }
+
+      await transaction.customer.delete({ where: { id: customer.id } });
+      await writeAuditLog(transaction, {
+        actionType: "CUSTOMER_EDIT",
+        actorId: user.id,
+        description: `Permanently deleted archived customer profile ${customer.customerCode}: ${customer.fullName}.`,
+        oldValue: customer,
+        targetId: customer.id,
+        targetType: "Customer",
+      });
+    });
+  } catch (error) {
+    const errorCode =
+      error instanceof CustomerArchiveError
+        ? error.code
+        : "customer-delete-unavailable";
+
+    redirect(customerListPath(errorCode, true, "archived"));
+  }
+
+  revalidateCustomerArchivePages(customerId);
+  redirect(customerListPath("customer-deleted", false, "archived"));
 }
 
 export async function assignCustomerPackageAction(formData: FormData) {

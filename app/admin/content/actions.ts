@@ -16,6 +16,25 @@ const CONTENT_PATH = "/admin/content";
 const PUBLIC_INTERNAL_PATH_PATTERN = /^\/(?!\/)[^\s\\]*$/;
 const contentTypes = new Set(Object.values(PublicContentType));
 
+function contentPath(errorOrStatus: string, isError = true, view?: "archived") {
+  const params = new URLSearchParams({
+    [isError ? "error" : "status"]: errorOrStatus,
+  });
+
+  if (view) {
+    params.set("view", view);
+  }
+
+  return `${CONTENT_PATH}?${params.toString()}`;
+}
+
+function revalidateContentPages() {
+  revalidatePath("/");
+  revalidatePath("/our-app");
+  revalidatePath(CONTENT_PATH);
+  revalidatePath("/admin/logs");
+}
+
 function optionalText(formData: FormData, name: string, maxLength: number) {
   const value = formData.get(name);
 
@@ -92,15 +111,15 @@ export async function savePublicContentAction(formData: FormData) {
   const ctaUrl = optionalPublicHref(formData, "ctaUrl");
 
   if (!title || !rawType || !contentTypes.has(rawType as PublicContentType)) {
-    redirect(`${CONTENT_PATH}?error=invalid-required`);
+    redirect(contentPath("invalid-required"));
   }
 
   if (startsAt === undefined || endsAt === undefined) {
-    redirect(`${CONTENT_PATH}?error=invalid-date`);
+    redirect(contentPath("invalid-date"));
   }
 
   if (startsAt && endsAt && endsAt < startsAt) {
-    redirect(`${CONTENT_PATH}?error=invalid-date-order`);
+    redirect(contentPath("invalid-date-order"));
   }
 
   const uploadedImageUrl = await uploadImageFromForm(
@@ -108,15 +127,15 @@ export async function savePublicContentAction(formData: FormData) {
     "imageUpload",
     { prefix: "public-content" },
   ).catch((error) => {
-    redirect(`${CONTENT_PATH}?error=upload-${imageUploadErrorCode(error)}`);
+    redirect(contentPath(`upload-${imageUploadErrorCode(error)}`));
   });
 
   if (rawImageUrl && !imageUrl && !uploadedImageUrl) {
-    redirect(`${CONTENT_PATH}?error=invalid-url`);
+    redirect(contentPath("invalid-url"));
   }
 
   if (rawCtaUrl && !ctaUrl) {
-    redirect(`${CONTENT_PATH}?error=invalid-url`);
+    redirect(contentPath("invalid-url"));
   }
 
   const data = {
@@ -185,13 +204,11 @@ export async function savePublicContentAction(formData: FormData) {
       });
     });
   } catch {
-    redirect(`${CONTENT_PATH}?error=unavailable`);
+    redirect(contentPath("unavailable"));
   }
 
-  revalidatePath("/");
-  revalidatePath("/our-app");
-  revalidatePath(CONTENT_PATH);
-  redirect(`${CONTENT_PATH}?status=saved`);
+  revalidateContentPages();
+  redirect(contentPath("saved", false));
 }
 
 export async function movePublicContentAction(formData: FormData) {
@@ -200,7 +217,7 @@ export async function movePublicContentAction(formData: FormData) {
   const direction = optionalText(formData, "direction", 10);
 
   if (!id || (direction !== "up" && direction !== "down")) {
-    redirect(`${CONTENT_PATH}?error=invalid-order`);
+    redirect(contentPath("invalid-order"));
   }
 
   try {
@@ -264,11 +281,128 @@ export async function movePublicContentAction(formData: FormData) {
       });
     });
   } catch {
-    redirect(`${CONTENT_PATH}?error=unavailable`);
+    redirect(contentPath("unavailable"));
   }
 
-  revalidatePath("/");
-  revalidatePath("/our-app");
-  revalidatePath(CONTENT_PATH);
-  redirect(`${CONTENT_PATH}?status=saved`);
+  revalidateContentPages();
+  redirect(contentPath("saved", false));
+}
+
+export async function archivePublicContentAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const id = optionalText(formData, "id", 100);
+
+  if (!id) {
+    redirect(contentPath("invalid-record"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const existing = await transaction.publicContent.findFirst({
+        where: { deletedAt: null, id },
+      });
+
+      if (!existing) {
+        throw new Error("Public content not found.");
+      }
+
+      const deletedAt = new Date();
+      const saved = await transaction.publicContent.update({
+        data: { deletedAt },
+        where: { id },
+      });
+
+      await writeAuditLog(transaction, {
+        actionType: "PUBLIC_CONTENT_EDIT",
+        actorId: user.id,
+        description: `Archived public content: ${saved.title}.`,
+        newValue: { deletedAt },
+        oldValue: existing,
+        targetId: saved.id,
+        targetType: "PublicContent",
+      });
+    });
+  } catch {
+    redirect(contentPath("archive-unavailable"));
+  }
+
+  revalidateContentPages();
+  redirect(contentPath("archived", false, "archived"));
+}
+
+export async function restorePublicContentAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const id = optionalText(formData, "id", 100);
+
+  if (!id) {
+    redirect(contentPath("invalid-record", true, "archived"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const existing = await transaction.publicContent.findFirst({
+        where: { deletedAt: { not: null }, id },
+      });
+
+      if (!existing) {
+        throw new Error("Public content not found.");
+      }
+
+      const saved = await transaction.publicContent.update({
+        data: { deletedAt: null },
+        where: { id },
+      });
+
+      await writeAuditLog(transaction, {
+        actionType: "PUBLIC_CONTENT_EDIT",
+        actorId: user.id,
+        description: `Restored public content: ${saved.title}.`,
+        newValue: { deletedAt: null },
+        oldValue: existing,
+        targetId: saved.id,
+        targetType: "PublicContent",
+      });
+    });
+  } catch {
+    redirect(contentPath("restore-unavailable", true, "archived"));
+  }
+
+  revalidateContentPages();
+  redirect(contentPath("restored", false));
+}
+
+export async function deletePublicContentAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const id = optionalText(formData, "id", 100);
+
+  if (!id) {
+    redirect(contentPath("invalid-record", true, "archived"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const existing = await transaction.publicContent.findFirst({
+        where: { deletedAt: { not: null }, id },
+      });
+
+      if (!existing) {
+        throw new Error("Public content not found.");
+      }
+
+      await transaction.publicContent.delete({ where: { id } });
+      await writeAuditLog(transaction, {
+        actionType: "PUBLIC_CONTENT_EDIT",
+        actorId: user.id,
+        description: `Permanently deleted archived public content: ${existing.title}.`,
+        oldValue: existing,
+        targetId: existing.id,
+        targetType: "PublicContent",
+      });
+    });
+  } catch {
+    redirect(contentPath("delete-unavailable", true, "archived"));
+  }
+
+  revalidateContentPages();
+  redirect(contentPath("deleted", false, "archived"));
 }

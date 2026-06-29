@@ -67,11 +67,11 @@ export default async function PackagesPage({
           aria-hidden="true"
           className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/55 to-[#061521]/95"
         />
-        <div className="relative mx-auto flex min-h-[24rem] w-full max-w-[90rem] flex-col items-center justify-center px-5 py-16 text-center sm:px-8 lg:py-20">
+        <div className="relative mx-auto flex min-h-[24rem] w-full max-w-[90rem] flex-col items-center justify-center px-5 pb-16 pt-32 text-center sm:px-8 lg:pb-20 lg:pt-36">
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-white/75">
             Packages and services
           </p>
-          <h1 className="mt-3 max-w-5xl text-5xl font-bold text-white sm:text-7xl">
+          <h1 className="mt-3 max-w-5xl text-4xl font-bold text-white sm:text-7xl">
             Choose your training rhythm
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-7 text-white/85 sm:text-xl sm:leading-8">
@@ -238,11 +238,10 @@ export default async function PackagesPage({
             <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {catalog.packages.map((gymPackage) => {
                 const hasDiscount = Boolean(gymPackage.discountPrice);
-                const ribbonLabel = hasDiscount
-                  ? gymPackage.discountRibbonPercent
+                const ribbonLabel =
+                  hasDiscount && gymPackage.discountRibbonPercent
                     ? `${gymPackage.discountRibbonPercent}%`
-                    : "Discount"
-                  : null;
+                    : null;
 
                 return (
                   <article
@@ -253,17 +252,41 @@ export default async function PackagesPage({
                     }`}
                     key={gymPackage.id}
                   >
-                    {ribbonLabel ? (
-                      <div className="absolute left-3 top-3 z-10 rounded-full bg-button-danger px-3 py-1.5 text-xs font-black uppercase tracking-wide text-white shadow-lg">
-                        {ribbonLabel}
-                      </div>
-                    ) : null}
                     {gymPackage.highlightOnPublicPackages ? (
                       <div className="absolute right-3 top-3 z-10 rounded-full bg-brand px-3 py-1.5 text-xs font-black uppercase tracking-wide text-white shadow-lg">
                         Featured
                       </div>
                     ) : null}
                     <div className="relative aspect-[16/10] overflow-hidden bg-[#07111d]">
+                      {ribbonLabel ? (
+                        <div
+                          aria-label={`Discount ${ribbonLabel}`}
+                          className="absolute left-2 top-2 z-10 size-[clamp(3.625rem,15vw,4.5rem)] sm:left-3 sm:top-3"
+                          role="img"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="absolute left-[21%] top-[50%] h-[48%] w-[23%] rotate-[18deg] rounded-b-[0.35rem] bg-gradient-to-b from-brand to-[#03405f] shadow-[0_8px_14px_rgba(0,0,0,0.28)] [clip-path:polygon(0_0,100%_0,100%_100%,50%_78%,0_100%)]"
+                          />
+                          <span
+                            aria-hidden="true"
+                            className="absolute right-[21%] top-[50%] h-[48%] w-[23%] -rotate-[18deg] rounded-b-[0.35rem] bg-gradient-to-b from-primary-active to-[#032a42] shadow-[0_8px_14px_rgba(0,0,0,0.28)] [clip-path:polygon(0_0,100%_0,100%_100%,50%_78%,0_100%)]"
+                          />
+                          <span
+                            aria-hidden="true"
+                            className="absolute inset-x-[6%] top-0 aspect-square rounded-full bg-[conic-gradient(from_25deg,#8a5a0a,#f9d36a,#fff0a3,#c98216,#f9d36a,#8a5a0a)] p-[3px] shadow-[0_10px_18px_rgba(0,0,0,0.34)]"
+                          >
+                            <span className="block h-full w-full rounded-full bg-[radial-gradient(circle_at_34%_26%,#fff6bc_0%,#ffd45c_38%,#c88716_74%,#80540b_100%)] ring-1 ring-[#fff1a8]/70" />
+                            <span className="absolute inset-[18%] rounded-full border border-[#8a5a0a]/45" />
+                          </span>
+                          <span
+                            aria-hidden="true"
+                            className="absolute left-1/2 top-[34%] z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-[clamp(0.8rem,2.4vw,1.05rem)] font-black leading-none text-[#102033] [text-shadow:0_1px_2px_rgb(255_255_255_/_0.72)]"
+                          >
+                            {ribbonLabel}
+                          </span>
+                        </div>
+                      ) : null}
                       {gymPackage.imageUrl ? (
                         <img
                           alt={`${gymPackage.name} package image`}

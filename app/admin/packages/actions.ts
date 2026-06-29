@@ -16,7 +16,18 @@ const PACKAGES_PATH = "/admin/packages";
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const PRICE_PATTERN = /^\d{1,8}(?:\.\d{1,2})?$/;
 
-function packagePath(errorOrStatus: string, id: string | null, isError = true) {
+class PackageRecordError extends Error {
+  constructor(readonly code: string) {
+    super(code);
+  }
+}
+
+function packagePath(
+  errorOrStatus: string,
+  id: string | null,
+  isError = true,
+  view?: "archived",
+) {
   const params = new URLSearchParams({
     [isError ? "error" : "status"]: errorOrStatus,
   });
@@ -25,11 +36,26 @@ function packagePath(errorOrStatus: string, id: string | null, isError = true) {
     params.set("package", id);
   }
 
+  if (view) {
+    params.set("view", view);
+  }
+
   return `${PACKAGES_PATH}?${params.toString()}${id ? `#package-${encodeURIComponent(id)}` : ""}`;
 }
 
 function redirectPackageError(error: string, id: string | null): never {
   redirect(packagePath(error, id));
+}
+
+function revalidatePackagePages() {
+  revalidatePath("/");
+  revalidatePath("/packages");
+  revalidatePath(PACKAGES_PATH);
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/logs");
+  revalidatePath("/registration");
+  revalidatePath("/registration/general");
+  revalidatePath("/registration/in-gym");
 }
 
 function optionalText(formData: FormData, name: string, maxLength: number) {
@@ -362,9 +388,140 @@ export async function savePackageAction(formData: FormData) {
     redirectPackageError("unavailable", id);
   }
 
-  revalidatePath("/");
-  revalidatePath("/packages");
-  revalidatePath(PACKAGES_PATH);
-  revalidatePath("/admin/categories");
+  revalidatePackagePages();
   redirect(packagePath("saved", savedPackageId, false));
+}
+
+export async function archivePackageAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const id = optionalText(formData, "id", 100);
+
+  if (!id) {
+    redirectPackageError("invalid-record", null);
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const existing = await transaction.package.findFirst({
+        where: { deletedAt: null, id },
+      });
+
+      if (!existing) {
+        throw new Error("Package not found.");
+      }
+
+      const deletedAt = new Date();
+      const saved = await transaction.package.update({
+        data: { deletedAt },
+        where: { id },
+      });
+
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_EDIT",
+        actorId: user.id,
+        description: `Archived package: ${saved.name}.`,
+        newValue: { deletedAt },
+        oldValue: existing,
+        targetId: saved.id,
+        targetType: "Package",
+      });
+    });
+  } catch {
+    redirectPackageError("archive-unavailable", id);
+  }
+
+  revalidatePackagePages();
+  redirect(packagePath("archived", null, false, "archived"));
+}
+
+export async function restorePackageAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const id = optionalText(formData, "id", 100);
+
+  if (!id) {
+    redirect(packagePath("invalid-record", null, true, "archived"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const existing = await transaction.package.findFirst({
+        where: { deletedAt: { not: null }, id },
+      });
+
+      if (!existing) {
+        throw new Error("Package not found.");
+      }
+
+      const saved = await transaction.package.update({
+        data: { deletedAt: null },
+        where: { id },
+      });
+
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_EDIT",
+        actorId: user.id,
+        description: `Restored package: ${saved.name}.`,
+        newValue: { deletedAt: null },
+        oldValue: existing,
+        targetId: saved.id,
+        targetType: "Package",
+      });
+    });
+  } catch {
+    redirect(packagePath("restore-unavailable", null, true, "archived"));
+  }
+
+  revalidatePackagePages();
+  redirect(packagePath("restored", null, false));
+}
+
+export async function deletePackageAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const id = optionalText(formData, "id", 100);
+
+  if (!id) {
+    redirect(packagePath("invalid-record", null, true, "archived"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const existing = await transaction.package.findFirst({
+        where: { deletedAt: { not: null }, id },
+      });
+
+      if (!existing) {
+        throw new Error("Package not found.");
+      }
+
+      const relationCounts = await Promise.all([
+        transaction.customerPackage.count({ where: { packageId: id } }),
+        transaction.customerPackageService.count({ where: { packageId: id } }),
+      ]);
+
+      if (relationCounts.some((count) => count > 0)) {
+        throw new PackageRecordError("package-delete-blocked");
+      }
+
+      await transaction.packageCategory.deleteMany({ where: { packageId: id } });
+      await transaction.package.delete({ where: { id } });
+      await writeAuditLog(transaction, {
+        actionType: "PACKAGE_EDIT",
+        actorId: user.id,
+        description: `Permanently deleted archived package: ${existing.name}.`,
+        oldValue: existing,
+        targetId: existing.id,
+        targetType: "Package",
+      });
+    });
+  } catch (error) {
+    const errorCode =
+      error instanceof PackageRecordError
+        ? error.code
+        : "delete-unavailable";
+
+    redirect(packagePath(errorCode, null, true, "archived"));
+  }
+
+  revalidatePackagePages();
+  redirect(packagePath("deleted", null, false, "archived"));
 }

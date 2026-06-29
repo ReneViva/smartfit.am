@@ -1,13 +1,18 @@
 import { PublicContentType } from "@prisma/client";
+import Link from "next/link";
 
 import { AdminExpandableCard } from "../../../components/admin/admin-expandable-card";
+import { AdminRecordAction } from "../../../components/admin/admin-record-action";
 import { ImageInput } from "../../../components/admin/image-input";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { db } from "../../../lib/db";
 import {
+  archivePublicContentAction,
+  deletePublicContentAction,
   movePublicContentAction,
+  restorePublicContentAction,
   savePublicContentAction,
 } from "./actions";
 
@@ -15,6 +20,7 @@ type ContentPageProps = {
   searchParams: Promise<{
     error?: string;
     status?: string;
+    view?: string;
   }>;
 };
 
@@ -23,18 +29,32 @@ const inputClass =
 const labelClass = "block text-sm font-semibold text-foreground";
 
 const errorMessages: Record<string, string> = {
+  "archive-unavailable":
+    "Public content could not be archived. Please try again.",
   "invalid-date": "Start and end dates must be valid.",
   "invalid-date-order": "End date cannot be earlier than start date.",
   "invalid-order": "Content order could not be changed.",
+  "invalid-record": "Choose a valid public content record.",
   "invalid-required": "A valid content type and title are required.",
   "invalid-url":
     "Image URLs must use http or https. CTA URLs may use http, https, or an internal path like /packages.",
+  "delete-unavailable":
+    "Archived public content could not be permanently deleted. Please try again.",
+  "restore-unavailable":
+    "Archived public content could not be restored. Please try again.",
   "upload-configuration":
     "Image upload storage is not configured. Add storage values to .env or use an image URL.",
   "upload-failed": "Image upload failed. Try again or use an image URL.",
   "upload-file-size": "Image files must be 5 MB or smaller.",
   "upload-file-type": "Choose a valid image file.",
   unavailable: "Public content could not be saved. Please try again.",
+};
+
+const statusMessages: Record<string, string> = {
+  archived: "Public content archived.",
+  deleted: "Archived public content permanently deleted.",
+  restored: "Public content restored.",
+  saved: "Public content saved.",
 };
 
 function dateTimeValue(value: Date | null) {
@@ -252,7 +272,9 @@ function MoveContentControls({
 }
 
 export default async function ContentPage({ searchParams }: ContentPageProps) {
-  const [content, params] = await Promise.all([
+  const params = await searchParams;
+  const isArchivedView = params.view === "archived";
+  const [content, activeCount, archivedCount] = await Promise.all([
     db.publicContent.findMany({
       orderBy: [
         { sortOrder: "asc" },
@@ -263,6 +285,7 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
         body: true,
         ctaLabel: true,
         ctaUrl: true,
+        deletedAt: true,
         endsAt: true,
         id: true,
         imageUrl: true,
@@ -273,11 +296,13 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
         type: true,
         visibleOnApp: true,
       },
-      where: { deletedAt: null },
+      where: isArchivedView ? { deletedAt: { not: null } } : { deletedAt: null },
     }),
-    searchParams,
+    db.publicContent.count({ where: { deletedAt: null } }),
+    db.publicContent.count({ where: { deletedAt: { not: null } } }),
   ]);
   const errorMessage = params.error ? errorMessages[params.error] : null;
+  const statusMessage = params.status ? statusMessages[params.status] : null;
 
   return (
     <>
@@ -295,9 +320,32 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
         </p>
       </header>
 
-      {params.status === "saved" ? (
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Link
+          className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+            isArchivedView
+              ? "border-border bg-card text-secondary hover:border-brand hover:text-primary-active"
+              : "border-brand bg-soft-blue text-primary-active"
+          }`}
+          href="/admin/content"
+        >
+          Active content ({activeCount})
+        </Link>
+        <Link
+          className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+            isArchivedView
+              ? "border-brand bg-soft-blue text-primary-active"
+              : "border-border bg-card text-secondary hover:border-brand hover:text-primary-active"
+          }`}
+          href="/admin/content?view=archived"
+        >
+          Archived content ({archivedCount})
+        </Link>
+      </div>
+
+      {statusMessage ? (
         <p className="mt-6 rounded-xl border border-status-low bg-card px-4 py-3 text-sm font-semibold text-foreground">
-          Public content saved.
+          {statusMessage}
         </p>
       ) : null}
       {errorMessage ? (
@@ -309,20 +357,24 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
         </p>
       ) : null}
 
-      <Card className="mt-8">
-        <h3 className="text-xl font-bold text-foreground">
-          Create public content
-        </h3>
-        <form action={savePublicContentAction} className="mt-5">
-          <ContentFields />
-          <Button className="mt-5" pendingLabel="Creating..." type="submit">
-            Create content
-          </Button>
-        </form>
-      </Card>
+      {!isArchivedView ? (
+        <Card className="mt-8">
+          <h3 className="text-xl font-bold text-foreground">
+            Create public content
+          </h3>
+          <form action={savePublicContentAction} className="mt-5">
+            <ContentFields />
+            <Button className="mt-5" pendingLabel="Creating..." type="submit">
+              Create content
+            </Button>
+          </form>
+        </Card>
+      ) : null}
 
       <section className="mt-10">
-        <h3 className="text-2xl font-bold text-foreground">Existing content</h3>
+        <h3 className="text-2xl font-bold text-foreground">
+          {isArchivedView ? "Archived content" : "Existing content"}
+        </h3>
         {content.length ? (
           <div className="mt-5 grid gap-4 xl:grid-cols-2">
             {content.map((item, index) => (
@@ -346,7 +398,7 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-full bg-neutral px-2.5 py-1 text-xs font-bold text-secondary">
-                            Order {index + 1}
+                            {isArchivedView ? "Archived" : `Order ${index + 1}`}
                           </span>
                           <span className="rounded-full bg-soft-blue px-2.5 py-1 text-xs font-bold capitalize text-primary-active">
                             {contentTypeLabel(item.type)}
@@ -373,7 +425,9 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
                           {item.body || "No description provided."}
                         </p>
                         <p className="mt-3 text-xs font-semibold text-muted">
-                          {contentDateRange(item.startsAt, item.endsAt)}
+                          {isArchivedView && item.deletedAt
+                            ? `Archived ${summaryDateFormat.format(item.deletedAt)}`
+                            : contentDateRange(item.startsAt, item.endsAt)}
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-secondary">
                           <span className="rounded-full border border-border bg-page px-2.5 py-1">
@@ -391,35 +445,89 @@ export default async function ContentPage({ searchParams }: ContentPageProps) {
                 >
                   <div className="mb-5">
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
-                      Editing content
+                      {isArchivedView ? "Archived content" : "Editing content"}
                     </p>
                     <h4 className="mt-1 text-lg font-bold text-foreground">
                       {item.title}
                     </h4>
                   </div>
-                  <form action={savePublicContentAction}>
-                    <ContentFields content={item} />
-                    <Button
-                      className="mt-5"
-                      pendingLabel="Saving..."
-                      type="submit"
-                    >
-                      Save changes
-                    </Button>
-                  </form>
+                  {isArchivedView ? (
+                    <div className="rounded-xl border border-border bg-page p-4">
+                      <p className="text-sm leading-6 text-secondary">
+                        Restore this item to edit it again, or permanently
+                        delete it if it is no longer needed.
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <AdminRecordAction
+                          action={restorePublicContentAction}
+                          confirmMessage={`Restore public content "${item.title}"?`}
+                          fields={{ id: item.id }}
+                          pendingLabel="Restoring..."
+                          variant="success"
+                        >
+                          Restore
+                        </AdminRecordAction>
+                        <AdminRecordAction
+                          action={deletePublicContentAction}
+                          confirmMessage={`Permanently delete archived public content "${item.title}"? This cannot be undone.`}
+                          fields={{ id: item.id }}
+                          pendingLabel="Deleting..."
+                          variant="danger"
+                        >
+                          Delete permanently
+                        </AdminRecordAction>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <form action={savePublicContentAction}>
+                        <ContentFields content={item} />
+                        <Button
+                          className="mt-5"
+                          pendingLabel="Saving..."
+                          type="submit"
+                        >
+                          Save changes
+                        </Button>
+                      </form>
+                      <div className="mt-5 rounded-xl border border-status-medium bg-page p-4">
+                        <p className="text-sm font-semibold text-foreground">
+                          Archive public content
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-secondary">
+                          Hides this item from public pages while preserving it
+                          for restore.
+                        </p>
+                        <AdminRecordAction
+                          action={archivePublicContentAction}
+                          className="mt-3"
+                          confirmMessage={`Archive public content "${item.title}"?`}
+                          fields={{ id: item.id }}
+                          pendingLabel="Archiving..."
+                          variant="danger"
+                        >
+                          Archive
+                        </AdminRecordAction>
+                      </div>
+                    </>
+                  )}
                 </AdminExpandableCard>
-                <MoveContentControls
-                  id={item.id}
-                  isFirst={index === 0}
-                  isLast={index === content.length - 1}
-                  orderPosition={index + 1}
-                />
+                {!isArchivedView ? (
+                  <MoveContentControls
+                    id={item.id}
+                    isFirst={index === 0}
+                    isLast={index === content.length - 1}
+                    orderPosition={index + 1}
+                  />
+                ) : null}
               </div>
             ))}
           </div>
         ) : (
           <p className="mt-5 rounded-2xl border border-dashed border-border bg-card px-6 py-10 text-center text-secondary">
-            No public content has been created yet.
+            {isArchivedView
+              ? "No public content has been archived."
+              : "No public content has been created yet."}
           </p>
         )}
       </section>

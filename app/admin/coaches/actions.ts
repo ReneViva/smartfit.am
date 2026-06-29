@@ -13,6 +13,33 @@ import {
 
 const COACHES_PATH = "/admin/coaches";
 
+class CoachRecordError extends Error {
+  constructor(readonly code: string) {
+    super(code);
+  }
+}
+
+function coachPath(errorOrStatus: string, isError = true, view?: "archived") {
+  const params = new URLSearchParams({
+    [isError ? "error" : "status"]: errorOrStatus,
+  });
+
+  if (view) {
+    params.set("view", view);
+  }
+
+  return `${COACHES_PATH}?${params.toString()}`;
+}
+
+function revalidateCoachPages() {
+  revalidatePath("/");
+  revalidatePath("/coaches");
+  revalidatePath("/packages");
+  revalidatePath(COACHES_PATH);
+  revalidatePath("/admin/packages");
+  revalidatePath("/admin/logs");
+}
+
 function optionalText(formData: FormData, name: string, maxLength: number) {
   const value = formData.get(name);
 
@@ -62,7 +89,7 @@ export async function saveCoachAction(formData: FormData) {
   const categoryIds = selectedCategoryIds(formData);
 
   if (!firstName || !lastName || !specialty) {
-    redirect(`${COACHES_PATH}?error=invalid-required`);
+    redirect(coachPath("invalid-required"));
   }
 
   if (categoryIds.length) {
@@ -78,7 +105,7 @@ export async function saveCoachAction(formData: FormData) {
     );
 
     if (categoryIds.some((categoryId) => !assignableCategoryIds.has(categoryId))) {
-      redirect(`${COACHES_PATH}?error=invalid-categories`);
+      redirect(coachPath("invalid-categories"));
     }
   }
 
@@ -87,11 +114,11 @@ export async function saveCoachAction(formData: FormData) {
     "photoUpload",
     { prefix: "coaches" },
   ).catch((error) => {
-    redirect(`${COACHES_PATH}?error=upload-${imageUploadErrorCode(error)}`);
+    redirect(coachPath(`upload-${imageUploadErrorCode(error)}`));
   });
 
   if (rawPhotoUrl && !photoUrl && !uploadedPhotoUrl) {
-    redirect(`${COACHES_PATH}?error=invalid-url`);
+    redirect(coachPath("invalid-url"));
   }
 
   const data = {
@@ -189,13 +216,142 @@ export async function saveCoachAction(formData: FormData) {
       });
     });
   } catch {
-    redirect(`${COACHES_PATH}?error=unavailable`);
+    redirect(coachPath("unavailable"));
   }
 
-  revalidatePath("/");
-  revalidatePath("/coaches");
-  revalidatePath("/packages");
-  revalidatePath(COACHES_PATH);
-  revalidatePath("/admin/packages");
-  redirect(`${COACHES_PATH}?status=saved`);
+  revalidateCoachPages();
+  redirect(coachPath("saved", false));
+}
+
+export async function archiveCoachAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const id = optionalText(formData, "id", 100);
+
+  if (!id) {
+    redirect(coachPath("invalid-record"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const existing = await transaction.coach.findFirst({
+        where: { deletedAt: null, id },
+      });
+
+      if (!existing) {
+        throw new Error("Coach not found.");
+      }
+
+      const deletedAt = new Date();
+      const saved = await transaction.coach.update({
+        data: { deletedAt },
+        where: { id },
+      });
+
+      await writeAuditLog(transaction, {
+        actionType: "COACH_EDIT",
+        actorId: user.id,
+        description: `Archived coach: ${saved.firstName} ${saved.lastName}.`,
+        newValue: { deletedAt },
+        oldValue: existing,
+        targetId: saved.id,
+        targetType: "Coach",
+      });
+    });
+  } catch {
+    redirect(coachPath("archive-unavailable"));
+  }
+
+  revalidateCoachPages();
+  redirect(coachPath("archived", false, "archived"));
+}
+
+export async function restoreCoachAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const id = optionalText(formData, "id", 100);
+
+  if (!id) {
+    redirect(coachPath("invalid-record", true, "archived"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const existing = await transaction.coach.findFirst({
+        where: { deletedAt: { not: null }, id },
+      });
+
+      if (!existing) {
+        throw new Error("Coach not found.");
+      }
+
+      const saved = await transaction.coach.update({
+        data: { deletedAt: null },
+        where: { id },
+      });
+
+      await writeAuditLog(transaction, {
+        actionType: "COACH_EDIT",
+        actorId: user.id,
+        description: `Restored coach: ${saved.firstName} ${saved.lastName}.`,
+        newValue: { deletedAt: null },
+        oldValue: existing,
+        targetId: saved.id,
+        targetType: "Coach",
+      });
+    });
+  } catch {
+    redirect(coachPath("restore-unavailable", true, "archived"));
+  }
+
+  revalidateCoachPages();
+  redirect(coachPath("restored", false));
+}
+
+export async function deleteCoachAction(formData: FormData) {
+  const user = await requireStaffRole("ADMIN");
+  const id = optionalText(formData, "id", 100);
+
+  if (!id) {
+    redirect(coachPath("invalid-record", true, "archived"));
+  }
+
+  try {
+    await db.$transaction(async (transaction) => {
+      const existing = await transaction.coach.findFirst({
+        where: { deletedAt: { not: null }, id },
+      });
+
+      if (!existing) {
+        throw new Error("Coach not found.");
+      }
+
+      const relationCounts = await Promise.all([
+        transaction.customer.count({ where: { assignedCoachId: id } }),
+        transaction.package.count({ where: { assignedCoachId: id } }),
+        transaction.customerPackage.count({ where: { coachId: id } }),
+        transaction.customerPackageService.count({ where: { coachId: id } }),
+      ]);
+
+      if (relationCounts.some((count) => count > 0)) {
+        throw new CoachRecordError("coach-delete-blocked");
+      }
+
+      await transaction.coach.delete({ where: { id } });
+      await writeAuditLog(transaction, {
+        actionType: "COACH_EDIT",
+        actorId: user.id,
+        description: `Permanently deleted archived coach: ${existing.firstName} ${existing.lastName}.`,
+        oldValue: existing,
+        targetId: existing.id,
+        targetType: "Coach",
+      });
+    });
+  } catch (error) {
+    const errorCode =
+      error instanceof CoachRecordError ? error.code : "delete-unavailable";
+
+    redirect(coachPath(errorCode, true, "archived"));
+  }
+
+  revalidateCoachPages();
+  redirect(coachPath("deleted", false, "archived"));
 }
