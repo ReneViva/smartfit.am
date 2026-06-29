@@ -30,6 +30,8 @@ SEED_REGISTRATION_EMAIL="..."
 SEED_REGISTRATION_PASSWORD="..."
 ```
 
+Staff login credentials are stored as hashed `StaffUser` rows in the database. Changing these environment variables in Render does not update existing login credentials by itself.
+
 Set these values to enable file uploads:
 
 ```env
@@ -91,6 +93,14 @@ npm run db:seed
 ```
 
 The seed upserts the configured ADMIN and REGISTRATION users and creates missing singleton settings/occupancy records. Verify all `SEED_*` values before running it in production. Never use placeholder or development passwords.
+
+To rotate existing production staff usernames, emails, or passwords without creating duplicate staff users, update the six `SEED_*` variables in Render and then run this command against the production database:
+
+```bash
+npm run reset:staff-credentials
+```
+
+Restart or redeploy the Render service after changing environment variables so the command and app process read the latest values. A clear build cache is not required for credential changes.
 
 ## 6. Start
 

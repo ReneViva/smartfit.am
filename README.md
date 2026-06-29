@@ -45,12 +45,12 @@ Open [http://localhost:3000](http://localhost:3000).
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `AUTH_SECRET` | Yes | Long random secret used to sign staff sessions |
 | `NEXT_PUBLIC_SITE_URL` | Yes for deployment | Public site origin used for canonical, sitemap, and social metadata URLs |
-| `SEED_ADMIN_USERNAME` | For intentional seed runs | Initial admin username |
-| `SEED_ADMIN_EMAIL` | For intentional seed runs | Initial admin email |
-| `SEED_ADMIN_PASSWORD` | For intentional seed runs | Initial admin password |
-| `SEED_REGISTRATION_USERNAME` | For intentional seed runs | Initial registration username |
-| `SEED_REGISTRATION_EMAIL` | For intentional seed runs | Initial registration email |
-| `SEED_REGISTRATION_PASSWORD` | For intentional seed runs | Initial registration password |
+| `SEED_ADMIN_USERNAME` | For intentional seed/reset runs | Admin username |
+| `SEED_ADMIN_EMAIL` | For intentional seed/reset runs | Admin email login |
+| `SEED_ADMIN_PASSWORD` | For intentional seed/reset runs | Admin password to hash into the database |
+| `SEED_REGISTRATION_USERNAME` | For intentional seed/reset runs | Registration username |
+| `SEED_REGISTRATION_EMAIL` | For intentional seed/reset runs | Registration email login |
+| `SEED_REGISTRATION_PASSWORD` | For intentional seed/reset runs | Registration password to hash into the database |
 | `STORAGE_PROVIDER` | For file uploads | Object storage provider, currently `r2` |
 | `CLOUD_NAME` | For file uploads | Storage bucket or container name |
 | `ACCESS_KEY_ID` | For file uploads | Storage access key ID; server-only |
@@ -86,6 +86,14 @@ Protected routes:
 `npm run db:seed` upserts the configured ADMIN and REGISTRATION accounts, creates the singleton gym settings record when missing, and creates an occupancy state when missing. Seed credentials come from the real `.env`; `.env.example` contains placeholders only.
 
 Run the seed intentionally. Before any production seed run, set strong unique passwords and a strong `AUTH_SECRET`.
+
+Staff login is database-backed. Updating Render or local environment variables does not automatically change existing login credentials until a database command is run. To update the existing ADMIN and REGISTRATION users from the configured `SEED_*` values without creating duplicate staff rows, run:
+
+```bash
+npm run reset:staff-credentials
+```
+
+The reset command requires all six `SEED_*` staff credential variables, hashes the passwords with the app's scrypt password format, and does not print password values.
 
 ### Local Demo Data
 
