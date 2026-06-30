@@ -121,6 +121,12 @@ const errorMessages: Record<string, string> = {
     "Frozen memberships cannot be selected or used for check-in.",
   "expired-membership":
     "Expired memberships can be checked in only without deductions.",
+  "membership-no-usable-services":
+    "This membership has no usable service lines for deductions. Check in without service deduction.",
+  "membership-not-yet-active":
+    "This membership is not active yet. Check in without service deduction.",
+  "membership-zero-sessions":
+    "This membership has no remaining service sessions. Check in without service deduction.",
   "membership-conflict":
     "This customer has multiple active memberships from older data. Admin must resolve before fast check-in.",
   "daily-limit-reached":
@@ -278,8 +284,36 @@ export default async function RegistrationPage({
         gymPresenceStatus: true,
         packages: {
           select: {
+            activationDate: true,
             expirationDate: true,
+            freezes: {
+              select: {
+                customerPackageServiceId: true,
+                plannedEndDate: true,
+                startDate: true,
+                status: true,
+              },
+              where: { status: "ACTIVE" },
+            },
             remainingSessions: true,
+            services: {
+              select: {
+                deletedAt: true,
+                endDate: true,
+                freezes: {
+                  select: {
+                    plannedEndDate: true,
+                    startDate: true,
+                    status: true,
+                  },
+                  where: { status: "ACTIVE" },
+                },
+                isActive: true,
+                remainingSessions: true,
+                startDate: true,
+              },
+              where: { deletedAt: null },
+            },
             status: true,
           },
           where: { deletedAt: null },

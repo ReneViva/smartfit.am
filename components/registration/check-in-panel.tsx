@@ -17,16 +17,20 @@ type CheckInServiceOption = {
 };
 
 type CheckInMembershipOption = {
+  allowsNoDeductionCheckIn: boolean;
   coachName: string | null;
   expirationLabel: string;
   id: string;
-  isExpired: boolean;
+  isUsableForDeduction: boolean;
   name: string;
   packageType: string;
   remainingGuestPasses: number;
   services: CheckInServiceOption[];
+  statusLabel: string;
+  statusReason: string | null;
   timeRestrictionReason: string | null;
   timeRule: string;
+  warnings: string[];
 };
 
 function parsedDraft(value: string) {
@@ -65,11 +69,14 @@ export function CheckInPanel({
   const hardBlockMessage =
     activeMembershipCount > 1
       ? "This customer has multiple active memberships from older data. Admin must resolve before fast check-in."
-      : !membership && frozenMembershipCount > 0
+      : membership && !membership.allowsNoDeductionCheckIn
+        ? membership.statusReason ??
+          "This membership is unavailable for fast check-in."
+        : !membership && frozenMembershipCount > 0
         ? "This membership is frozen and cannot be used for fast check-in."
         : membership?.timeRestrictionReason ?? null;
-  const canUseMembership = Boolean(
-    membership && !membership.isExpired && !hardBlockMessage,
+  const canDeductFromMembership = Boolean(
+    membership && membership.isUsableForDeduction && !hardBlockMessage,
   );
   const totalServiceDeductions = services.reduce((total, service) => {
     const draft = parsedDraft(serviceDeductions[service.id] ?? "0");
@@ -88,15 +95,22 @@ export function CheckInPanel({
   const parsedGuestCount = parsedDraft(guestCount);
   const occupancyDelta = parsedGuestCount !== null ? 1 + parsedGuestCount : 1;
   const guestControlsAvailable = Boolean(
-    membership && canUseMembership && membership.remainingGuestPasses > 0,
+    membership &&
+      canDeductFromMembership &&
+      membership.remainingGuestPasses > 0,
   );
+  const noDeductionMembershipMessage =
+    membership &&
+    !membership.isUsableForDeduction &&
+    membership.allowsNoDeductionCheckIn
+      ? `${membership.statusReason ?? "Membership is not usable for deductions."} Check-in is allowed without service or guest-pass deductions.`
+      : null;
   const warningMessage =
     hardBlockMessage ??
+    noDeductionMembershipMessage ??
     (!membership
       ? "No active membership is available. This check-in will not deduct service sessions."
-      : membership.isExpired
-        ? "This membership is expired. Check-in is allowed without service or guest-pass deductions."
-        : !services.length
+      : !services.length
           ? "No active service lines are available. This check-in will not deduct service sessions."
           : services.every(
               (service) => !service.isUsable || service.remainingSessions === 0,
@@ -140,7 +154,7 @@ export function CheckInPanel({
                 </p>
               </div>
               <p className="rounded-full bg-card px-3 py-1 text-xs font-semibold text-secondary">
-                {membership.isExpired ? "expired" : "active"}
+                {membership.statusLabel}
               </p>
             </div>
             <div className="mt-3 grid gap-2 text-sm text-secondary sm:grid-cols-2">
@@ -149,6 +163,13 @@ export function CheckInPanel({
               <p>{membership.coachName ?? "No membership coach"}</p>
               <p>{membership.remainingGuestPasses} guest passes remaining</p>
             </div>
+            {membership.warnings.length ? (
+              <ul className="mt-3 space-y-1 text-xs font-semibold text-button-warning">
+                {membership.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         ) : null}
 
@@ -164,7 +185,7 @@ export function CheckInPanel({
           </p>
         ) : null}
 
-        {membership && canUseMembership && services.length ? (
+        {membership && canDeductFromMembership && services.length ? (
           <div className="mt-5 grid gap-3 lg:grid-cols-2">
             {services.map((service) => {
               const value = serviceDeductions[service.id] ?? "0";
@@ -307,7 +328,7 @@ export function CheckInPanel({
         >
           {hardBlockMessage
             ? "Check-in blocked"
-            : totalServiceDeductions > 0
+            : totalServiceDeductions > 0 && canDeductFromMembership
               ? "Check in and deduct services"
               : "Check in without service deduction"}
         </Button>

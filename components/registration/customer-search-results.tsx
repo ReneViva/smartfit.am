@@ -7,6 +7,7 @@ import type {
 } from "@prisma/client";
 import Link from "next/link";
 
+import { membershipEffectiveStatus } from "../../lib/membership-status";
 import { StatusBadge } from "../ui/status-badge";
 import {
   handleLookupLinkClick,
@@ -24,8 +25,27 @@ export type RegistrationSearchResult = {
   gymPresenceStatus: GymPresenceStatus;
   phone: string | null;
   packages: Array<{
+    activationDate: Date;
     expirationDate: Date;
+    freezes: {
+      customerPackageServiceId: string | null;
+      plannedEndDate: Date | null;
+      startDate: Date;
+      status: string;
+    }[];
     remainingSessions: number;
+    services: {
+      deletedAt: Date | null;
+      endDate: Date | null;
+      freezes: {
+        plannedEndDate: Date | null;
+        startDate: Date;
+        status: string;
+      }[];
+      isActive: boolean;
+      remainingSessions: number;
+      startDate: Date | null;
+    }[];
     status: CustomerPackageStatus;
   }>;
   status: CustomerStatus;
@@ -90,8 +110,7 @@ export function CustomerSearchResults({
 }) {
   const { isPending, navigate, pendingCustomerCode } =
     useCustomerLookupMotion();
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  const now = new Date();
   const clearParams = new URLSearchParams();
 
   if (selectedCustomerCode) {
@@ -168,19 +187,28 @@ export function CustomerSearchResults({
             key={resultSetKey}
           >
             {results.map((customer, index) => {
-            const activePackages = customer.packages.filter(
-              (gymPackage) => gymPackage.status === "ACTIVE",
+            const packageStatuses = customer.packages.map((gymPackage) =>
+              membershipEffectiveStatus(gymPackage, now),
+            );
+            const activePackages = packageStatuses.filter(
+              (status) => status.isUsableForDeduction,
             ).length;
             const hasFrozen = customer.packages.some(
-              (gymPackage) => gymPackage.status === "FROZEN",
+              (gymPackage, packageIndex) =>
+                packageStatuses[packageIndex]?.statusKey === "frozen",
             );
-            const hasExpired = customer.packages.some(
-              (gymPackage) =>
-                gymPackage.status === "EXPIRED" ||
-                gymPackage.expirationDate < today,
+            const hasExpired = packageStatuses.some(
+              (status) => status.statusKey === "expired",
             );
             const hasZeroSessions = customer.packages.some(
-              (gymPackage) => gymPackage.remainingSessions <= 0,
+              (gymPackage, packageIndex) =>
+                packageStatuses[packageIndex]?.statusKey === "zeroSessions" ||
+                gymPackage.services.some(
+                  (service) =>
+                    service.isActive &&
+                    !service.deletedAt &&
+                    service.remainingSessions <= 0,
+                ),
             );
             const hasNoPackage = customer.packages.length === 0;
             const selected =

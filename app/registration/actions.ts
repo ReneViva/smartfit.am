@@ -11,8 +11,13 @@ import {
 } from "../../lib/customer-memberships";
 import { db } from "../../lib/db";
 import { writeAuditLog } from "../../lib/logging";
+import {
+  membershipEffectiveStatus,
+  serviceEffectiveStatus,
+  type MembershipEffectiveStatusKey,
+  type ServiceEffectiveStatusKey,
+} from "../../lib/membership-status";
 import type { NoteMutationResult } from "../../lib/notes";
-import { hasBlockingFreeze } from "../../lib/package-freezes";
 import {
   packageTimeRestrictionReason,
 } from "../../lib/registration/package-usability";
@@ -397,26 +402,42 @@ function startOfUtcDay(value: Date) {
   return date;
 }
 
-function serviceDateError(
-  service: {
-    endDate: Date | null;
-    startDate: Date | null;
-  },
-  today: Date,
+function membershipStatusError(statusKey: MembershipEffectiveStatusKey) {
+  switch (statusKey) {
+    case "expired":
+      return "expired-membership";
+    case "frozen":
+      return "frozen-package";
+    case "notStarted":
+      return "membership-not-yet-active";
+    case "noUsableServices":
+      return "membership-no-usable-services";
+    case "zeroSessions":
+      return "membership-zero-sessions";
+    default:
+      return "invalid-package";
+  }
+}
+
+function serviceStatusError(statusKey: ServiceEffectiveStatusKey) {
+  switch (statusKey) {
+    case "expired":
+      return "service-expired";
+    case "frozen":
+      return "service-frozen";
+    case "notStarted":
+      return "service-not-yet-active";
+    case "zeroSessions":
+      return "service-sessions-insufficient";
+    default:
+      return "invalid-service";
+  }
+}
+
+function membershipShouldCheckTimeRestriction(
+  statusKey: MembershipEffectiveStatusKey,
 ) {
-  if (!service.startDate || !service.endDate) {
-    return "invalid-service" as const;
-  }
-
-  if (service.startDate > today) {
-    return "service-not-yet-active" as const;
-  }
-
-  if (service.endDate < today) {
-    return "service-expired" as const;
-  }
-
-  return null;
+  return !["expired", "notStarted"].includes(statusKey);
 }
 
 function addDays(value: Date, days: number) {
@@ -730,7 +751,6 @@ export async function checkInAction(formData: FormData) {
         },
       });
       const now = new Date();
-      const today = startOfUtcDay(now);
       const submittedServiceIds = [...serviceDeductions.keys()];
       const totalServiceDeductions = [...serviceDeductions.values()].reduce(
         (total, deduction) => total + deduction,
@@ -748,17 +768,21 @@ export async function checkInAction(formData: FormData) {
       }
 
       const activeMembership = activeMemberships[0] ?? null;
+      const activeMembershipStatus = activeMembership
+        ? membershipEffectiveStatus(activeMembership, now)
+        : null;
+
+      if (activeMembershipStatus?.statusKey === "frozen") {
+        throw new CheckInError("frozen-package");
+      }
 
       if (
-        activeMembership &&
-        hasBlockingFreeze(
-          activeMembership.freezes.filter(
-            (freeze) => !freeze.customerPackageServiceId,
-          ),
-          now,
-        )
+        activeMembershipStatus &&
+        !activeMembershipStatus.allowsNoDeductionCheckIn
       ) {
-        throw new CheckInError("frozen-package");
+        throw new CheckInError(
+          membershipStatusError(activeMembershipStatus.statusKey),
+        );
       }
 
       if (!activeMembership) {
@@ -790,10 +814,6 @@ export async function checkInAction(formData: FormData) {
         }
       }
 
-      const membershipExpired = activeMembership
-        ? activeMembership.expirationDate < today
-        : false;
-
       if (activeMembership) {
         await assertMembershipCheckInLimits(
           transaction,
@@ -802,11 +822,20 @@ export async function checkInAction(formData: FormData) {
           now,
         );
 
-        if (membershipExpired && (totalServiceDeductions > 0 || guestCount > 0)) {
-          throw new CheckInError("expired-membership");
+        if (
+          activeMembershipStatus &&
+          !activeMembershipStatus.isUsableForDeduction &&
+          (totalServiceDeductions > 0 || guestCount > 0)
+        ) {
+          throw new CheckInError(
+            membershipStatusError(activeMembershipStatus.statusKey),
+          );
         }
 
-        if (!membershipExpired) {
+        if (
+          activeMembershipStatus &&
+          membershipShouldCheckTimeRestriction(activeMembershipStatus.statusKey)
+        ) {
           const timeRestrictionError = packageTimeRestrictionReason(
             activeMembership,
             now,
@@ -827,13 +856,11 @@ export async function checkInAction(formData: FormData) {
             throw new CheckInError("invalid-service");
           }
 
-          const dateError = serviceDateError(service, today);
-          if (dateError) {
-            throw new CheckInError(dateError);
-          }
-
-          if (hasBlockingFreeze(service.freezes, now)) {
-            throw new CheckInError("service-frozen");
+          const serviceStatus = serviceEffectiveStatus(service, now);
+          if (!serviceStatus.isUsableForDeduction) {
+            throw new CheckInError(
+              serviceStatusError(serviceStatus.statusKey),
+            );
           }
 
           if (deduction > service.remainingSessions) {

@@ -24,6 +24,7 @@ import {
   serviceLineDisplayName,
   serviceValidityStatus,
 } from "../../lib/customer-memberships";
+import { membershipEffectiveStatus } from "../../lib/membership-status";
 import type { CustomerNoteView } from "../../lib/notes";
 import type { RegistrationCurrentMembershipVisitSummary } from "../../lib/registration/current-membership-visits";
 import type { CustomerRecentActivityItem } from "../../lib/registration/recent-activity";
@@ -37,6 +38,7 @@ import { RecentActivity } from "./recent-activity";
 import { ServiceSessionStepper, SessionStepper } from "./session-stepper";
 
 type PackageCardValue = {
+  activationDate: Date;
   allowedEndTime: string | null;
   allowedStartTime: string | null;
   coach: {
@@ -162,27 +164,20 @@ function packageTimeRule(customerPackage: PackageCardValue) {
 
 function packageStatus(
   customerPackage: PackageCardValue,
-  today: Date,
+  now: Date,
 ): {
   label: string;
-  status: "active" | "expired" | "medium" | "notInGym";
+  status:
+    | "active"
+    | "closeToExpiry"
+    | "expired"
+    | "high"
+    | "medium"
+    | "notInGym";
 } {
-  if (
-    customerPackage.status === "EXPIRED" ||
-    customerPackage.expirationDate < today
-  ) {
-    return { label: "expired", status: "expired" };
-  }
+  const status = membershipEffectiveStatus(customerPackage, now);
 
-  if (customerPackage.status === "FROZEN") {
-    return { label: "frozen / not usable", status: "medium" };
-  }
-
-  if (customerPackage.status === "INACTIVE") {
-    return { label: "inactive", status: "notInGym" };
-  }
-
-  return { label: "active", status: "active" };
+  return { label: status.label, status: status.badge };
 }
 
 function CurrentMembershipVisitSummary({
@@ -267,13 +262,17 @@ export function RegistrationCustomerCard({
   showAllPackages: boolean;
 }) {
   const now = new Date();
-  const today = new Date(now);
-  today.setUTCHours(0, 0, 0, 0);
-  const activePackages = customer.packages.filter(
-    (customerPackage) =>
-      customerPackage.status === "ACTIVE" &&
-      customerPackage.expirationDate >= today,
-  );
+  const activePackages = customer.packages.filter((customerPackage) => {
+    const status = membershipEffectiveStatus(customerPackage, now).statusKey;
+
+    return [
+      "active",
+      "expiringSoon",
+      "lowSessions",
+      "noUsableServices",
+      "zeroSessions",
+    ].includes(status);
+  });
   const visiblePackages = showAllPackages ? customer.packages : activePackages;
   const hiddenPackageCount = customer.packages.length - activePackages.length;
   const togglePath = `/registration?customer=${encodeURIComponent(customer.customerCode)}${showAllPackages ? "" : "&showAll=1"}${compact ? "&view=compact" : ""}`;
@@ -282,13 +281,7 @@ export function RegistrationCustomerCard({
   );
   const frozenMemberships = customer.packages.filter(
     (customerPackage) =>
-      customerPackage.status === "FROZEN" ||
-      hasBlockingFreeze(
-        customerPackage.freezes.filter(
-          (freeze) => !freeze.customerPackageServiceId,
-        ),
-        now,
-      ),
+      membershipEffectiveStatus(customerPackage, now).statusKey === "frozen",
   );
   const activeMembership =
     activeMemberships.length === 1 ? activeMemberships[0] : null;
@@ -302,13 +295,22 @@ export function RegistrationCustomerCard({
     : false;
   const checkInMembership = activeMembership && !activeMembershipHasBlockingFreeze
     ? (() => {
-        const isExpired = activeMembership.expirationDate < today;
+        const membershipStatus = membershipEffectiveStatus(
+          activeMembership,
+          now,
+        );
+        const applyTimeRestriction = ![
+          "expired",
+          "notStarted",
+        ].includes(membershipStatus.statusKey);
 
         return {
+          allowsNoDeductionCheckIn:
+            membershipStatus.allowsNoDeductionCheckIn,
           coachName: membershipCoachDisplayName(activeMembership),
           expirationLabel: displayDate(activeMembership.expirationDate),
           id: activeMembership.id,
-          isExpired,
+          isUsableForDeduction: membershipStatus.isUsableForDeduction,
           name: membershipDisplayName(activeMembership),
           packageType: membershipTypeDisplayName(activeMembership),
           remainingGuestPasses: activeMembership.remainingGuestPasses,
@@ -328,10 +330,13 @@ export function RegistrationCustomerCard({
                 statusLabel: serviceStatus.label,
               };
             }),
-          timeRestrictionReason: isExpired
-            ? null
-            : packageTimeRestrictionReason(activeMembership, now),
+          statusLabel: membershipStatus.label,
+          statusReason: membershipStatus.reason,
+          timeRestrictionReason: applyTimeRestriction
+            ? packageTimeRestrictionReason(activeMembership, now)
+            : null,
           timeRule: packageTimeRule(activeMembership),
+          warnings: membershipStatus.warnings,
         };
       })()
     : null;
@@ -539,10 +544,14 @@ export function RegistrationCustomerCard({
         {visiblePackages.length ? (
           <div className="mt-5 grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
             {visiblePackages.map((customerPackage) => {
-              const displayStatus = packageStatus(customerPackage, today);
+              const effectiveStatus = membershipEffectiveStatus(
+                customerPackage,
+                now,
+              );
+              const displayStatus = packageStatus(customerPackage, now);
               const usability = packageUsability(customerPackage, now);
-              const isExpired = displayStatus.status === "expired";
-              const isZero = customerPackage.remainingSessions === 0;
+              const isExpired = effectiveStatus.statusKey === "expired";
+              const isZero = effectiveStatus.statusKey === "zeroSessions";
               const packageCoach = membershipCoachDisplayName(customerPackage);
               const activeServiceLines = customerPackage.services.filter(
                 (service) => service.isActive && !service.deletedAt,
@@ -565,7 +574,7 @@ export function RegistrationCustomerCard({
 
               return (
                 <section
-                  className={`animate-panel-in smooth-card flex min-w-0 flex-col rounded-2xl border bg-card p-5 shadow-sm ${isExpired || isZero ? "border-status-high" : usability.usable ? "border-border" : "border-status-medium"}`}
+                  className={`animate-panel-in smooth-card flex min-w-0 flex-col rounded-2xl border bg-card p-5 shadow-sm ${isExpired || isZero ? "border-status-high" : effectiveStatus.isUsableForDeduction ? "border-border" : "border-status-medium"}`}
                   key={customerPackage.id}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -610,6 +619,14 @@ export function RegistrationCustomerCard({
                     </div>
                   </div>
                   <dl className="mt-4 grid gap-3 text-sm">
+                    <div>
+                      <dt className="font-semibold text-secondary">Starts</dt>
+                      <dd
+                        className={`mt-1 ${effectiveStatus.statusKey === "notStarted" ? "font-bold text-button-warning" : "text-foreground"}`}
+                      >
+                        {displayDate(customerPackage.activationDate)}
+                      </dd>
+                    </div>
                     <div>
                       <dt className="font-semibold text-secondary">Expires</dt>
                       <dd

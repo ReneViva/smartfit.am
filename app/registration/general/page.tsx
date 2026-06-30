@@ -21,6 +21,7 @@ import {
   serviceValidityStatus,
 } from "../../../lib/customer-memberships";
 import { db } from "../../../lib/db";
+import { membershipEffectiveStatus } from "../../../lib/membership-status";
 import { hasBlockingFreeze } from "../../../lib/package-freezes";
 import { packageTimeRestrictionReason } from "../../../lib/registration/package-usability";
 
@@ -47,12 +48,26 @@ type SearchResultCustomer = AvatarCustomer & {
   customerCode: string;
   gymPresenceStatus: GymPresenceStatus;
   packages: Array<{
+    activationDate: Date;
     expirationDate: Date;
+    freezes: {
+      customerPackageServiceId: string | null;
+      plannedEndDate: Date | null;
+      startDate: Date;
+      status: string;
+    }[];
     remainingSessions: number;
     services: Array<{
       deletedAt: Date | null;
+      endDate: Date | null;
+      freezes: {
+        plannedEndDate: Date | null;
+        startDate: Date;
+        status: string;
+      }[];
       isActive: boolean;
       remainingSessions: number;
+      startDate: Date | null;
     }>;
     status: CustomerPackageStatus;
   }>;
@@ -94,6 +109,12 @@ const errorMessages: Record<string, string> = {
     "Service deductions must be non-negative whole numbers.",
   "interval-limit-reached":
     "This membership has reached its check-in limit for the membership interval.",
+  "membership-no-usable-services":
+    "This membership has no usable service lines for deductions. Check in without service deduction.",
+  "membership-not-yet-active":
+    "This membership is not active yet. Check in without service deduction.",
+  "membership-zero-sessions":
+    "This membership has no remaining service sessions. Check in without service deduction.",
   "membership-conflict":
     "This customer has multiple active memberships from older data. Admin must resolve before fast check-in.",
   "no-open-visit":
@@ -266,20 +287,22 @@ function serviceNameFromReason(reason: string | null) {
     .trim();
 }
 
-function warningBadges(customer: SearchResultCustomer, today: Date) {
-  const activePackages = customer.packages.filter(
-    (membership) => membership.status === "ACTIVE",
+function warningBadges(customer: SearchResultCustomer, now: Date) {
+  const packageStatuses = customer.packages.map((membership) =>
+    membershipEffectiveStatus(membership, now),
+  );
+  const activePackages = packageStatuses.filter(
+    (status) => status.isUsableForDeduction,
   ).length;
   const hasFrozen = customer.packages.some(
-    (membership) => membership.status === "FROZEN",
+    (_membership, index) => packageStatuses[index]?.statusKey === "frozen",
   );
-  const hasExpired = customer.packages.some(
-    (membership) =>
-      membership.status === "EXPIRED" || membership.expirationDate < today,
+  const hasExpired = packageStatuses.some(
+    (status) => status.statusKey === "expired",
   );
   const hasZeroSessions = customer.packages.some(
-    (membership) =>
-      membership.remainingSessions <= 0 ||
+    (membership, index) =>
+      packageStatuses[index]?.statusKey === "zeroSessions" ||
       membership.services.some(
         (service) =>
           service.isActive && !service.deletedAt && service.remainingSessions <= 0,
@@ -309,13 +332,13 @@ function SearchResultCard({
   inGymQuery,
   query,
   selectedCustomerCode,
-  today,
+  now,
 }: {
   customer: SearchResultCustomer;
   inGymQuery: string;
   query: string;
   selectedCustomerCode: string;
-  today: Date;
+  now: Date;
 }) {
   const selected = customer.customerCode === selectedCustomerCode;
 
@@ -344,7 +367,7 @@ function SearchResultCard({
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        {warningBadges(customer, today)}
+        {warningBadges(customer, now)}
       </div>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <Link
@@ -380,8 +403,7 @@ export default async function RegistrationGeneralPage({
     deletedAt: null,
     ...(hideInactiveCustomers ? { status: "ACTIVE" as const } : {}),
   };
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  const now = new Date();
 
   const searchConditions: Prisma.CustomerWhereInput[] = [
     customerVisibility,
@@ -409,13 +431,33 @@ export default async function RegistrationGeneralPage({
           id: true,
           packages: {
             select: {
+              activationDate: true,
               expirationDate: true,
+              freezes: {
+                select: {
+                  customerPackageServiceId: true,
+                  plannedEndDate: true,
+                  startDate: true,
+                  status: true,
+                },
+                where: { status: "ACTIVE" },
+              },
               remainingSessions: true,
               services: {
                 select: {
                   deletedAt: true,
+                  endDate: true,
+                  freezes: {
+                    select: {
+                      plannedEndDate: true,
+                      startDate: true,
+                      status: true,
+                    },
+                    where: { status: "ACTIVE" },
+                  },
                   isActive: true,
                   remainingSessions: true,
+                  startDate: true,
                 },
                 where: { deletedAt: null },
               },
@@ -594,20 +636,29 @@ export default async function RegistrationGeneralPage({
   const checkInMembership = activeMembership && !activeMembershipHasBlockingFreeze
     ? (() => {
         const packageCoach = membershipCoachDisplayName(activeMembership);
-        const isExpired = activeMembership.expirationDate < today;
+        const membershipStatus = membershipEffectiveStatus(
+          activeMembership,
+          now,
+        );
+        const applyTimeRestriction = ![
+          "expired",
+          "notStarted",
+        ].includes(membershipStatus.statusKey);
 
         return {
+          allowsNoDeductionCheckIn:
+            membershipStatus.allowsNoDeductionCheckIn,
           coachName: packageCoach,
           expirationLabel: displayDate(activeMembership.expirationDate),
           id: activeMembership.id,
-          isExpired,
+          isUsableForDeduction: membershipStatus.isUsableForDeduction,
           name: membershipDisplayName(activeMembership),
           packageType: membershipTypeDisplayName(activeMembership),
           remainingGuestPasses: activeMembership.remainingGuestPasses,
           services: activeMembership.services
             .filter((service) => service.isActive && !service.deletedAt)
             .map((service) => {
-              const serviceStatus = serviceValidityStatus(service, new Date());
+              const serviceStatus = serviceValidityStatus(service, now);
 
               return {
                 coachName: serviceLineCoachDisplayName(service),
@@ -620,10 +671,13 @@ export default async function RegistrationGeneralPage({
                 statusLabel: serviceStatus.label,
               };
             }),
-          timeRestrictionReason: isExpired
-            ? null
-            : packageTimeRestrictionReason(activeMembership, new Date()),
+          statusLabel: membershipStatus.label,
+          statusReason: membershipStatus.reason,
+          timeRestrictionReason: applyTimeRestriction
+            ? packageTimeRestrictionReason(activeMembership, now)
+            : null,
           timeRule: membershipTimeRuleDisplay(activeMembership),
+          warnings: membershipStatus.warnings,
         };
       })()
     : null;
@@ -749,9 +803,9 @@ export default async function RegistrationGeneralPage({
                     customer={customer}
                     inGymQuery={inGymQuery}
                     key={customer.id}
+                    now={now}
                     query={query}
                     selectedCustomerCode={selectedCustomerCode}
-                    today={today}
                   />
                 ))}
               </div>

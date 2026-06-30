@@ -13,6 +13,7 @@ import {
   membershipTimeRuleDisplay,
   membershipTypeDisplayName,
 } from "../../lib/customer-memberships";
+import { membershipEffectiveStatus } from "../../lib/membership-status";
 import { Button } from "../ui/button";
 import { StatusBadge } from "../ui/status-badge";
 import { CustomerPackageFreezeControls } from "./customer-package-freeze-controls";
@@ -30,6 +31,12 @@ type ActiveFreezeValue = {
   plannedDays: number;
   plannedEndDate: Date | null;
   resultingExpirationDate: Date | null;
+  startDate: Date;
+  status: PackageFreezeStatus;
+};
+
+type ServiceFreezeValue = {
+  plannedEndDate: Date | null;
   startDate: Date;
   status: PackageFreezeStatus;
 };
@@ -70,6 +77,13 @@ type CustomerPackageValue = {
   remainingFreezeChances: number;
   remainingGuestPasses: number;
   remainingSessions: number;
+  services: {
+    endDate: Date | null;
+    freezes: ServiceFreezeValue[];
+    isActive: boolean;
+    remainingSessions: number;
+    startDate: Date | null;
+  }[];
   status: CustomerPackageStatus;
   timeRestrictionLabel: string | null;
   updatedAt: Date;
@@ -127,67 +141,54 @@ function packageTimeRule(customerPackage: CustomerPackageValue) {
   return membershipTimeRuleDisplay(customerPackage);
 }
 
-function packageState(customerPackage: CustomerPackageValue, today: Date) {
-  if (customerPackage.status === "FROZEN") {
-    return { badge: "medium" as const, label: "Frozen" };
-  }
+function displayStatusLabel(label: string) {
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
-  if (
-    customerPackage.status === "EXPIRED" ||
-    customerPackage.expirationDate < today
-  ) {
-    return { badge: "expired" as const, label: "Expired" };
-  }
+function packageState(customerPackage: CustomerPackageValue, now: Date) {
+  const status = membershipEffectiveStatus(customerPackage, now);
 
-  if (customerPackage.status === "INACTIVE") {
-    return { badge: "notInGym" as const, label: "Inactive" };
-  }
-
-  if (customerPackage.remainingSessions === 0) {
-    return { badge: "expired" as const, label: "Finished" };
-  }
-
-  return { badge: "active" as const, label: "Active" };
+  return {
+    badge: status.badge,
+    key: status.statusKey,
+    label: displayStatusLabel(status.label),
+    reason: status.reason,
+    warnings: status.warnings,
+  };
 }
 
 function isCurrentPackage(
   customerPackage: CustomerPackageValue,
-  today: Date,
+  now: Date,
 ) {
-  if (customerPackage.status === "FROZEN") {
-    return true;
-  }
-
-  return (
-    customerPackage.status === "ACTIVE" &&
-    customerPackage.expirationDate >= today &&
-    (customerPackage.remainingSessions > 0 ||
-      customerPackage.remainingGuestPasses > 0)
-  );
+  return [
+    "active",
+    "expiringSoon",
+    "frozen",
+    "lowSessions",
+    "noUsableServices",
+    "zeroSessions",
+  ].includes(membershipEffectiveStatus(customerPackage, now).statusKey);
 }
 
 function matchesHistoryFilter(
   customerPackage: CustomerPackageValue,
   filter: HistoryFilter,
-  today: Date,
+  now: Date,
 ) {
+  const status = membershipEffectiveStatus(customerPackage, now);
+
   switch (filter) {
     case "active":
-      return (
-        customerPackage.status === "ACTIVE" &&
-        customerPackage.expirationDate >= today
-      );
+      return status.isUsableForDeduction;
     case "finished":
-      return customerPackage.remainingSessions === 0;
+      return status.statusKey === "zeroSessions";
     case "expired":
-      return (
-        customerPackage.status === "EXPIRED" ||
-        customerPackage.expirationDate < today
-      );
+      return status.statusKey === "expired";
     case "frozen":
-      return customerPackage.status === "FROZEN";
+      return status.statusKey === "frozen";
     case "inactive":
-      return customerPackage.status === "INACTIVE";
+      return status.statusKey === "inactive";
     default:
       return true;
   }
@@ -265,12 +266,18 @@ export function CustomerPackageOverview({
   const latestAttentionPackage = useMemo(
     () =>
       packages
-        .filter(
-          (customerPackage) =>
-            customerPackage.remainingSessions === 0 ||
-            customerPackage.status === "EXPIRED" ||
-            customerPackage.status === "INACTIVE" ||
-            customerPackage.expirationDate < today,
+        .filter((customerPackage) =>
+          [
+            "expired",
+            "inactive",
+            "missingDates",
+            "noUsableServices",
+            "notStarted",
+            "packageInactive",
+            "zeroSessions",
+          ].includes(
+            membershipEffectiveStatus(customerPackage, today).statusKey,
+          ),
         )
         .sort(
           (left, right) =>
@@ -405,7 +412,21 @@ export function CustomerPackageOverview({
                     <PackageSummary customerPackage={customerPackage} />
                   </div>
 
-                  {customerPackage.status === "FROZEN" ? (
+                  {state.reason && state.key !== "frozen" ? (
+                    <p className="mt-4 rounded-lg border border-status-medium bg-card px-3 py-2 text-sm font-semibold text-foreground">
+                      {state.reason}
+                    </p>
+                  ) : null}
+
+                  {state.warnings.length ? (
+                    <ul className="mt-4 space-y-1 rounded-lg border border-status-medium bg-card px-3 py-2 text-sm font-semibold text-foreground">
+                      {state.warnings.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+
+                  {state.key === "frozen" ? (
                     <p className="mt-4 rounded-lg border border-status-medium bg-card px-3 py-2 text-sm font-semibold text-foreground">
                       Frozen memberships remain in history and cannot be used for
                       check-in.
@@ -620,6 +641,13 @@ export function CustomerPackageOverview({
                         {state.label}
                       </StatusBadge>
                     </div>
+                    {state.warnings.length ? (
+                      <ul className="mt-3 space-y-1 rounded-lg border border-status-medium bg-card px-3 py-2 text-xs font-semibold text-foreground">
+                        {state.warnings.map((warning) => (
+                          <li key={warning}>{warning}</li>
+                        ))}
+                      </ul>
+                    ) : null}
                     <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
                       <div>
                         <dt className="font-semibold text-secondary">Dates</dt>
@@ -750,6 +778,13 @@ export function CustomerPackageOverview({
                           <StatusBadge className="text-xs" status={state.badge}>
                             {state.label}
                           </StatusBadge>
+                          {state.warnings.length ? (
+                            <ul className="mt-2 space-y-1 text-xs font-semibold leading-5 text-secondary">
+                              {state.warnings.map((warning) => (
+                                <li key={warning}>{warning}</li>
+                              ))}
+                            </ul>
+                          ) : null}
                         </td>
                         {readOnly ? null : (
                           <td className="px-4 py-4">

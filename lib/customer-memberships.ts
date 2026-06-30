@@ -1,5 +1,5 @@
 import { packageTypeLabel } from "./package-types";
-import { hasBlockingFreeze } from "./package-freezes";
+import { serviceEffectiveStatus } from "./membership-status";
 
 type PersonValue =
   | {
@@ -116,6 +116,7 @@ export function serviceLineCoachDisplayName(service: {
 
 export function serviceValidityStatus(
   service: {
+    deletedAt?: Date | null;
     endDate?: Date | null;
     freezes?: {
       plannedEndDate: Date | null;
@@ -123,36 +124,19 @@ export function serviceValidityStatus(
       status: string;
     }[];
     isActive?: boolean | null;
+    remainingSessions?: number | null;
     startDate?: Date | null;
   },
   now = new Date(),
 ) {
-  if (hasBlockingFreeze(service.freezes, now)) {
-    return { label: "frozen", status: "medium" as const, usable: false };
-  }
+  const status = serviceEffectiveStatus(service, now);
 
-  if (service.isActive === false) {
-    return { label: "inactive", status: "notInGym" as const, usable: false };
-  }
-
-  if (!service.startDate || !service.endDate) {
-    return { label: "dates missing", status: "medium" as const, usable: false };
-  }
-
-  const today = new Date(now);
-  today.setUTCHours(0, 0, 0, 0);
-
-  if (service.startDate > today) {
-    return {
-      label: "not yet active",
-      status: "medium" as const,
-      usable: false,
-    };
-  }
-
-  if (service.endDate < today) {
-    return { label: "expired", status: "expired" as const, usable: false };
-  }
-
-  return { label: "active", status: "active" as const, usable: true };
+  return {
+    label: status.label,
+    reason: status.reason,
+    status: status.badge,
+    statusKey: status.statusKey,
+    usable: status.isUsableForDeduction,
+    warnings: status.warnings,
+  };
 }

@@ -1,8 +1,10 @@
-import { hasBlockingFreeze } from "../package-freezes";
+import { membershipEffectiveStatus } from "../membership-status";
 
 type PackageUsabilityValue = {
+  activationDate: Date;
   allowedEndTime: string | null;
   allowedStartTime: string | null;
+  deletedAt?: Date | null;
   expirationDate: Date;
   freezes?: {
     customerPackageServiceId?: string | null;
@@ -16,6 +18,18 @@ type PackageUsabilityValue = {
     isActive: boolean;
   } | null;
   remainingSessions: number;
+  services?: {
+    deletedAt?: Date | null;
+    endDate?: Date | null;
+    freezes?: {
+      plannedEndDate: Date | null;
+      startDate: Date;
+      status: string;
+    }[];
+    isActive?: boolean | null;
+    remainingSessions?: number | null;
+    startDate?: Date | null;
+  }[];
   status: "ACTIVE" | "INACTIVE" | "EXPIRED" | "FROZEN";
 };
 
@@ -63,44 +77,10 @@ export function packageUsability(
   customerPackage: PackageUsabilityValue,
   now = new Date(),
 ) {
-  const membershipFreezes = customerPackage.freezes?.filter(
-    (freeze) => !freeze.customerPackageServiceId,
-  );
+  const status = membershipEffectiveStatus(customerPackage, now);
 
-  if (
-    customerPackage.status === "FROZEN" ||
-    hasBlockingFreeze(membershipFreezes, now)
-  ) {
-    return { reason: "Frozen memberships cannot be used.", usable: false };
-  }
-
-  const today = new Date(now);
-  today.setUTCHours(0, 0, 0, 0);
-
-  if (
-    customerPackage.status === "EXPIRED" ||
-    customerPackage.expirationDate < today
-  ) {
-    return { reason: "Membership is expired.", usable: false };
-  }
-
-  if (customerPackage.status === "INACTIVE") {
-    return { reason: "Membership status is inactive.", usable: false };
-  }
-
-  if (customerPackage.status !== "ACTIVE") {
-    return { reason: "Membership status is not active.", usable: false };
-  }
-
-  if (
-    customerPackage.package &&
-    (customerPackage.package.deletedAt || !customerPackage.package.isActive)
-  ) {
-    return { reason: "The package definition is inactive.", usable: false };
-  }
-
-  if (customerPackage.remainingSessions <= 0) {
-    return { reason: "Membership has no remaining sessions.", usable: false };
+  if (!status.isUsableForDeduction) {
+    return { reason: status.reason, usable: false };
   }
 
   if (customerPackage.hasTimeRestriction) {

@@ -23,6 +23,7 @@ import {
   serviceLineDisplayName,
   serviceValidityStatus,
 } from "../../lib/customer-memberships";
+import { membershipEffectiveStatus } from "../../lib/membership-status";
 import {
   calculateFreezeUsage,
   hasBlockingFreeze,
@@ -137,22 +138,6 @@ function displayDateTime(value: Date | null) {
 
 function displayOptionalDate(value: Date | null) {
   return value ? displayDate(value) : "Missing date";
-}
-
-function statusBadge(status: CustomerPackageStatus) {
-  if (status === "FROZEN") {
-    return "medium";
-  }
-
-  if (status === "EXPIRED") {
-    return "expired";
-  }
-
-  if (status === "INACTIVE") {
-    return "notInGym";
-  }
-
-  return "active";
 }
 
 function ServiceLineForm({
@@ -619,6 +604,17 @@ export function CustomerMembershipEditor({
     () => membership?.services.filter((service) => service.isActive) ?? [],
     [membership],
   );
+  const membershipStatus = useMemo(
+    () => (membership ? membershipEffectiveStatus(membership) : null),
+    [membership],
+  );
+  const usableServices = useMemo(
+    () =>
+      membership?.services.filter(
+        (service) => serviceValidityStatus(service).usable,
+      ) ?? [],
+    [membership],
+  );
 
   if (activeMembershipConflict) {
     return (
@@ -665,7 +661,7 @@ export function CustomerMembershipEditor({
             Membership & Services
           </p>
           <h3 className="mt-1 text-2xl font-bold text-foreground">
-            {membership ? "Manage active membership" : "Create membership"}
+            {membership ? "Manage membership" : "Create membership"}
           </h3>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
             One membership container holds the customer&apos;s date range,
@@ -673,12 +669,30 @@ export function CustomerMembershipEditor({
             lines.
           </p>
         </div>
-        {membership ? (
-          <StatusBadge status={statusBadge(membership.status)}>
-            {membership.status.toLowerCase()}
-          </StatusBadge>
+        {membershipStatus ? (
+          <div className="text-right">
+            <StatusBadge status={membershipStatus.badge}>
+              {membershipStatus.label}
+            </StatusBadge>
+            <p className="mt-2 text-xs font-semibold text-secondary">
+              Stored status: {membership?.status.toLowerCase()}
+            </p>
+          </div>
         ) : null}
       </div>
+
+      {membershipStatus?.reason ? (
+        <p className="rounded-xl border border-status-medium bg-page px-4 py-3 text-sm font-semibold text-foreground">
+          {membershipStatus.reason}
+        </p>
+      ) : null}
+      {membershipStatus?.warnings.length ? (
+        <ul className="space-y-1 rounded-xl border border-status-medium bg-page px-4 py-3 text-sm font-semibold text-foreground">
+          {membershipStatus.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      ) : null}
 
       {membership ? (
         <div className="grid gap-3 rounded-xl border border-border bg-page p-4 sm:grid-cols-4">
@@ -708,10 +722,10 @@ export function CustomerMembershipEditor({
           </div>
           <div>
             <p className="text-2xl font-bold text-foreground">
-              {activeServices.length}
+              {usableServices.length}
             </p>
             <p className="mt-1 text-xs font-semibold text-secondary">
-              active service lines
+              usable service lines
             </p>
           </div>
         </div>
