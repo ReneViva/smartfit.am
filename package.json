@@ -15,6 +15,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:seed:demo": "node prisma/seed-demo-data.js",
+    "cleanup:dummy-data": "node prisma/cleanup-dummy-data.js",
     "reset:staff-credentials": "node prisma/reset-staff-credentials.js"
   },
   "dependencies": {
