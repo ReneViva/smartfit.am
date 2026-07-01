@@ -57,7 +57,9 @@ type CustomerPackageValue = {
   id: string;
   initialGuestPasses: number;
   initialSessions: number;
+  membershipCost: string | null;
   membershipName: string | null;
+  membershipType: string | null;
   package: {
     allowedEndTime: string | null;
     allowedStartTime: string | null;
@@ -139,6 +141,40 @@ function packageCoach(customerPackage: CustomerPackageValue) {
 
 function packageTimeRule(customerPackage: CustomerPackageValue) {
   return membershipTimeRuleDisplay(customerPackage);
+}
+
+function privateMembershipDetails(customerPackage: CustomerPackageValue) {
+  return [
+    customerPackage.membershipType?.trim()
+      ? { label: "Type", value: customerPackage.membershipType.trim() }
+      : null,
+    customerPackage.membershipCost?.trim()
+      ? { label: "Cost", value: customerPackage.membershipCost.trim() }
+      : null,
+  ].filter(Boolean) as { label: string; value: string }[];
+}
+
+function MembershipPrivateDetails({
+  customerPackage,
+}: {
+  customerPackage: CustomerPackageValue;
+}) {
+  const details = privateMembershipDetails(customerPackage);
+
+  if (!details.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-secondary">
+      {details.map((detail) => (
+        <span key={detail.label}>
+          {detail.label}:{" "}
+          <span className="text-foreground">{detail.value}</span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function displayStatusLabel(label: string) {
@@ -375,6 +411,7 @@ export function CustomerPackageOverview({
                       <h4 className="mt-2 break-words text-xl font-bold text-foreground">
                         {membershipDisplayName(customerPackage)}
                       </h4>
+                      <MembershipPrivateDetails customerPackage={customerPackage} />
                     </div>
                     <StatusBadge status={state.badge}>
                       {state.label}
@@ -475,6 +512,7 @@ export function CustomerPackageOverview({
               <p className="mt-1 text-sm font-semibold text-primary-active">
                 {membershipTypeDisplayName(latestAttentionPackage)}
               </p>
+              <MembershipPrivateDetails customerPackage={latestAttentionPackage} />
             </div>
             <StatusBadge
               status={packageState(latestAttentionPackage, today).badge}
@@ -636,6 +674,7 @@ export function CustomerPackageOverview({
                         <p className="mt-1 text-xs font-semibold text-primary-active">
                           {membershipTypeDisplayName(customerPackage)}
                         </p>
+                        <MembershipPrivateDetails customerPackage={customerPackage} />
                       </div>
                       <StatusBadge className="text-xs" status={state.badge}>
                         {state.label}
@@ -754,6 +793,7 @@ export function CustomerPackageOverview({
                           <p className="mt-1 text-xs font-semibold text-primary-active">
                             {membershipTypeDisplayName(customerPackage)}
                           </p>
+                          <MembershipPrivateDetails customerPackage={customerPackage} />
                         </td>
                         <td className="px-4 py-4 text-secondary">
                           {displayDate(customerPackage.activationDate)}

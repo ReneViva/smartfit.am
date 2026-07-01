@@ -319,6 +319,8 @@ model CustomerPackage {
   packageId                    String?
   package                      Package?              @relation(fields: [packageId], references: [id], onDelete: SetNull)
   membershipName               String?
+  membershipType               String?
+  membershipCost               String?
   coachId                      String?
   coach                        Coach?                @relation(fields: [coachId], references: [id])
   activationDate               DateTime

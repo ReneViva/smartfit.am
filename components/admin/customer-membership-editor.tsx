@@ -84,7 +84,9 @@ type MembershipValue = {
   hasUnlimitedDailyCheckIns: boolean;
   hasUnlimitedIntervalCheckIns: boolean;
   id: string;
+  membershipCost: string | null;
   membershipName: string | null;
+  membershipType: string | null;
   initialGuestPasses: number;
   initialSessions: number;
   intervalCheckInLimit: number | null;
@@ -108,7 +110,9 @@ type LegacyContainerValue = {
   activationDate: Date;
   expirationDate: Date;
   id: string;
+  membershipCost: string | null;
   membershipName: string | null;
+  membershipType: string | null;
   package: {
     name: string;
     packageType: string;
@@ -138,6 +142,46 @@ function displayDateTime(value: Date | null) {
 
 function displayOptionalDate(value: Date | null) {
   return value ? displayDate(value) : "Missing date";
+}
+
+function privateMembershipDetails(membership: {
+  membershipCost?: string | null;
+  membershipType?: string | null;
+}) {
+  return [
+    membership.membershipType?.trim()
+      ? { label: "Type", value: membership.membershipType.trim() }
+      : null,
+    membership.membershipCost?.trim()
+      ? { label: "Cost", value: membership.membershipCost.trim() }
+      : null,
+  ].filter(Boolean) as { label: string; value: string }[];
+}
+
+function MembershipPrivateDetails({
+  membership,
+}: {
+  membership: {
+    membershipCost?: string | null;
+    membershipType?: string | null;
+  };
+}) {
+  const details = privateMembershipDetails(membership);
+
+  if (!details.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold text-secondary">
+      {details.map((detail) => (
+        <span key={detail.label}>
+          {detail.label}:{" "}
+          <span className="text-foreground">{detail.value}</span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function ServiceLineForm({
@@ -642,6 +686,7 @@ export function CustomerMembershipEditor({
               <p className="mt-1 text-xs font-semibold text-brand">
                 {membershipTypeDisplayName(container)}
               </p>
+              <MembershipPrivateDetails membership={container} />
               <p className="mt-2 text-sm text-secondary">
                 {displayDate(container.activationDate)} -{" "}
                 {displayDate(container.expirationDate)}
@@ -668,6 +713,9 @@ export function CustomerMembershipEditor({
             limits, guest passes, freeze counter, and private service/session
             lines.
           </p>
+          {membership ? (
+            <MembershipPrivateDetails membership={membership} />
+          ) : null}
         </div>
         {membershipStatus ? (
           <div className="text-right">
@@ -786,6 +834,26 @@ export function CustomerMembershipEditor({
               name="membershipName"
               placeholder="1 month / 8 sessions"
               required
+            />
+          </label>
+          <label className={labelClass}>
+            Type of membership
+            <input
+              className={inputClass}
+              defaultValue={membership?.membershipType ?? ""}
+              maxLength={150}
+              name="membershipType"
+              placeholder="Monthly, VIP, Student, Pool + Gym"
+            />
+          </label>
+          <label className={labelClass}>
+            Cost
+            <input
+              className={inputClass}
+              defaultValue={membership?.membershipCost ?? ""}
+              maxLength={150}
+              name="membershipCost"
+              placeholder="20,000 AMD, $50, Free"
             />
           </label>
           <label className={labelClass}>

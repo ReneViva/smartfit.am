@@ -176,6 +176,8 @@ function serviceName(value: JsonObject) {
 
 const membershipFields: FieldDefinition[] = [
   { key: "membershipName", label: "Membership title" },
+  { key: "membershipType", label: "Type of membership" },
+  { key: "membershipCost", label: "Cost" },
   { key: "packageName", label: "Legacy package" },
   { format: displayDate, key: "activationDate", label: "Start date" },
   { format: displayDate, key: "expirationDate", label: "End date" },
@@ -287,6 +289,12 @@ function createdDetails(targetType: string | null, value: JsonObject) {
 
   return [
     `Membership title: ${membershipName(value)}`,
+    ...(cleanString(value.membershipType)
+      ? [`Type of membership: ${displayText(value.membershipType)}`]
+      : []),
+    ...(cleanString(value.membershipCost)
+      ? [`Cost: ${displayText(value.membershipCost)}`]
+      : []),
     `Dates: ${displayDate(value.activationDate)} - ${displayDate(
       value.expirationDate,
     )}`,

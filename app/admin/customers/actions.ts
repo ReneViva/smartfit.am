@@ -1352,6 +1352,8 @@ export async function saveCustomerMembershipAction(formData: FormData) {
   const customerId = optionalText(formData, "customerId", 100);
   const customerPackageId = optionalText(formData, "customerPackageId", 100);
   const membershipName = optionalText(formData, "membershipName", 200);
+  const membershipType = optionalText(formData, "membershipType", 150);
+  const membershipCost = optionalText(formData, "membershipCost", 150);
   const activationDate = requiredDate(formData, "activationDate");
   const expirationDate = requiredDate(formData, "expirationDate");
   const initialGuestPasses = nonNegativeInteger(
@@ -1436,7 +1438,9 @@ export async function saveCustomerMembershipAction(formData: FormData) {
         initialGuestPasses,
         intervalCheckInLimit: intervalLimit.limit,
         dailyCheckInLimit: dailyLimit.limit,
+        membershipCost,
         membershipName,
+        membershipType,
         remainingFreezeChances,
         remainingGuestPasses,
         status: rawStatus as CustomerPackageStatus,
